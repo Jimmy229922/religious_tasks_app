@@ -46,6 +46,15 @@ class NotificationManager {
     'اللهم إنك عفو تحب العفو فاعف عني',
     'رضيت بالله رباً وبالإسلام ديناً وبمحمد نبياً',
     'يا حي يا قيوم برحمتك أستغيث',
+    'اللهم بارك لي في وقتي وعملي',
+    'ربي اغفر لي ولوالدي وللمؤمنين والمؤمنات',
+    'اللهم إني أسألك الهدى والتقى والعفاف والغنى',
+    'الحمد لله على كل حال',
+    'اللهم ارزقني حبك وحب من ينفعني حبه عندك',
+    'اللهم أعني على ذكرك وشكرك وحسن عبادتك',
+    'سبحان الله عدد ما خلق، سبحان الله ملء ما خلق',
+    'استغفر الله العظيم وأتوب إليه',
+    'اللهم اجعلنا من الذاكرين الله كثيراً والذاكرات',
   ];
 
   static const List<String> kDhikrTitles = [
@@ -98,8 +107,15 @@ class NotificationManager {
       await androidPlugin?.deleteNotificationChannel('adhan_channel_maghrib');
       await androidPlugin?.deleteNotificationChannel('adhan_channel_isha');
 
+      // Cancel all pending notifications to remove old "New Dhikr" or other stale scheduled items
+      await flutterLocalNotificationsPlugin.cancelAll();
+
       await prefs.setBool(kNotificationChannelVersionKey, true);
     }
+
+    // Ensure we cancel all previous schedules on every fresh boot/init to avoid duplicates
+    // We will reschedule them freshly below.
+    await flutterLocalNotificationsPlugin.cancelAll();
 
     // 1. General Reminder Channel
     await androidPlugin?.createNotificationChannel(
@@ -144,13 +160,36 @@ class NotificationManager {
   }
 
   Future<void> _configureLocalTimeZone() async {
-    tz_data.initializeTimeZones();
-    final dynamic timeZoneName = await FlutterTimezone.getLocalTimezone();
     try {
-      tz.setLocalLocation(tz.getLocation(timeZoneName.toString()));
+      tz_data.initializeTimeZones();
+      final dynamic rawTimeZone = await FlutterTimezone.getLocalTimezone();
+
+      // Clean up the timezone string if it comes in a weird format like "TimezoneInfo(Africa/Cairo, ...)"
+      String timeZoneName = rawTimeZone.toString();
+      if (timeZoneName.startsWith("TimezoneInfo(")) {
+        // extract "Africa/Cairo" part
+        final parts = timeZoneName.split(',');
+        if (parts.isNotEmpty) {
+          timeZoneName = parts[0].replaceAll("TimezoneInfo(", "").trim();
+        }
+      }
+
+      try {
+        tz.setLocalLocation(tz.getLocation(timeZoneName));
+      } catch (e) {
+        // Fallback common timezones if direct detection fails
+        if (timeZoneName.contains("Cairo") || timeZoneName.contains("Egypt")) {
+          tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
+        } else {
+          // Retry with original just in case, or default to UTC
+          tz.setLocalLocation(tz.getLocation('UTC'));
+        }
+      }
     } catch (e) {
       debugPrint('Failed to set location: $e');
-      tz.setLocalLocation(tz.getLocation('UTC'));
+      try {
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      } catch (_) {}
     }
   }
 

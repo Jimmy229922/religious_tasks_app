@@ -88,6 +88,31 @@ class _PermissionsOnboardingScreenState
   }
 
   Future<void> _finishOnboarding() async {
+    // Check if all essential permissions are granted
+    bool isAllGranted =
+        _notificationStatus.isGranted && _locationStatus.isGranted;
+
+    if (Platform.isAndroid) {
+      // On Android 12+, we want exact alarm too, typically.
+      // If it's not granted, we block.
+      if (!_exactAlarmStatus.isGranted) {
+        isAllGranted = false;
+      }
+    }
+
+    if (!isAllGranted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "مينفعش نبدا من غير ما ناخد كل الصلاحيات عشان التطبيق يشتغل صح",
+            style: GoogleFonts.cairo(color: Colors.white),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // Save that we've finished onboarding
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_completed', true);

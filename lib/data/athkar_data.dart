@@ -65,6 +65,15 @@ const String _salawatText = 'اللهم صل وسلم على نبينا محمد
 const String _faterText =
     'اللهم فاطر السماوات والأرض، عالم الغيب والشهادة، رب كل شيء ومليكه، أشهد أن لا إله إلا أنت، أعوذ بك من شر نفسي ومن شر الشيطان وشركه، وأن أقترف على نفسي سوءا أو أجره إلى مسلم.';
 
+// --- Sleep Athkar Texts ---
+const String _sleepBismika =
+    'باسمك ربي وضعت جنبي، وبك أرفعه، فإن أمسكت نفسي فارحمها، وإن أرسلتها فاحفظها بما تحفظ به عبادك الصالحين.';
+const String _sleepBismikaAllahumma = 'باسمك اللهم أموت وأحيا.';
+const String _sleepQini = 'اللهم قني عذابك يوم تبعث عبادك.';
+const String _sleepWudu =
+    'اللهم أسلمت نفسي إليك، وفوضت أمري إليك، ووجهت وجهي إليك، وألجأت ظهري إليك، رغبة ورهبة إليك، لا ملجأ ولا منجا منك إلا إليك، آمنت بكتابك الذي أنزلت، وبنبيك الذي أرسلت.';
+const String _surahMulk = 'قراءة سورة الملك.';
+
 const DhikrSeed _ridhaSeed = DhikrSeed(
   text: _ridhaText,
   reward: 'حقا على الله أن يرضيه',
@@ -282,8 +291,72 @@ const List<DhikrSeed> _eveningSeeds = [
   _salawatSeed,
 ];
 
+const List<DhikrSeed> _sleepSeeds = [
+  DhikrSeed(
+    text: _sleepBismika,
+    reward: 'حفظ النفس وتسليمها لله',
+    count: 1,
+  ),
+  DhikrSeed(
+    text: _ayatKursiText,
+    reward: 'لا يزال عليك من الله حافظ ولا يقربك شيطان',
+    count: 1,
+  ),
+  DhikrSeed(
+    text: _surahMulk,
+    reward: 'تنجي من عذاب القبر وتشفع لصاحبها',
+    count: 1,
+  ),
+  DhikrSeed(
+    text: _sleepBismikaAllahumma,
+    reward: 'ذكر الموت والحياة بالله',
+    count: 1,
+  ),
+  DhikrSeed(
+    text: _sleepQini,
+    reward: 'نجاة من العذاب يوم القيامة',
+    count: 3,
+  ),
+  DhikrSeed(
+    text: _surahIkhlas,
+    reward: 'تعدل ثلث القرآن',
+    count: 3,
+  ),
+  DhikrSeed(
+    text: _surahFalaq,
+    reward: 'تحصين من الشرور',
+    count: 3,
+  ),
+  DhikrSeed(
+    text: _surahNas,
+    reward: 'تحصين من الوسواس',
+    count: 3,
+  ),
+  DhikrSeed(
+    text: _sleepWudu,
+    reward: 'من مات عليها مات على الفطرة',
+    count: 1,
+  ),
+  DhikrSeed(
+    text: 'سبحان الله',
+    reward: 'خير من خادم (التسبيح)',
+    count: 33,
+  ),
+  DhikrSeed(
+    text: 'الحمد لله',
+    reward: 'خير من خادم (التحميد)',
+    count: 33,
+  ),
+  DhikrSeed(
+    text: 'الله أكبر',
+    reward: 'خير من خادم (التكبير)',
+    count: 34,
+  ),
+];
+
 List<DhikrItem> buildMorningAthkar() => _buildAthkar(_morningSeeds);
 List<DhikrItem> buildEveningAthkar() => _buildAthkar(_eveningSeeds);
+List<DhikrItem> buildSleepAthkar() => _buildAthkar(_sleepSeeds);
 
 List<DhikrItem> _buildAthkar(List<DhikrSeed> seeds) {
   return seeds

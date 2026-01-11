@@ -30,11 +30,13 @@ class TasksViewModel extends ChangeNotifier {
   // Streak & Quran Data
   int _morningStreak = 0;
   int _eveningStreak = 0;
+  int _sleepStreak = 0;
   String _lastSurah = "الفاتحة";
   int _lastAyah = 1;
 
   int get morningStreak => _morningStreak;
   int get eveningStreak => _eveningStreak;
+  int get sleepStreak => _sleepStreak;
   String get lastSurah => _lastSurah;
   int get lastAyah => _lastAyah;
 
@@ -55,11 +57,124 @@ class TasksViewModel extends ChangeNotifier {
   DateTime get now => _now;
   Timer? _clockTimer;
 
+  // --- Dynamic Content State (Refreshed by user) ---
+  String _currentInspiration = "";
+  String _currentBlessing = "";
+  String _currentEventBanner = "";
+
+  String get currentInspiration => _currentInspiration;
+  String get currentBlessing => _currentBlessing;
+  String get currentEventBanner => _currentEventBanner;
+
+  final List<String> _inspirationsList = [
+    "أحب الأعمال إلى الله أدومها وإن قل",
+    "الدعاء هو العبادة",
+    "من صلى البردين دخل الجنة",
+    "أقرب ما يكون العبد من ربه وهو ساجد",
+    "الكلمة الطيبة صدقة",
+    "تبسمك في وجه أخيك صدقة",
+    "اتق الله حيثما كنت",
+    "لا تغضب ولك الجنة",
+    "خير الناس أنفعهم للناس",
+    "إنما الأعمال بالنيات",
+    "من كان في حاجة أخيه كان الله في حاجته",
+    "خيركم من تعلم القرآن وعلمه",
+    "الدين النصيحة",
+    "المسلم من سلم المسلمون من لسانه ويده",
+    "إماطة الأذى عن الطريق صدقة",
+    "لا تحقرن من المعروف شيئاً",
+    "من لزم الاستغفار جعل الله له من كل هم فرجا",
+  ];
+
+  final List<String> _blessingsList = [
+    "نعمة البصر",
+    "نعمة السمع",
+    "نعمة الإسلام",
+    "نعمة الصحة والعافية",
+    "نعمة الأهل والأحباب",
+    "نعمة الأمن والأمان",
+    "نعمة العقل والتفكير",
+    "نعمة النطق والبيان",
+    "نعمة الهداية للطريق المستقيم",
+    "نعمة الرزق والمأكل والمشرب",
+    "نعمة الستر",
+    "نعمة النوم والراحة",
+  ];
+
+  final List<String> _generalEventsList = [
+    "كثرة الصلاة على النبي تكفيك همك",
+    "تصدق ولو بشق تمرة",
+    "بر الوالدين مفتاح الجنة",
+    "حافظ على صلاة الضحى",
+    "اقرأ وردك القرآني اليومي",
+    "جدد نيتك في كل عمل",
+    "اذكر الله يذكرك",
+  ];
+
   TasksViewModel() {
     _initTasks();
     _initLocationAndPrayers();
     _loadQuranProgress();
     _startClock();
+    _initRandomContent();
+  }
+
+  void _initRandomContent() {
+    // Initial Load - Use Day of Year for Consistency on first load, or Random.
+    // User requested refresh feature, implying they want randomness or updates.
+    // Let's stick to Day logic for initial, but verify inputs.
+
+    // We can just call refreshRandomContent to seed it initially,
+    // but typically "daily" content implies stability unless updated manually.
+    // However, for the "refresh" feature to be obvious, let's randomize or use day logic.
+
+    final dayOfYear = int.parse(intl.DateFormat("D").format(DateTime.now()));
+
+    _currentInspiration =
+        _inspirationsList[dayOfYear % _inspirationsList.length];
+    _currentBlessing = _blessingsList[dayOfYear % _blessingsList.length];
+
+    // Event Banner: Check date first
+    _currentEventBanner = _getDateSpecificEvent() ??
+        _generalEventsList[dayOfYear % _generalEventsList.length];
+  }
+
+  void refreshRandomContent() {
+    // Pick random new values
+    final random = DateTime.now().millisecondsSinceEpoch;
+
+    _currentInspiration = _inspirationsList[random % _inspirationsList.length];
+    // Simple shift for others to ensure variety
+    _currentBlessing = _blessingsList[(random + 5) % _blessingsList.length];
+
+    // For Event Banner, we can toggle between date specific (if any) and random general hints
+    // Or just random from generals + date specific?
+    // Let's just pick a random from general list to give "fresh" advice.
+    // Or maybe include the Date Specific one in the mix?
+
+    final dateEvent = _getDateSpecificEvent();
+    if (dateEvent != null && (random % 2 == 0)) {
+      // 50% chance to show the date event again (if exists)
+      _currentEventBanner = dateEvent;
+    } else {
+      _currentEventBanner =
+          _generalEventsList[random % _generalEventsList.length];
+    }
+
+    notifyListeners();
+  }
+
+  String? _getDateSpecificEvent() {
+    final weekday = _now.weekday;
+    // Fasting Mondays
+    if (weekday == DateTime.monday) return "صيام الاثنين (سنة)";
+    if (weekday == DateTime.thursday) return "صيام الخميس (سنة)";
+
+    // Friday
+    if (weekday == DateTime.friday) {
+      return "يوم الجمعة: سورة الكهف وساعة استجابة";
+    }
+    return null;
   }
 
   Future<void> refreshLocation() async {
@@ -101,6 +216,7 @@ class TasksViewModel extends ChangeNotifier {
           name: kAthkarEvening,
           description: AppStrings.afterAsr,
           targetCount: 1),
+      TaskItem(name: kAthkarSleep, description: "قبل النوم", targetCount: 1),
       TaskItem(
           name: kQuranWird, description: AppStrings.dailyWird, targetCount: 1),
     ];
@@ -147,6 +263,7 @@ class TasksViewModel extends ChangeNotifier {
       final data = jsonDecode(jsonStr);
       _morningStreak = data['morning'] ?? 0;
       _eveningStreak = data['evening'] ?? 0;
+      _sleepStreak = data['sleep'] ?? 0;
     }
   }
 
@@ -160,7 +277,11 @@ class TasksViewModel extends ChangeNotifier {
 
     final lastDate = _storage.getString(lastDateKey);
 
-    int newStreak = (type == 'morning') ? _morningStreak : _eveningStreak;
+    int newStreak = (type == 'morning')
+        ? _morningStreak
+        : (type == 'evening')
+            ? _eveningStreak
+            : _sleepStreak;
 
     if (lastDate == todayStr) {
       // already incremented today
@@ -173,13 +294,19 @@ class TasksViewModel extends ChangeNotifier {
 
     if (type == 'morning') {
       _morningStreak = newStreak;
-    } else {
+    } else if (type == 'evening') {
       _eveningStreak = newStreak;
+    } else {
+      _sleepStreak = newStreak;
     }
 
     await _storage.setString(lastDateKey, todayStr);
     // Save composite
-    final data = {'morning': _morningStreak, 'evening': _eveningStreak};
+    final data = {
+      'morning': _morningStreak,
+      'evening': _eveningStreak,
+      'sleep': _sleepStreak
+    };
     await _storage.setString(_athkarStreaksKey, jsonEncode(data));
     notifyListeners();
   }
@@ -264,6 +391,7 @@ class TasksViewModel extends ChangeNotifier {
       if (completionValue) {
         if (_tasks[index].name == kAthkarMorning) _updateStreak('morning');
         if (_tasks[index].name == kAthkarEvening) _updateStreak('evening');
+        if (_tasks[index].name == kAthkarSleep) _updateStreak('sleep');
       }
     } else {
       _tasks[index].isCompleted = !_tasks[index].isCompleted;
@@ -277,6 +405,7 @@ class TasksViewModel extends ChangeNotifier {
       if (_tasks[index].isCompleted) {
         if (_tasks[index].name == kAthkarMorning) _updateStreak('morning');
         if (_tasks[index].name == kAthkarEvening) _updateStreak('evening');
+        if (_tasks[index].name == kAthkarSleep) _updateStreak('sleep');
       }
     }
     _saveTasks();
@@ -291,6 +420,7 @@ class TasksViewModel extends ChangeNotifier {
         // Check for streak update
         if (_tasks[index].name == kAthkarMorning) _updateStreak('morning');
         if (_tasks[index].name == kAthkarEvening) _updateStreak('evening');
+        if (_tasks[index].name == kAthkarSleep) _updateStreak('sleep');
       }
       _saveTasks();
       notifyListeners();
@@ -322,42 +452,14 @@ class TasksViewModel extends ChangeNotifier {
           ].contains(t.name))
       .toList();
 
-  String get dailyInspiration {
-    final list = [
-      "أحب الأعمال إلى الله أدومها وإن قل",
-      "الدعاء هو العبادة",
-      "من صلى البردين دخل الجنة",
-      "أقرب ما يكون العبد من ربه وهو ساجد",
-      "الكلمة الطيبة صدقة",
-      "تبسمك في وجه أخيك صدقة",
-      "اتق الله حيثما كنت",
-    ];
-    // Use day of year to rotate
-    final dayOfYear = int.parse(intl.DateFormat("D").format(_now));
-    return list[dayOfYear % list.length];
-  }
+  // Aliases for backward compatibility or cleaner UI refactoring
+  String get dailyInspiration => _currentInspiration;
+  String? get activeEvent =>
+      _currentEventBanner.isEmpty ? null : _currentEventBanner;
 
   // --- New Features Logic ---
 
-  // 1. Smart Events (Fasting/Events)
-  String? get activeEvent {
-    // Hijri components (Needs HijriCalendar package import in VM or conversion)
-    // For simplicity, we use simple weekday checks first.
-    // Ideally pass Hijri date from UI or use helper.
-    final weekday = _now.weekday;
-    // Dart: Monday=1 ... Sunday=7
-
-    // Fasting Mondays (remind Sunday night or Monday)
-    if (weekday == DateTime.monday) return "صيام الاثنين (سنة)";
-    if (weekday == DateTime.thursday) return "صيام الخميس (سنة)";
-
-    // White days (13,14,15 Hijri)
-    if (weekday == DateTime.friday) {
-      return "يوم الجمعة: سورة الكهف وساعة استجابة";
-    }
-
-    return null;
-  }
+  // 1. Smart Events (Fasting/Events) code replaced by _currentEventBanner state.
 
   // 2. Quran Progress
   void _loadQuranProgress() {
@@ -385,6 +487,8 @@ class TasksViewModel extends ChangeNotifier {
     final hour = _now.hour;
     // Morning Athkar: 5:00 AM to 11:00 AM
     if (hour >= 5 && hour < 11) {
+      // Check if Morning Athkar is done, if not return it
+      // Actually standard logic is fine for morning range.
       return kAthkarMorning;
     }
     // Fajr (Pre-Dawn): 3:00 AM to 5:00 AM
@@ -396,7 +500,21 @@ class TasksViewModel extends ChangeNotifier {
     if (hour >= 15 && hour < 20) return kAthkarEvening;
 
     // Sleep Athkar: 8:00 PM onwards or late night
-    if (hour >= 20 || hour < 3) return "أذكار النوم";
+    if (hour >= 20 || hour < 3) {
+      // Check if Evening Athkar is done
+      final eveningTask = _tasks.firstWhere(
+        (t) => t.name == kAthkarEvening,
+        orElse: () => TaskItem(
+            name: kAthkarEvening,
+            description: AppStrings.afterAsr,
+            targetCount: 1),
+      );
+
+      if (!eveningTask.isCompleted) {
+        return kAthkarEvening;
+      }
+      return kAthkarSleep; // "أذكار النوم" in Consts
+    }
 
     return "استغفر الله";
   }

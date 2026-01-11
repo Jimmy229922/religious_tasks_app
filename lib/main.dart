@@ -5,7 +5,6 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'app/religious_app.dart';
-import 'services/notifications_service.dart';
 import 'services/storage_service.dart';
 import 'providers/theme_provider.dart';
 import 'providers/athkar_view_model.dart';
@@ -16,8 +15,13 @@ void main() async {
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   await initializeDateFormatting('ar', null);
   HijriCalendar.setLocal('ar');
-  await NotificationManager().init();
-  await StorageService.init();
+  // NotificationManager().init() removed to prevent startup crash.
+  // Moved to SplashScreen/Main App usage.
+  try {
+    await StorageService.init();
+  } catch (e) {
+    debugPrint("StorageService init failed: $e");
+  }
 
   runApp(
     MultiProvider(

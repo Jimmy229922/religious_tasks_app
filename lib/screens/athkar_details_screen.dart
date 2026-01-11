@@ -51,10 +51,18 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   void initState() {
     super.initState();
     _audioService.init();
-    _progressKey = widget.isMorning
-        ? 'athkar_morning_progress'
-        : 'athkar_evening_progress';
-    _dateKey = widget.isMorning ? 'athkar_morning_date' : 'athkar_evening_date';
+
+    if (widget.title == "أذكار النوم") {
+      _progressKey = 'athkar_sleep_progress';
+      _dateKey = 'athkar_sleep_date';
+    } else {
+      _progressKey = widget.isMorning
+          ? 'athkar_morning_progress'
+          : 'athkar_evening_progress';
+      _dateKey =
+          widget.isMorning ? 'athkar_morning_date' : 'athkar_evening_date';
+    }
+
     _loadProgress();
   }
 
@@ -102,7 +110,12 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
     final savedDate = prefs.getString(_dateKey);
     final savedScale = prefs.getDouble(_fontScaleKey);
 
-    final list = widget.isMorning ? buildMorningAthkar() : buildEveningAthkar();
+    List<DhikrItem> list;
+    if (widget.title == "أذكار النوم") {
+      list = buildSleepAthkar();
+    } else {
+      list = widget.isMorning ? buildMorningAthkar() : buildEveningAthkar();
+    }
 
     if (savedDate == today) {
       final saved = prefs.getString(_progressKey);

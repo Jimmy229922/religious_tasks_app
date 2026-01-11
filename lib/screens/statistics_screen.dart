@@ -5,11 +5,13 @@ import 'package:google_fonts/google_fonts.dart';
 class StatisticsScreen extends StatelessWidget {
   final int morningStreak;
   final int eveningStreak;
+  final int sleepStreak;
 
   const StatisticsScreen({
     super.key,
     required this.morningStreak,
     required this.eveningStreak,
+    this.sleepStreak = 0,
   });
 
   @override
@@ -47,23 +49,34 @@ class StatisticsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 40),
-              Row(
+              // Streaks Grid
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                alignment: WrapAlignment.center,
                 children: [
-                  Expanded(
-                      child: _buildStreakCard(
+                  _buildStreakCard(
                     title: "أذكار الصباح",
                     count: morningStreak,
                     color: Colors.amber,
                     icon: Icons.wb_sunny_rounded,
-                  )),
-                  const SizedBox(width: 16),
-                  Expanded(
-                      child: _buildStreakCard(
+                    width: (MediaQuery.of(context).size.width - 60) /
+                        2, // Half width approx
+                  ),
+                  _buildStreakCard(
                     title: "أذكار المساء",
                     count: eveningStreak,
                     color: Colors.indigo,
                     icon: Icons.nights_stay_rounded,
-                  )),
+                    width: (MediaQuery.of(context).size.width - 60) / 2,
+                  ),
+                  _buildStreakCard(
+                    title: "أذكار النوم",
+                    count: sleepStreak, // Add this param to constructor
+                    color: Colors.deepPurple,
+                    icon: Icons.bed_rounded,
+                    width: double.infinity, // Full width for the 3rd one
+                  ),
                 ],
               ),
             ],
@@ -78,8 +91,10 @@ class StatisticsScreen extends StatelessWidget {
     required int count,
     required Color color,
     required IconData icon,
+    required double width,
   }) {
     return Container(
+      width: width,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,

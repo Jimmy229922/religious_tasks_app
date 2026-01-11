@@ -5,6 +5,7 @@ const String kAthkarMorning =
     '\u0623\u0630\u0643\u0627\u0631\u0020\u0627\u0644\u0635\u0628\u0627\u062D';
 const String kAthkarEvening =
     '\u0623\u0630\u0643\u0627\u0631\u0020\u0627\u0644\u0645\u0633\u0627\u0621';
+const String kAthkarSleep = 'أذكار النوم';
 const String kPrayerFajr =
     '\u0635\u0644\u0627\u0629\u0020\u0627\u0644\u0641\u062C\u0631';
 const String kPrayerDhuhr =

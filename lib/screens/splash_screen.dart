@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/notifications_service.dart';
 import '../providers/theme_provider.dart';
 import '../constants/app_constants.dart';
 import 'tasks_screen.dart';
@@ -24,6 +25,13 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkOnboardingAndNavigate() async {
+    // Initialize notifications safely without crashing app
+    try {
+      await NotificationManager().init();
+    } catch (e) {
+      debugPrint("Notification init error: $e");
+    }
+
     await Future.delayed(const Duration(seconds: 3));
     if (!mounted) return;
 

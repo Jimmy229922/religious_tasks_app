@@ -30,6 +30,89 @@ class TasksScreen extends StatefulWidget {
 }
 
 class _TasksScreenState extends State<TasksScreen> {
+  void _showSuccessOverlay(BuildContext context, bool isDark) {
+    OverlayEntry? overlayEntry;
+
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).size.height *
+            0.2, // Show a bit down from top
+        left: 0,
+        right: 0,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.elasticOut,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value.clamp(0.0, 1.0),
+                child: Transform.scale(
+                  scale: value,
+                  child: Center(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 40),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF64FFDA)
+                            : const Color(0xFF009688),
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
+                          )
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_rounded,
+                              color: isDark ? Colors.black : Colors.white),
+                          const SizedBox(width: 10),
+                          Text(
+                            "تم تحديث المحتوى بنجاح",
+                            style: GoogleFonts.cairo(
+                              color: isDark ? Colors.black : Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(overlayEntry);
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      if (overlayEntry != null) {
+        try {
+          overlayEntry?.remove();
+          overlayEntry = null;
+        } catch (_) {}
+      }
+    });
+  }
+
+  Future<void> _handleRefresh(TasksViewModel vm, bool isDark) async {
+    vm.refreshRandomContent();
+    await Future.delayed(const Duration(milliseconds: 1000));
+    if (mounted) {
+      _showSuccessOverlay(context, isDark);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = Provider.of<TasksViewModel>(context);
@@ -42,8 +125,8 @@ class _TasksScreenState extends State<TasksScreen> {
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: SafeArea(
-          child: CustomScrollView(
-            slivers: [
+          child: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
               // 1. Sliver App Bar with Title & Settings
               SliverAppBar(
                 floating: true,
@@ -76,211 +159,242 @@ class _TasksScreenState extends State<TasksScreen> {
                           builder: (_) => StatisticsScreen(
                                 morningStreak: vm.morningStreak,
                                 eveningStreak: vm.eveningStreak,
+                                sleepStreak: vm.sleepStreak,
                               )),
                     ),
                   )
                 ],
               ),
-
-              // 2. Date & Location (Header)
-              SliverToBoxAdapter(
-                child: _buildDateAndLocationHeader(context, vm, isDark),
-              ),
-
-              // 2.5 Smart Events Banner
-              if (vm.activeEvent != null)
-                SliverToBoxAdapter(
-                  child: _buildSmartEventBanner(vm.activeEvent!, isDark),
-                ),
-
-              // 2.6 Quran Progress Card (Mini)
-              SliverToBoxAdapter(
-                child: _buildQuranProgressCard(context, vm, isDark),
-              ),
-
-              // 3. Daily Inspiration Quote
-              SliverToBoxAdapter(
-                child: _buildDailyInspiration(vm, isDark),
-              ),
-
-              // 4. Dynamic Prayer Card
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    children: [
-                      _buildDynamicPrayerCard(vm, isDark),
-                      const SizedBox(height: 12),
-                      _buildContextAwareSuggestion(
-                          vm, isDark), // New Context Aware Button
-                    ],
+            ],
+            body: RefreshIndicator(
+              color: isDark ? const Color(0xFF64FFDA) : Colors.teal,
+              backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+              displacement: 20,
+              onRefresh: () => _handleRefresh(vm, isDark),
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  // 2. Date & Location (Header)
+                  SliverToBoxAdapter(
+                    child: _buildDateAndLocationHeader(context, vm, isDark),
                   ),
-                ),
-              ),
 
-              // 5. Daily Progress Bar (Linear)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20.0, vertical: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // 2.5 Combined Header Info (Smart Banner + Quran Progress)
+                  SliverToBoxAdapter(
+                      child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text(
-                            AppStrings.dailyProgress,
-                            style: GoogleFonts.cairo(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: isDark ? Colors.white70 : Colors.black87,
-                            ),
+                          // Quran Progress takes priority or half space
+                          Expanded(
+                              flex: 3,
+                              child:
+                                  _buildQuranProgressCard(context, vm, isDark)),
+
+                          // Smart Event (if Active)
+                          if (vm.activeEvent != null) ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                                flex: 2,
+                                child: _buildSmartEventBanner(
+                                    vm.activeEvent!, isDark)),
+                          ]
+                        ],
+                      ),
+                    ),
+                  )),
+
+                  // 3. Daily Inspiration Quote
+                  SliverToBoxAdapter(
+                    child: _buildDailyInspiration(vm, isDark),
+                  ),
+
+                  // 4. Dynamic Prayer Card
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Column(
+                        children: [
+                          _buildDynamicPrayerCard(vm, isDark),
+                          const SizedBox(height: 12),
+                          _buildContextAwareSuggestion(
+                              vm, isDark), // New Context Aware Button
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 5. Daily Progress Bar (Linear)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20.0, vertical: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                AppStrings.dailyProgress,
+                                style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color:
+                                      isDark ? Colors.white70 : Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                "${(vm.progress * 100).toInt()}%",
+                                style: GoogleFonts.ibmPlexMono(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color:
+                                      isDark ? Colors.tealAccent : Colors.teal,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            "${(vm.progress * 100).toInt()}%",
-                            style: GoogleFonts.ibmPlexMono(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: isDark ? Colors.tealAccent : Colors.teal,
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: LinearProgressIndicator(
+                              value: vm.progress,
+                              minHeight: 10,
+                              backgroundColor:
+                                  isDark ? Colors.white10 : Colors.grey[200],
+                              valueColor: AlwaysStoppedAnimation(
+                                isDark ? Colors.tealAccent : Colors.teal,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: vm.progress,
-                          minHeight: 10,
-                          backgroundColor:
-                              isDark ? Colors.white10 : Colors.grey[200],
-                          valueColor: AlwaysStoppedAnimation(
-                            isDark ? Colors.tealAccent : Colors.teal,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 6. Quick Actions Horizontal Scroll
-              SliverToBoxAdapter(
-                child: Container(
-                  height: 100,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      _buildQuickActionCard(
-                        context,
-                        icon: Icons.menu_book_rounded,
-                        label: AppStrings.quran,
-                        color: const Color(0xFF1E5128),
-                        isDark: isDark,
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const SurahKahfScreen())),
-                      ),
-                      _buildQuickActionCard(
-                        context,
-                        icon: Icons.fingerprint,
-                        label: AppStrings.tasbeeh,
-                        color: const Color(0xFF8E24AA),
-                        isDark: isDark,
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const CustomTasbeehScreen())),
-                      ),
-                      _buildQuickActionCard(
-                        context,
-                        icon: Icons.explore_rounded,
-                        label: AppStrings.qibla,
-                        color: const Color(0xFFD84315),
-                        isDark: isDark,
-                        onTap: () {
-                          if (vm.prayerTimes?.coordinates != null) {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => QiblaScreen(
-                                        coordinates:
-                                            vm.prayerTimes!.coordinates)));
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(AppStrings.locating)));
-                          }
-                        },
-                      ),
-                      _buildQuickActionCard(
-                        context,
-                        icon: Icons.calendar_month_rounded,
-                        label: AppStrings.calendar,
-                        color: const Color(0xFF1976D2),
-                        isDark: isDark,
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (ctx) =>
-                                const CalendarExplorerDialog(initialTab: 0),
-                          );
-                        },
-                      ),
-                      _buildQuickActionCard(
-                        context,
-                        icon: Icons.repeat_on_rounded, // or loops icon
-                        label: "حلقة ذكر",
-                        color: const Color(0xFFE94560),
-                        isDark: isDark,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const GuidedTasbeehScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 7. Loading State or Task Lists
-              if (vm.isLoadingLocation)
-                SliverFillRemaining(
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: isDark ? Colors.white : Colors.teal,
                     ),
                   ),
-                )
-              else ...[
-                // Prayer Tasks Group
-                if (vm.prayerTasks.isNotEmpty) ...[
-                  _buildSectionHeader("الصلوات المفروضة", isDark),
-                  _buildTasksSliverList(context, vm, vm.prayerTasks, isDark),
+
+                  // 6. Quick Actions Horizontal Scroll
+                  SliverToBoxAdapter(
+                    child: Container(
+                      height: 100,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          _buildQuickActionCard(
+                            context,
+                            icon: Icons.menu_book_rounded,
+                            label: AppStrings.quran,
+                            color: const Color(0xFF1E5128),
+                            isDark: isDark,
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const SurahKahfScreen())),
+                          ),
+                          _buildQuickActionCard(
+                            context,
+                            icon: Icons.fingerprint,
+                            label: AppStrings.tasbeeh,
+                            color: const Color(0xFF8E24AA),
+                            isDark: isDark,
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const CustomTasbeehScreen())),
+                          ),
+                          _buildQuickActionCard(
+                            context,
+                            icon: Icons.explore_rounded,
+                            label: AppStrings.qibla,
+                            color: const Color(0xFFD84315),
+                            isDark: isDark,
+                            onTap: () {
+                              if (vm.prayerTimes?.coordinates != null) {
+                                Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => QiblaScreen(
+                                            coordinates:
+                                                vm.prayerTimes!.coordinates)));
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(AppStrings.locating)));
+                              }
+                            },
+                          ),
+                          _buildQuickActionCard(
+                            context,
+                            icon: Icons.calendar_month_rounded,
+                            label: AppStrings.calendar,
+                            color: const Color(0xFF1976D2),
+                            isDark: isDark,
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) =>
+                                    const CalendarExplorerDialog(initialTab: 0),
+                              );
+                            },
+                          ),
+                          _buildQuickActionCard(
+                            context,
+                            icon: Icons.repeat_on_rounded, // or loops icon
+                            label: "حلقة ذكر",
+                            color: const Color(0xFFE94560),
+                            isDark: isDark,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const GuidedTasbeehScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 7. Loading State or Task Lists
+                  if (vm.isLoadingLocation)
+                    SliverFillRemaining(
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: isDark ? Colors.white : Colors.teal,
+                        ),
+                      ),
+                    )
+                  else ...[
+                    // Prayer Tasks Group
+                    if (vm.prayerTasks.isNotEmpty) ...[
+                      _buildSectionHeader("الصلوات المفروضة", isDark),
+                      _buildTasksSliverList(
+                          context, vm, vm.prayerTasks, isDark),
+                    ],
+
+                    // Other Tasks Group
+                    if (vm.otherTasks.isNotEmpty) ...[
+                      _buildSectionHeader("السنن والأذكار", isDark),
+                      _buildTasksSliverList(context, vm, vm.otherTasks, isDark),
+                    ],
+
+                    // 8. Gratitude Section (The "Thanks" feature)
+                    SliverToBoxAdapter(
+                        child: _buildGratitudeSection(context, vm, isDark)),
+
+                    const SliverToBoxAdapter(
+                        child: SizedBox(height: 80)), // Bottom padding
+                  ],
                 ],
-
-                // Other Tasks Group
-                if (vm.otherTasks.isNotEmpty) ...[
-                  _buildSectionHeader("السنن والأذكار", isDark),
-                  _buildTasksSliverList(context, vm, vm.otherTasks, isDark),
-                ],
-
-                // 8. Gratitude Section (The "Thanks" feature)
-                SliverToBoxAdapter(
-                    child: _buildGratitudeSection(context, isDark)),
-
-                const SliverToBoxAdapter(
-                    child: SizedBox(height: 80)), // Bottom padding
-              ]
-            ],
+              ),
+            ),
           ),
         ),
       ),
@@ -289,27 +403,12 @@ class _TasksScreenState extends State<TasksScreen> {
 
   // --- Helper Widgets ---
 
-  Widget _buildGratitudeSection(BuildContext context, bool isDark) {
-    // List of blessings
-    final List<String> blessings = [
-      "نعمة البصر",
-      "نعمة السمع",
-      "نعمة الإسلام",
-      "نعمة الصحة والعافية",
-      "نعمة الأهل والأحباب",
-      "نعمة الأمن والأمان",
-      "نعمة العقل والتفكير",
-      "نعمة النطق والبيان",
-      "نعمة الهداية للطريق المستقيم",
-      "نعمة الرزق والمأكل والمشرب",
-      "نعمة الستر",
-      "نعمة النوم والراحة",
-    ];
-
-    // Pick one based on day of year to rotate daily
-    final dayOfYear = int.parse(intl.DateFormat("D").format(DateTime.now()));
-    final index = dayOfYear % blessings.length;
-    final blessingOfDay = blessings[index];
+  Widget _buildGratitudeSection(
+      BuildContext context, TasksViewModel vm, bool isDark) {
+    // Pick from VM (randomized on refresh)
+    final blessingOfDay = vm.currentBlessing.isEmpty
+        ? "نعمة الإسلام" // Fallback if VM init delayed
+        : vm.currentBlessing;
 
     return Container(
       margin: const EdgeInsets.all(20),
@@ -374,6 +473,133 @@ class _TasksScreenState extends State<TasksScreen> {
     );
   }
 
+  Widget _buildProfessionalClockDialog(
+      BuildContext context, TasksViewModel vm, bool isDark) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: StreamBuilder(
+        stream: Stream.periodic(const Duration(seconds: 1)),
+        builder: (context, snapshot) {
+          final now = DateTime.now();
+          final hour = intl.DateFormat('hh', 'ar').format(now);
+          final minute = intl.DateFormat('mm', 'ar').format(now);
+          final second = intl.DateFormat('ss', 'ar').format(now);
+          final amPm = intl.DateFormat('a', 'ar').format(now);
+
+          return Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                  color: isDark
+                      ? Colors.tealAccent.withValues(alpha: 0.3)
+                      : Colors.teal.shade200,
+                  width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                )
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "الوقت الآن",
+                  style: GoogleFonts.cairo(
+                    color: isDark ? Colors.white70 : Colors.teal[800],
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Digital Clock Row
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildDigitBox(hour, isDark),
+                      _buildColon(isDark),
+                      _buildDigitBox(minute, isDark),
+                      _buildColon(isDark),
+                      _buildDigitBox(second, isDark, isSeconds: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  amPm,
+                  style: GoogleFonts.ibmPlexMono(
+                    color: isDark ? Colors.tealAccent : Colors.teal[900],
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 12),
+                  ),
+                  child: Text("إغلاق",
+                      style: GoogleFonts.cairo(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                )
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDigitBox(String val, bool isDark, {bool isSeconds = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black45 : Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+            color: isSeconds
+                ? Colors.redAccent.withValues(alpha: 0.5)
+                : Colors.blueGrey.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        val,
+        style: GoogleFonts.ibmPlexMono(
+          fontSize: isSeconds ? 24 : 32,
+          fontWeight: FontWeight.bold,
+          color: isSeconds
+              ? (isDark ? Colors.redAccent : Colors.red[700])
+              : (isDark ? Colors.white : Colors.black87),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColon(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Text(
+        ":",
+        style: GoogleFonts.ibmPlexMono(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          color: isDark ? Colors.white38 : Colors.grey[400],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDateAndLocationHeader(
       BuildContext context, TasksViewModel vm, bool isDark) {
     // Date Formatting
@@ -381,49 +607,90 @@ class _TasksScreenState extends State<TasksScreen> {
     final dayName = intl.DateFormat('EEEE', 'ar').format(vm.now);
     final hijriStr = '${hijri.hDay} ${hijri.longMonthName} ${hijri.hYear}';
     final gregorianStr = intl.DateFormat('d MMMM yyyy', 'ar').format(vm.now);
+    final timeStr = intl.DateFormat('hh:mm a', 'ar').format(vm.now);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
       color: isDark ? const Color(0xFF1A1F26) : Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          InkWell(
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => const CalendarExplorerDialog(initialTab: 0),
-              );
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$dayName، $hijriStr',
-                      style: GoogleFonts.cairo(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // DATE SECTION -> Opens Calendar
+              InkWell(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) =>
+                        const CalendarExplorerDialog(initialTab: 0),
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(4.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$dayName، $gregorianStr',
+                        style: GoogleFonts.cairo(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.teal[800],
+                        ),
                       ),
-                    ),
-                    Text(
-                      gregorianStr,
-                      style: GoogleFonts.cairo(
-                        fontSize: 12,
-                        color: Colors.grey,
+                      const SizedBox(height: 4),
+                      Text(
+                        hijriStr,
+                        style: GoogleFonts.cairo(
+                          fontSize: 14,
+                          color: isDark ? Colors.white70 : Colors.grey[700],
+                          height: 1.0,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                Icon(Icons.calendar_today_outlined,
-                    color: isDark ? Colors.tealAccent : Colors.teal, size: 20),
-              ],
-            ),
+              ),
+
+              // TIME SECTION -> Opens Professional Clock
+              InkWell(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) =>
+                        _buildProfessionalClockDialog(ctx, vm, isDark),
+                  );
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.black26 : Colors.teal.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.tealAccent.withValues(alpha: 0.3)
+                          : Colors.teal.shade100,
+                    ),
+                  ),
+                  child: Text(
+                    timeStr,
+                    style: GoogleFonts.ibmPlexMono(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.tealAccent : Colors.teal[900],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const Divider(height: 20),
+          const Divider(height: 24),
           Row(
             children: [
               Icon(Icons.location_on,
@@ -479,7 +746,6 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Widget _buildSmartEventBanner(String event, bool isDark) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF5E35B1), // Deep Purple
@@ -488,19 +754,21 @@ class _TasksScreenState extends State<TasksScreen> {
           BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.stars_rounded, color: Colors.amber, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              event,
-              style: GoogleFonts.cairo(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
+          const Icon(Icons.stars_rounded, color: Colors.amber, size: 28),
+          const SizedBox(height: 4),
+          Text(
+            event,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.cairo(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -510,52 +778,64 @@ class _TasksScreenState extends State<TasksScreen> {
   Widget _buildQuranProgressCard(
       BuildContext context, TasksViewModel vm, bool isDark) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white,
+        color: isDark
+            ? const Color(0xFF2C3E50)
+            : Colors.white, // Slightly darker/distinct background
         borderRadius: BorderRadius.circular(12),
         border:
             Border.all(color: isDark ? Colors.white12 : Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E5128).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.auto_stories_rounded,
-                color: Color(0xFF1E5128)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "متابع الختمة",
-                  style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
-                ),
-                Text(
-                  "سورة ${vm.lastSurah}: آية ${vm.lastAyah}",
-                  style: GoogleFonts.cairo(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87),
-                ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                    color: Colors.grey.shade100,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2))
               ],
+      ),
+      child: InkWell(
+        onTap: () => _showUpdateQuranDialog(context, vm),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E5128).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.auto_stories_rounded,
+                  color: Color(0xFF1E5128), size: 24),
             ),
-          ),
-          TextButton(
-            onPressed: () {
-              _showUpdateQuranDialog(context, vm);
-            },
-            child: Text("تحديث",
-                style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-          )
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "متابع الختمة",
+                    style: GoogleFonts.cairo(
+                        fontSize: 11, color: Colors.grey, height: 1.0),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "سورة ${vm.lastSurah} : ${vm.lastAyah}",
+                    style: GoogleFonts.cairo(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
+                        height: 1.2),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.edit_note, size: 20, color: Colors.grey)
+          ],
+        ),
       ),
     );
   }
@@ -658,10 +938,16 @@ class _TasksScreenState extends State<TasksScreen> {
       Navigator.push(context,
           MaterialPageRoute(builder: (_) => const CustomTasbeehScreen()));
     } else if (text == "أذكار النوم") {
-      // Future: Navigate to Sleep Athkar
-      // For now, treat as specialized Evening or show guided
-      Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const GuidedTasbeehScreen()));
+      // Navigate to Sleep Athkar Details
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const AthkarDetailsScreen(
+            title: "أذكار النوم",
+            isMorning: false, // Use night styling
+          ),
+        ),
+      );
     }
   }
 
