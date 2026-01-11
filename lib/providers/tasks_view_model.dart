@@ -189,8 +189,16 @@ class TasksViewModel extends ChangeNotifier {
 
   void _startClock() {
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _now = DateTime.now();
-      notifyListeners();
+      final newNow = DateTime.now();
+      if (newNow.minute != _now.minute ||
+          newNow.hour != _now.hour ||
+          _now.day != newNow.day) {
+        _now = newNow;
+        notifyListeners();
+      } else {
+        // Just update internal time without rebuilding UI essentially
+        _now = newNow;
+      }
     });
   }
 
