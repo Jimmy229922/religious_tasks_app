@@ -8,6 +8,7 @@ import '../models/dhikr_item.dart';
 import 'package:religious_tasks_app/core/services/athkar_tracking_service.dart';
 import 'package:religious_tasks_app/core/services/storage_service.dart';
 import 'package:religious_tasks_app/core/services/audio_service.dart';
+import 'package:religious_tasks_app/core/services/ad_service.dart';
 import '../widgets/dhikr_card.dart';
 import '../widgets/details/athkar_header.dart';
 import '../widgets/details/athkar_controls.dart';
@@ -319,6 +320,11 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   Future<void> _exitScreen() async {
     if (_allDone) {
       await AthkarTrackingService.markCompleted(isMorning: widget.isMorning);
+
+      // Show Interstitial Ad for Morning/Evening Athkar completion
+      if (widget.title.contains("الصباح") || widget.title.contains("المساء")) {
+        await AdService.instance.showInterstitialAd();
+      }
     }
     if (!mounted) return;
     Navigator.of(context).pop(_allDone);

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'app/religious_app.dart';
+import 'core/services/ad_service.dart';
 import 'core/services/notifications_service.dart';
 import 'core/services/storage_service.dart';
 import 'core/theme/theme_provider.dart';
@@ -33,6 +34,9 @@ void main() async {
   NotificationManager().init().catchError((e) {
     debugPrint("Notification init failed: $e");
   });
+
+  // Initialize Ads
+  AdService.instance.init();
 
   runApp(
     MultiProvider(
