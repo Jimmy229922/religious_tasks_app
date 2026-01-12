@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:adhan/adhan.dart';
 import 'dart:math' as math;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/app_constants.dart';
 import '../providers/athkar_view_model.dart';
@@ -302,11 +303,13 @@ class _TasksScreenState extends State<TasksScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(hijriStr,
-                              style: GoogleFonts.arefRuqaa(
-                                  color: Colors.white, fontSize: 18)),
                           Text(gregorianStr,
                               style: GoogleFonts.glory(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold)),
+                          Text(hijriStr,
+                              style: GoogleFonts.arefRuqaa(
                                   color: Colors.white70, fontSize: 14)),
                         ],
                       ),
@@ -775,7 +778,25 @@ class _TasksScreenState extends State<TasksScreen> {
     } else if (task.name.contains(kProphetPrayer)) {
       Navigator.push(context,
               MaterialPageRoute(builder: (_) => const ProphetPrayersScreen()))
-          .then((_) => vm.toggleTask(index, completionValue: true));
+          .then((_) async {
+        final prefs = await SharedPreferences.getInstance();
+        final count = prefs.getInt('prophet_prayer_counter') ?? 0;
+        // Mark as completed only if target (e.g. 100 or 200) reached?
+        // Or if count > 0?
+        // Let's assume if user returns, we check if they did meaningful progress.
+        // But better: Don't force true.
+        // If count == 0, force false.
+        // If count > 0, we can leave it or check target.
+        // Let's rely on what the screen logic did, or just sync.
+
+        // Fix: If count is 0, uncheck. If count >= task.targetCount, check.
+        // Otherwise, leave as is (User might be in progress).
+        if (count == 0) {
+          vm.toggleTask(index, completionValue: false);
+        } else if (count >= (task.targetCount ?? 200)) {
+          vm.toggleTask(index, completionValue: true);
+        }
+      });
     } else if (task.name == kCustomWird) {
       Navigator.push(context,
           MaterialPageRoute(builder: (_) => const CustomTasbeehScreen()));
@@ -874,7 +895,9 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Widget _buildNextPrayerCountdownCard(TasksViewModel vm, bool isDark) {
-    if (vm.nextPrayerTime == null) return const SizedBox.shrink();
+    if (vm.nextPrayerTime == null || vm.prayerTimes == null) {
+      return const SizedBox.shrink();
+    }
 
     final diff = vm.nextPrayerTime!.difference(vm.now);
     final duration = diff.isNegative ? Duration.zero : diff;
@@ -883,103 +906,189 @@ class _TasksScreenState extends State<TasksScreen> {
     final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
     final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
 
+    // Dynamic Gradient & Icon based on Next Prayer
+    var nextPrayer = vm.prayerTimes!.nextPrayer();
+    if (nextPrayer == Prayer.none) nextPrayer = Prayer.fajr;
+
+    List<Color> gradientColors;
+    IconData timeIcon;
+
+    switch (nextPrayer) {
+      case Prayer.fajr:
+        gradientColors = [
+          const Color(0xFF141E30),
+          const Color(0xFF243B55)
+        ]; // Deep Night
+        timeIcon = Icons.nights_stay_rounded;
+        break;
+      case Prayer.sunrise:
+        gradientColors = [
+          const Color(0xFFcc2b5e),
+          const Color(0xFF753a88)
+        ]; // Purple Sunrise
+        timeIcon = Icons.wb_twilight_rounded;
+        break;
+      case Prayer.dhuhr:
+        gradientColors = [
+          const Color(0xFF2980B9),
+          const Color(0xFF6DD5FA)
+        ]; // Blue Sky
+        timeIcon = Icons.wb_sunny_rounded;
+        break;
+      case Prayer.asr:
+        gradientColors = [
+          const Color(0xFFFF8008),
+          const Color(0xFFFFC837)
+        ]; // Orange Afternoon
+        timeIcon = Icons.wb_sunny_outlined;
+        break;
+      case Prayer.maghrib:
+        gradientColors = [
+          const Color(0xFF8E2DE2),
+          const Color(0xFF4A00E0)
+        ]; // Twilight Purple
+        timeIcon = Icons.wb_twilight_sharp;
+        break;
+      case Prayer.isha:
+        gradientColors = [
+          const Color(0xFF0F2027),
+          const Color(0xFF203A43),
+          const Color(0xFF2C5364)
+        ]; // Dark Night
+        timeIcon = Icons.bedtime_rounded;
+        break;
+      default:
+        gradientColors = [const Color(0xFF141E30), const Color(0xFF243B55)];
+        timeIcon = Icons.access_time_rounded;
+    }
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.tealAccent.withValues(alpha: 0.3)
-              : Colors.teal.shade200,
-          width: 1.5,
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: gradientColors.last.withValues(alpha: 0.4),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Column(
         children: [
           Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.tealAccent.withValues(alpha: 0.1)
-                      : Colors.teal.shade50,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.hourglass_bottom_rounded,
-                  color: isDark ? Colors.tealAccent : Colors.teal,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      "الوقت المتبقي لصلاة ${vm.nextPrayerName}",
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.cairo(
-                        color: isDark ? Colors.white70 : Colors.teal[800],
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "$hours:$minutes:$seconds",
-                      style: GoogleFonts.ibmPlexMono(
-                        color: isDark ? Colors.white : Colors.teal[900],
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Daily Progress Bar
-          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "إنجاز اليوم",
-                style: GoogleFonts.cairo(
-                  fontSize: 12,
-                  color: isDark ? Colors.white70 : Colors.teal[800],
-                ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(timeIcon, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "الصلاة القادمة",
+                        style: GoogleFonts.cairo(
+                          color: Colors.white70,
+                          fontSize: 10,
+                        ),
+                      ),
+                      Text(
+                        vm.nextPrayerName,
+                        style: GoogleFonts.arefRuqaa(
+                          color: Colors.white,
+                          fontSize: 24, // Increased font size
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              Text(
-                "${(vm.progress * 100).toInt()}%",
-                style: GoogleFonts.ibmPlexMono(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.tealAccent : Colors.teal,
-                ),
-              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text("الوقت المتبقي",
+                      style: GoogleFonts.cairo(
+                          color: Colors.white70, fontSize: 10)),
+                  Text(
+                    "$hours:$minutes:$seconds",
+                    style: GoogleFonts.ibmPlexMono(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              )
             ],
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: vm.progress,
-              backgroundColor: isDark ? Colors.white10 : Colors.teal.shade50,
-              color: isDark ? Colors.tealAccent : Colors.teal,
-              minHeight: 6,
-            ),
+          const SizedBox(height: 20),
+          // Progress Bar with custom styling
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("رحلتك اليومية",
+                      style: GoogleFonts.cairo(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold)),
+                  Text(
+                    "${(vm.progress * 100).toInt()}%",
+                    style: GoogleFonts.ibmPlexMono(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Stack(
+                children: [
+                  Container(
+                    height: 8,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  FractionallySizedBox(
+                    widthFactor: vm.progress,
+                    child: Container(
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: Colors.white, // Pure white for contrast
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            blurRadius: 6,
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),

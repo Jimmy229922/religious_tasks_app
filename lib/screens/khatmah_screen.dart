@@ -147,6 +147,8 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      resizeToAvoidBottomInset:
+          false, // Prevents the background from shrinking/becoming blank
       appBar: AppBar(
         title: Text(
           "متابع الختمة",
@@ -168,114 +170,119 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  Icon(
-                    Icons.menu_book_rounded,
-                    size: 80,
-                    color: isDark ? Colors.amberAccent : Colors.teal,
-                  ),
-                  const SizedBox(height: 30),
-                  Text(
-                    "أين وصلت في قراءتك؟",
-                    style: GoogleFonts.cairo(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
+          // Push content up when keyboard appears
+          child: Padding(
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    Icon(
+                      Icons.menu_book_rounded,
+                      size: 80,
+                      color: isDark ? Colors.amberAccent : Colors.teal,
                     ),
-                  ),
-                  const SizedBox(height: 30),
-
-                  // Dropdown for Surah
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white10 : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border:
-                          Border.all(color: Colors.teal.withValues(alpha: 0.5)),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: _surahs.contains(vm.lastSurah)
-                            ? vm.lastSurah
-                            : _surahs[0],
-                        dropdownColor:
-                            isDark ? const Color(0xFF2C3E50) : Colors.white,
-                        items: _surahs
-                            .map((s) => DropdownMenuItem(
-                                  value: s,
-                                  child: Text(s,
-                                      style: GoogleFonts.cairo(
-                                          color: isDark
-                                              ? Colors.white
-                                              : Colors.black87)),
-                                ))
-                            .toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            vm.updateQuranProgress(val, vm.lastAyah);
-                          }
-                        },
+                    const SizedBox(height: 30),
+                    Text(
+                      "أين وصلت في قراءتك؟",
+                      style: GoogleFonts.cairo(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 30),
 
-                  // Input for Ayah
-                  TextField(
-                    controller: _ayahController,
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.ibmPlexMono(
-                        fontSize: 24,
-                        color: isDark ? Colors.white : Colors.black87),
-                    decoration: InputDecoration(
-                      labelText: "رقم الآية",
-                      labelStyle: GoogleFonts.cairo(color: Colors.teal),
-                      filled: true,
-                      fillColor: isDark ? Colors.white10 : Colors.white,
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                    // Dropdown for Surah
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white10 : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: Colors.teal.withValues(alpha: 0.5)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: _surahs.contains(vm.lastSurah)
+                              ? vm.lastSurah
+                              : _surahs[0],
+                          dropdownColor:
+                              isDark ? const Color(0xFF2C3E50) : Colors.white,
+                          items: _surahs
+                              .map((s) => DropdownMenuItem(
+                                    value: s,
+                                    child: Text(s,
+                                        style: GoogleFonts.cairo(
+                                            color: isDark
+                                                ? Colors.white
+                                                : Colors.black87)),
+                                  ))
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              vm.updateQuranProgress(val, vm.lastAyah);
+                            }
+                          },
+                        ),
+                      ),
                     ),
-                    onChanged: (val) {
-                      final ayah = int.tryParse(val);
-                      if (ayah != null) {
-                        vm.updateQuranProgress(vm.lastSurah, ayah);
-                      }
-                    },
-                  ),
+                    const SizedBox(height: 20),
 
-                  // Display Current Status
-                  const SizedBox(height: 40),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.amber),
+                    // Input for Ayah
+                    TextField(
+                      controller: _ayahController,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.ibmPlexMono(
+                          fontSize: 24,
+                          color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        labelText: "رقم الآية",
+                        labelStyle: GoogleFonts.cairo(color: Colors.teal),
+                        filled: true,
+                        fillColor: isDark ? Colors.white10 : Colors.white,
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onChanged: (val) {
+                        final ayah = int.tryParse(val);
+                        if (ayah != null) {
+                          vm.updateQuranProgress(vm.lastSurah, ayah);
+                        }
+                      },
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "آخر حفظ: سورة ${vm.lastSurah} - آية ${vm.lastAyah}",
-                          style: GoogleFonts.cairo(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : Colors.black87),
-                        )
-                      ],
-                    ),
-                  ),
 
-                  const SizedBox(height: 40),
-                ],
+                    // Display Current Status
+                    const SizedBox(height: 40),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.amber),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            "آخر حفظ: سورة ${vm.lastSurah} - آية ${vm.lastAyah}",
+                            style: GoogleFonts.cairo(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : Colors.black87),
+                          )
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
             ),
           ),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import '../providers/tasks_view_model.dart';
+import '../constants/app_constants.dart';
 
 class ProphetPrayersScreen extends StatefulWidget {
   const ProphetPrayersScreen({super.key});
@@ -53,6 +56,16 @@ class _ProphetPrayersScreenState extends State<ProphetPrayersScreen>
     // تشغيل الاهتزاز والصوت الخفيف
     HapticFeedback.lightImpact();
     SystemSound.play(SystemSoundType.click);
+
+    if (_counter == 200) {
+      if (mounted) {
+        final vm = Provider.of<TasksViewModel>(context, listen: false);
+        final index = vm.tasks.indexWhere((t) => t.name == kProphetPrayer);
+        if (index != -1) {
+          vm.toggleTask(index, completionValue: true);
+        }
+      }
+    }
   }
 
   void _reset() async {
@@ -62,6 +75,14 @@ class _ProphetPrayersScreenState extends State<ProphetPrayersScreen>
     });
     await prefs.setInt('prophet_prayer_counter', 0);
     HapticFeedback.mediumImpact();
+
+    if (mounted) {
+      final vm = Provider.of<TasksViewModel>(context, listen: false);
+      final index = vm.tasks.indexWhere((t) => t.name == kProphetPrayer);
+      if (index != -1) {
+        vm.toggleTask(index, completionValue: false);
+      }
+    }
   }
 
   @override
@@ -108,8 +129,7 @@ class _ProphetPrayersScreenState extends State<ProphetPrayersScreen>
                   right: -30,
                   child: Opacity(
                     opacity: 0.1,
-                    child:
-                        Icon(Icons.mosque, size: 300, color: Colors.white),
+                    child: Icon(Icons.mosque, size: 300, color: Colors.white),
                   ),
                 ),
 
