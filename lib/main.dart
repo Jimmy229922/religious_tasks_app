@@ -6,11 +6,12 @@ import 'package:provider/provider.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'app/religious_app.dart';
-import 'services/notifications_service.dart';
-import 'services/storage_service.dart';
-import 'providers/theme_provider.dart';
-import 'providers/athkar_view_model.dart';
-import 'providers/tasks_view_model.dart';
+import 'core/services/notifications_service.dart';
+import 'core/services/storage_service.dart';
+import 'core/theme/theme_provider.dart';
+import 'features/athkar/providers/athkar_view_model.dart';
+import 'features/tasbeeh/providers/tasbeeh_view_model.dart';
+import 'features/tasks/providers/tasks_view_model.dart';
 
 void main() async {
   debugPrint("🟢 Application Main Function Started");
@@ -39,6 +40,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AthkarViewModel()),
         ChangeNotifierProvider(create: (_) => TasksViewModel()),
+        ChangeNotifierProvider(create: (_) => TasbeehViewModel()),
       ],
       child: const ReligiousApp(),
     ),

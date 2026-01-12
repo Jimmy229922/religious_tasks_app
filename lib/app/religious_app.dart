@@ -3,9 +3,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-import '../constants/app_constants.dart';
-import '../screens/splash_screen.dart';
-import '../providers/theme_provider.dart';
+import '../core/constants/app_constants.dart';
+import '../features/splash/screens/splash_screen.dart';
+import '../core/theme/theme_provider.dart';
 
 class ReligiousApp extends StatelessWidget {
   const ReligiousApp({super.key});

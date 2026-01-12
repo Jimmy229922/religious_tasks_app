@@ -1,0 +1,14 @@
+const String kAppName = 'رفيق مسلم';
+const String kAthkarLabel = 'أذكار';
+const String kAthkarMorning = 'أذكار الصباح';
+const String kAthkarEvening = 'أذكار المساء';
+const String kAthkarSleep = 'أذكار النوم';
+const String kPrayerFajr = 'صلاة الفجر';
+const String kPrayerDhuhr = 'صلاة الظهر';
+const String kPrayerAsr = 'صلاة العصر';
+const String kPrayerMaghrib = 'صلاة المغرب';
+const String kPrayerIsha = 'صلاة العشاء';
+const String kProphetPrayer = 'الصلاة على النبي';
+const String kQuranWird = 'ورد القرآن';
+const String kPrayerQiyam = 'قيام الليل';
+const String kCustomWird = 'ورد مخصص';
