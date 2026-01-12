@@ -41,12 +41,13 @@ class ReligiousApp extends StatelessWidget {
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF000000), // OLED Pure Black
         colorScheme: ColorScheme.fromSeed(
           brightness: Brightness.dark,
           seedColor: const Color(0xFF90CAF9),
           primary: const Color(0xFF90CAF9),
           secondary: const Color(0xFFFFB74D),
-          surface: const Color(0xFF121212),
+          surface: const Color(0xFF000000), // OLED Pure Black
         ),
         textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
       ),

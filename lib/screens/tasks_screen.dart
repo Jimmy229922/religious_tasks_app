@@ -54,12 +54,19 @@ class _TasksScreenState extends State<TasksScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.black : null,
+          gradient: isDark
+              ? null // No gradient in OLED mode, just pure black
+              : const LinearGradient(
+                  colors: [
+                    Color(0xFF0F2027),
+                    Color(0xFF203A43),
+                    Color(0xFF2C5364)
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
         ),
         child: Scaffold(
           backgroundColor: Colors.transparent,
@@ -111,11 +118,27 @@ class _TasksScreenState extends State<TasksScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
                             children: [
-                              if (vm.activeEvent != null) ...[
-                                _buildSmartEventBanner(vm.activeEvent!, isDark),
-                                const SizedBox(height: 12),
-                              ],
-                              _buildContextAwareSuggestion(context, vm, isDark),
+                              IntrinsicHeight(
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (vm.activeEvent != null) ...[
+                                      Expanded(
+                                        flex: 4,
+                                        child: _buildSmartEventBanner(
+                                            vm.activeEvent!, isDark),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                    Expanded(
+                                      flex: 6,
+                                      child: _buildContextAwareSuggestion(
+                                          context, vm, isDark),
+                                    ),
+                                  ],
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               _buildQuickAccessRow(context, vm, isDark),
                             ],
@@ -155,174 +178,188 @@ class _TasksScreenState extends State<TasksScreen> {
     final hijriStr =
         "${hijriDate.hDay} ${hijriDate.longMonthName} ${hijriDate.hYear}";
     final gregorianStr =
-        intl.DateFormat('d MMMM yyyy', 'ar').format(DateTime.now());
+        intl.DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.now());
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Stack(
-        alignment: Alignment.center,
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF151515)
+            : Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.white24,
+          width: 1,
+        ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Stack(
+            alignment: Alignment.center,
             children: [
-              // Rings Section
-              GestureDetector(
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) =>
-                        _buildProfessionalClockDialog(context, vm, isDark),
-                  );
-                },
-                child: SizedBox(
-                  width: 100,
-                  height: 100,
-                  child: CustomPaint(
-                    painter: _RingsPainter(
-                      prayersProgress: vm.prayersProgress,
-                      athkarProgress: vm.athkarProgress,
-                      quranProgress: vm.quranProgress,
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            intl.DateFormat('hh:mm')
-                                .format(vm.now), // 12-hour format
-                            style: GoogleFonts.ibmPlexMono(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 26, // Bigger font
-                                shadows: [
-                                  Shadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.5),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2))
-                                ]),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Rings Section
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) =>
+                            _buildProfessionalClockDialog(context, vm, isDark),
+                      );
+                    },
+                    child: SizedBox(
+                      width: 100,
+                      height: 100,
+                      child: CustomPaint(
+                        painter: _RingsPainter(
+                          prayersProgress: vm.prayersProgress,
+                          athkarProgress: vm.athkarProgress,
+                          quranProgress: vm.quranProgress,
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                intl.DateFormat('hh:mm')
+                                    .format(vm.now), // 12-hour format
+                                style: GoogleFonts.ibmPlexMono(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 26, // Bigger font
+                                    shadows: [
+                                      Shadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.5),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2))
+                                    ]),
+                              ),
+                              Text(
+                                intl.DateFormat('a', 'ar')
+                                    .format(vm.now), // AM/PM
+                                style: GoogleFonts.cairo(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold),
+                              )
+                            ],
                           ),
-                          Text(
-                            intl.DateFormat('a', 'ar').format(vm.now), // AM/PM
-                            style: GoogleFonts.cairo(
-                                color: Colors.white70,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold),
-                          )
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
 
-              // Date & Location Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text("السلام عليكم",
-                        style: GoogleFonts.cairo(
-                            color: Colors.white70, fontSize: 16)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0x33FFFFFF)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.location_on_rounded,
-                              color: Colors.tealAccent, size: 14),
-                          const SizedBox(width: 4),
-                          Text(vm.locationName,
-                              style: GoogleFonts.cairo(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Weather Info Widget
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.15)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
+                  // Date & Location Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Weather Info Widget
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.15)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text(
-                                vm.weatherInfo['temp'] ?? "",
-                                style: GoogleFonts.ibmPlexMono(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    vm.weatherInfo['temp'] ?? "",
+                                    style: GoogleFonts.ibmPlexMono(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.cloud_outlined,
+                                      color: Colors.white70, size: 16),
+                                ],
                               ),
-                              const SizedBox(width: 6),
-                              const Icon(Icons.cloud_outlined,
-                                  color: Colors.white70, size: 16),
+                              if (vm.weatherInfo['advice'] != null)
+                                Text(
+                                  vm.weatherInfo['advice']!,
+                                  style: GoogleFonts.cairo(
+                                    color: Colors.white70,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                             ],
                           ),
-                          if (vm.weatherInfo['advice'] != null)
-                            Text(
-                              vm.weatherInfo['advice']!,
-                              style: GoogleFonts.cairo(
-                                color: Colors.white70,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                        ),
+                        const SizedBox(height: 8),
 
-                    InkWell(
-                      onTap: () {
-                        // Open Calendar
-                        showDialog(
-                          context: context,
-                          builder: (context) =>
-                              const CalendarExplorerDialog(initialTab: 0),
-                        );
-                      },
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(gregorianStr,
-                              style: GoogleFonts.glory(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold)),
-                          Text(hijriStr,
-                              style: GoogleFonts.arefRuqaa(
-                                  color: Colors.white70, fontSize: 14)),
-                        ],
-                      ),
+                        InkWell(
+                          onTap: () {
+                            // Open Calendar
+                            showDialog(
+                              context: context,
+                              builder: (context) =>
+                                  const CalendarExplorerDialog(initialTab: 0),
+                            );
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(gregorianStr,
+                                  style: GoogleFonts.cairo(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold)),
+                              Text(hijriStr,
+                                  style: GoogleFonts.arefRuqaa(
+                                      color: Colors.white70, fontSize: 14)),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           ),
-
-          // Next Prayer Countdown (Optional Center Element)
-          // If you want a countdown, you'd calculate it from vm.nextPrayerTime
-          // For now, let's assume the rings are the main focus as requested.
+          const SizedBox(height: 16),
+          Divider(color: Colors.white.withValues(alpha: 0.1), height: 1),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.location_on_rounded,
+                  color: Colors.tealAccent, size: 14),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(vm.locationName,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.cairo(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13)),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -403,6 +440,7 @@ class _TasksScreenState extends State<TasksScreen> {
   Widget _buildSmartEventBanner(String event, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(12),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: const Color(0xFF5E35B1), // Deep Purple
         borderRadius: BorderRadius.circular(12),
@@ -434,7 +472,7 @@ class _TasksScreenState extends State<TasksScreen> {
   Widget _buildContextAwareSuggestion(
       BuildContext context, TasksViewModel vm, bool isDark) {
     return Container(
-      width: double.infinity,
+      // width: double.infinity,
       decoration: BoxDecoration(
         color:
             isDark ? Colors.teal.withValues(alpha: 0.2) : Colors.teal.shade50,
@@ -536,7 +574,7 @@ class _TasksScreenState extends State<TasksScreen> {
             () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const SurahKahfScreen())),
             isDark,
-            Colors.amber,
+            const Color(0xFF6A1B9A), // Deep Purple
           ),
           const SizedBox(width: 8),
           _buildQuickAccessItem(
@@ -546,7 +584,7 @@ class _TasksScreenState extends State<TasksScreen> {
             () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const CustomTasbeehScreen())),
             isDark,
-            Colors.purple,
+            const Color(0xFF1565C0), // Rich Blue
           ),
           const SizedBox(width: 8),
           _buildQuickAccessItem(
@@ -562,7 +600,27 @@ class _TasksScreenState extends State<TasksScreen> {
                       builder: (_) => QiblaScreen(coordinates: coords)));
             },
             isDark,
-            Colors.teal,
+            const Color(0xFF00695C), // Dark Teal
+          ),
+          const SizedBox(width: 8),
+          _buildQuickAccessItem(
+            context,
+            "متابع الختمة",
+            Icons.bookmark_added,
+            () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const KhatmahScreen())),
+            isDark,
+            const Color(0xFFD4AF37), // Metallic Gold
+          ),
+          const SizedBox(width: 8),
+          _buildQuickAccessItem(
+            context,
+            "حلقة الذكر",
+            Icons.groups,
+            () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const HalqatDhikrScreen())),
+            isDark,
+            const Color(0xFF66BB6A), // Softer Green
           ),
           const SizedBox(width: 8),
           _buildQuickAccessItem(
@@ -574,27 +632,7 @@ class _TasksScreenState extends State<TasksScreen> {
               builder: (context) => const CalendarExplorerDialog(initialTab: 0),
             ),
             isDark,
-            Colors.blueGrey,
-          ),
-          const SizedBox(width: 8),
-          _buildQuickAccessItem(
-            context,
-            "حلقة الذكر",
-            Icons.groups,
-            () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const HalqatDhikrScreen())),
-            isDark,
-            Colors.green,
-          ),
-          const SizedBox(width: 8),
-          _buildQuickAccessItem(
-            context,
-            "متابع الختمة",
-            Icons.bookmark_added,
-            () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const KhatmahScreen())),
-            isDark,
-            Colors.deepOrange,
+            const Color(0xFF00ACC1), // Cyan/Teal
           ),
         ],
       ),
@@ -610,15 +648,37 @@ class _TasksScreenState extends State<TasksScreen> {
         width: 80,
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white10 : baseColor.withValues(alpha: 0.1),
+          color: isDark
+              ? const Color(0xFF1E1E1E)
+              : baseColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-              color:
-                  isDark ? Colors.white12 : baseColor.withValues(alpha: 0.3)),
+              color: isDark
+                  ? baseColor.withValues(alpha: 0.4)
+                  : baseColor.withValues(alpha: 0.3)),
+          boxShadow: isDark
+              ? []
+              : [
+                  BoxShadow(
+                      color: baseColor.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2))
+                ],
         ),
         child: Column(
           children: [
-            Icon(icon, color: isDark ? Colors.white : baseColor, size: 28),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? baseColor.withValues(alpha: 0.15)
+                    : Colors.transparent,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon,
+                  color: isDark ? baseColor.withValues(alpha: 0.9) : baseColor,
+                  size: 26),
+            ),
             const SizedBox(height: 6),
             Text(
               label,
@@ -635,45 +695,81 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Widget _buildDailyInspiration(TasksViewModel vm, bool isDark) {
+    bool isQuran = vm.isInspirationQuran;
+    Color contentColor = isDark
+        ? Colors.white
+        : (isQuran ? const Color(0xFF004D40) : Colors.teal[900]!);
+    Color iconColor =
+        isQuran ? const Color(0xFFD4AF37) : Colors.orange; // Gold for Quran
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : const Color(0xFFE0F2F1), // Teal 50
+        color: isDark
+            ? const Color(0xFF1E1E1E)
+            : (isQuran ? const Color(0xFFE0F2F1) : const Color(0xFFE0F2F1)),
+        gradient: isQuran && !isDark
+            ? const LinearGradient(colors: [Color(0xFFE0F2F1), Colors.white])
+            : null,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white12 : Colors.teal.shade100,
+          color: isDark
+              ? Colors.white12
+              : (isQuran ? const Color(0xFF80CBC4) : Colors.teal.shade100),
         ),
+        boxShadow: isQuran && !isDark
+            ? [
+                BoxShadow(
+                    color: Colors.teal.withValues(alpha: 0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2))
+              ]
+            : [],
       ),
       child: Column(
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.lightbulb_outline,
-                  color: Colors.orange, size: 20),
+              Icon(isQuran ? Icons.auto_stories : Icons.lightbulb_outline,
+                  color: iconColor, size: 20),
               const SizedBox(width: 8),
               Text(
-                "همسة اليوم",
+                isQuran ? "آية اليوم" : "همسة اليوم",
                 style: GoogleFonts.cairo(
-                  fontSize: 12,
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white70 : Colors.teal[800],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
-            "\"${vm.dailyInspiration}\"",
+            isQuran
+                ? "﴿ ${vm.currentInspiration} ﴾"
+                : "\"${vm.currentInspiration}\"",
             textAlign: TextAlign.center,
             style: GoogleFonts.amiri(
-              // Amiri is nice for Arabic quotes
+              // Amiri is nice for Arabic quotes and Quran
               fontSize: 18,
-              fontStyle: FontStyle.italic,
-              color: isDark ? Colors.white : Colors.teal[900],
-              height: 1.5,
+              fontWeight: isQuran ? FontWeight.bold : FontWeight.normal,
+              fontStyle: isQuran ? FontStyle.normal : FontStyle.italic,
+              color: contentColor,
+              height: 1.6,
             ),
           ),
+          if (vm.currentInspirationSource.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              vm.currentInspirationSource,
+              style: GoogleFonts.cairo(
+                fontSize: 12,
+                color: isDark ? Colors.white54 : Colors.grey[700],
+              ),
+            )
+          ]
         ],
       ),
     );

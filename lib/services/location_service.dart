@@ -63,6 +63,8 @@ class LocationService {
 
   Future<String> getLocationName(Position position) async {
     try {
+      // NOTE: localeIdentifier parameter might not be supported in some versions of geocoding package.
+      // If removed, it will use the system or device locale.
       final placemarks = await placemarkFromCoordinates(
         position.latitude,
         position.longitude,
@@ -72,24 +74,34 @@ class LocationService {
         final place = placemarks[0];
         final parts = <String>[];
 
+        // Hierarchical Address for Professional Look:
+        // Country -> Administrative Area (Gov) -> Locality (City) -> SubLocality (Neighborhood)
+
+        // 1. Country (e.g. مصر)
+        if (place.country?.isNotEmpty == true) {
+          parts.add(place.country!);
+        }
+
+        // 2. Governorate (e.g. محافظة القاهرة)
+        // We prefer AdministrativeArea.
         if (place.administrativeArea?.isNotEmpty == true) {
           parts.add(place.administrativeArea!);
         }
+
+        // 3. City/District (e.g. مدينة نصر)
+        // Locality is usually the city. SubAdministrativeArea is sometimes equivalent.
         if (place.locality?.isNotEmpty == true) {
           parts.add(place.locality!);
         } else if (place.subAdministrativeArea?.isNotEmpty == true) {
           parts.add(place.subAdministrativeArea!);
         }
-        if (place.subLocality?.isNotEmpty == true) {
-          parts.add(place.subLocality!);
-        }
 
+        // Construct the full string
         final uniqueParts = parts.toSet().toList();
-        final clean = uniqueParts
-            .where((e) => e.trim().isNotEmpty)
-            .take(2)
-            .join(" - ")
-            .trim();
+
+        // Join with comma for a classic address format
+        final clean =
+            uniqueParts.where((e) => e.trim().isNotEmpty).join("، ").trim();
 
         return clean.isNotEmpty ? clean : AppStrings.unknownLocation;
       }

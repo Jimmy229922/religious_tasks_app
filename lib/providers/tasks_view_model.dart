@@ -97,10 +97,17 @@ class TasksViewModel extends ChangeNotifier {
 
   // --- Dynamic Content State (Refreshed by user) ---
   String _currentInspiration = "";
+  String _currentInspirationSource =
+      ""; // e.g. "البقرة: 152" or empty for general wisdom
+  bool _isInspirationQuran = false;
+
   String _currentBlessing = "";
   String _currentEventBanner = "";
 
   String get currentInspiration => _currentInspiration;
+  String get currentInspirationSource => _currentInspirationSource;
+  bool get isInspirationQuran => _isInspirationQuran;
+
   String get currentBlessing => _currentBlessing;
   String get currentEventBanner => _currentEventBanner;
 
@@ -122,6 +129,47 @@ class TasksViewModel extends ChangeNotifier {
     "إماطة الأذى عن الطريق صدقة",
     "لا تحقرن من المعروف شيئاً",
     "من لزم الاستغفار جعل الله له من كل هم فرجا",
+  ];
+
+  final List<Map<String, String>> _quranVersesList = [
+    {
+      "text": "فَاذْكُرُونِي أَذْكُرْكُمْ وَاشْكُرُوا لِي وَلَا تَكْفُرُونِ",
+      "source": "سورة البقرة"
+    },
+    {"text": "إِنَّ اللَّهَ مَعَ الصَّابِرِينَ", "source": "سورة البقرة"},
+    {
+      "text":
+          "وَإِذَا سَأَلَكَ عِبَادِي عَنِّي فَإِنِّي قَرِيبٌ ۖ أُجِيبُ دَعْوَةَ الدَّاعِ إِذَا دَعَانِ",
+      "source": "سورة البقرة"
+    },
+    {
+      "text": "أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ",
+      "source": "سورة الرعد"
+    },
+    {
+      "text":
+          "وَمَنْ يَتَّقِ اللَّهَ يَجْعَلْ لَهُ مَخْرَجًا * وَيَرْزُقْهُ مِنْ حَيْثُ لَا يَحْتَسِبُ",
+      "source": "سورة الطلاق"
+    },
+    {"text": "وَرَحْمَتِي وَسِعَتْ كُلَّ شَيْءٍ", "source": "سورة الأعراف"},
+    {
+      "text": "لَا يُكَلِّفُ اللَّهُ نَفْسًا إِلَّا وُسْعَهَا",
+      "source": "سورة البقرة"
+    },
+    {
+      "text": "قُلْ لَنْ يُصِيبَنَا إِلَّا مَا كَتَبَ اللَّهُ لَنَا",
+      "source": "سورة التوبة"
+    },
+    {
+      "text": "وَعَسَى أَنْ تَكْرَهُوا شَيْئًا وَهُوَ خَيْرٌ لَكُمْ",
+      "source": "سورة البقرة"
+    },
+    {"text": "وَكَفَى بِاللَّهِ وَكِيلًا", "source": "سورة النساء"},
+    {
+      "text": "رَبِّ اشْرَحْ لِي صَدْرِي * وَيَسِّرْ لِي أَمْرِي",
+      "source": "سورة طه"
+    },
+    {"text": "إِنَّ مَعَ الْعُسْرِ يُسْرًا", "source": "سورة الشرح"},
   ];
 
   final List<String> _blessingsList = [
@@ -158,18 +206,22 @@ class TasksViewModel extends ChangeNotifier {
   }
 
   void _initRandomContent() {
-    // Initial Load - Use Day of Year for Consistency on first load, or Random.
-    // User requested refresh feature, implying they want randomness or updates.
-    // Let's stick to Day logic for initial, but verify inputs.
-
-    // We can just call refreshRandomContent to seed it initially,
-    // but typically "daily" content implies stability unless updated manually.
-    // However, for the "refresh" feature to be obvious, let's randomize or use day logic.
-
     final dayOfYear = int.parse(intl.DateFormat("D").format(DateTime.now()));
 
-    _currentInspiration =
-        _inspirationsList[dayOfYear % _inspirationsList.length];
+    // Toggle between Quran and Wisdom based on day parity for variation
+    if (dayOfYear % 2 == 1) {
+      // Prefer Quran on odd days or just mix
+      final index = dayOfYear % _quranVersesList.length;
+      _currentInspiration = _quranVersesList[index]["text"]!;
+      _currentInspirationSource = _quranVersesList[index]["source"]!;
+      _isInspirationQuran = true;
+    } else {
+      _currentInspiration =
+          _inspirationsList[dayOfYear % _inspirationsList.length];
+      _currentInspirationSource = "";
+      _isInspirationQuran = false;
+    }
+
     _currentBlessing = _blessingsList[dayOfYear % _blessingsList.length];
 
     // Event Banner: Check date first
@@ -182,19 +234,26 @@ class TasksViewModel extends ChangeNotifier {
   void refreshRandomContent() {
     // Pick random new values
     final random = DateTime.now().millisecondsSinceEpoch;
+    final useQuran = random % 2 == 0; // 50/50 chance
 
-    _currentInspiration = _inspirationsList[random % _inspirationsList.length];
+    if (useQuran) {
+      final index = random % _quranVersesList.length;
+      _currentInspiration = _quranVersesList[index]["text"]!;
+      _currentInspirationSource = _quranVersesList[index]["source"]!;
+      _isInspirationQuran = true;
+    } else {
+      final index = random % _inspirationsList.length;
+      _currentInspiration = _inspirationsList[index];
+      _currentInspirationSource = "";
+      _isInspirationQuran = false;
+    }
+
     // Simple shift for others to ensure variety
     _currentBlessing = _blessingsList[(random + 5) % _blessingsList.length];
 
-    // For Event Banner, we can toggle between date specific (if any) and random general hints
-    // Or just random from generals + date specific?
-    // Let's just pick a random from general list to give "fresh" advice.
-    // Or maybe include the Date Specific one in the mix?
-
+    // For Event Banner
     final dateEvent = _getDateSpecificEvent();
-    if (dateEvent != null && (random % 2 == 0)) {
-      // 50% chance to show the date event again (if exists)
+    if (dateEvent != null && (random % 3 == 0)) {
       _currentEventBanner = dateEvent;
     } else {
       _currentEventBanner =
