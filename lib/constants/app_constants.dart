@@ -20,4 +20,5 @@ const String kProphetPrayer =
     '\u0627\u0644\u0635\u0644\u0627\u0629\u0020\u0639\u0644\u0649\u0020\u0627\u0644\u0646\u0628\u064A';
 const String kQuranWird =
     '\u0648\u0631\u062F\u0020\u0627\u0644\u0642\u0631\u0622\u0646';
+const String kPrayerQiyam = 'قيام الليل';
 const String kCustomWird = 'ورد مخصص';

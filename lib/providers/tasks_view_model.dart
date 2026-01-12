@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
@@ -51,6 +52,43 @@ class TasksViewModel extends ChangeNotifier {
 
   PrayerTimes? _tomorrowPrayerTimes;
   PrayerTimes? get tomorrowPrayerTimes => _tomorrowPrayerTimes;
+
+  DateTime? get nextPrayerTime {
+    if (_prayerTimes == null) return null;
+    final next = _prayerTimes!.nextPrayer();
+    // If next is none, it might be after Isha, so next is Fajr tomorrow?
+    // adhan package usually handles this if initialized correctly, or returns none if today's prayers are done.
+    if (next == Prayer.none) {
+      return _tomorrowPrayerTimes?.fajr;
+    }
+    return _prayerTimes!.timeForPrayer(next);
+  }
+
+  String get nextPrayerName {
+    if (_prayerTimes == null) return "";
+    final next = _prayerTimes!.nextPrayer();
+    if (next == Prayer.none) return "الفجر"; // Assuming tomorrow Fajr
+    return _getPrayerNameArabic(next);
+  }
+
+  String _getPrayerNameArabic(Prayer p) {
+    switch (p) {
+      case Prayer.fajr:
+        return "الفجر";
+      case Prayer.sunrise:
+        return "الشروق";
+      case Prayer.dhuhr:
+        return "الظهر";
+      case Prayer.asr:
+        return "العصر";
+      case Prayer.maghrib:
+        return "المغرب";
+      case Prayer.isha:
+        return "العشاء";
+      default:
+        return "";
+    }
+  }
 
   // Clock timer state
   DateTime _now = DateTime.now();
@@ -137,6 +175,8 @@ class TasksViewModel extends ChangeNotifier {
     // Event Banner: Check date first
     _currentEventBanner = _getDateSpecificEvent() ??
         _generalEventsList[dayOfYear % _generalEventsList.length];
+
+    _updateWeather();
   }
 
   void refreshRandomContent() {
@@ -160,6 +200,8 @@ class TasksViewModel extends ChangeNotifier {
       _currentEventBanner =
           _generalEventsList[random % _generalEventsList.length];
     }
+
+    _updateWeather();
 
     notifyListeners();
   }
@@ -189,16 +231,8 @@ class TasksViewModel extends ChangeNotifier {
 
   void _startClock() {
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      final newNow = DateTime.now();
-      if (newNow.minute != _now.minute ||
-          newNow.hour != _now.hour ||
-          _now.day != newNow.day) {
-        _now = newNow;
-        notifyListeners();
-      } else {
-        // Just update internal time without rebuilding UI essentially
-        _now = newNow;
-      }
+      _now = DateTime.now();
+      notifyListeners();
     });
   }
 
@@ -216,6 +250,10 @@ class TasksViewModel extends ChangeNotifier {
       TaskItem(name: kPrayerAsr, description: "", targetCount: 1),
       TaskItem(name: kPrayerMaghrib, description: "", targetCount: 1),
       TaskItem(name: kPrayerIsha, description: "", targetCount: 1),
+      TaskItem(
+          name: kPrayerQiyam,
+          description: "ركعتين في جوف الليل",
+          targetCount: 1),
       TaskItem(
           name: kProphetPrayer,
           description: AppStrings.count200,
@@ -329,19 +367,26 @@ class TasksViewModel extends ChangeNotifier {
     _isLoadingLocation = true;
     notifyListeners();
 
+    // 1. Get location (optimized: tries cached first, then low accuracy fresh, then returns)
     final result = await _locationService.getCurrentPosition();
 
-    if (result.message.isNotEmpty) {
-      _locationName = result.message;
-      _isLoadingLocation = false;
-      notifyListeners();
-      // If position is null but message is set (error), we stop here unless we want to try cached inside service
-      if (result.position == null) return;
+    if (result.position != null) {
+      // 2. Calculate prayer times IMMEDIATELY (CPU conversion only, milliseconds)
+      await _calculatePrayers(result.position!);
+
+      // 3. Start geocoding in background (doesn't block UI from showing prayers)
+      _locationService.getLocationName(result.position!).then((name) {
+        _locationName = name;
+        notifyListeners();
+      });
+    } else {
+      _locationName = result.message.isNotEmpty
+          ? result.message
+          : AppStrings.unknownLocation;
     }
 
-    if (result.position != null) {
-      await _calculatePrayers(result.position!);
-    }
+    _isLoadingLocation = false;
+    notifyListeners();
   }
 
   Future<void> _calculatePrayers(Position position) async {
@@ -492,23 +537,58 @@ class TasksViewModel extends ChangeNotifier {
 
   // 3. Context Aware Athkar
   String get suggestedAthkar {
+    // 1. Precise logic based on Prayer Times (if available)
+    if (_prayerTimes != null) {
+      final next = _prayerTimes!.nextPrayer();
+      final current = _prayerTimes!.currentPrayer();
+
+      // Between Fajr and Sunrise -> Fajr Prayer / Morning Athkar
+      if (current == Prayer.fajr) return kPrayerFajr;
+
+      // Between Sunrise and Dhuhr -> Morning Athkar
+      if (current == Prayer.sunrise) return kAthkarMorning;
+
+      // Between Dhuhr and Asr -> Dhuhr/Work
+      if (current == Prayer.dhuhr) return kPrayerDhuhr;
+
+      // Between Asr and Maghrib -> Evening Athkar
+      if (current == Prayer.asr) return kAthkarEvening;
+
+      // Between Maghrib and Isha -> Maghrib Prayer
+      if (current == Prayer.maghrib) return kPrayerMaghrib;
+
+      // Between Isha and Midnight -> Isha Prayer / Sleep
+      if (current == Prayer.isha) {
+        // If late (after 2 hours of Isha), suggest Sleep Athkar
+        final ishaTime = _prayerTimes!.isha;
+        if (_now.difference(ishaTime).inHours >= 1) {
+          return kAthkarSleep; // 'أذكار النوم'
+        }
+        return kPrayerIsha;
+      }
+
+      // Pre-Fajr (Next is Fajr) -> Qiyam (Night Prayer)
+      if (next == Prayer.fajr) {
+        // If very close to Fajr (e.g. 20 mins), maybe suggest "Istighfar" or "Witr"
+        return kPrayerQiyam; // 'قيام الليل'
+      }
+    }
+
+    // 2. Fallback Logic (Time based ranges) if Location failed
     final hour = _now.hour;
     // Morning Athkar: 5:00 AM to 11:00 AM
     if (hour >= 5 && hour < 11) {
-      // Check if Morning Athkar is done, if not return it
-      // Actually standard logic is fine for morning range.
       return kAthkarMorning;
     }
-    // Fajr (Pre-Dawn): 3:00 AM to 5:00 AM
-    if (hour >= 3 && hour < 5) {
+    // Fajr (Pre-Dawn): 4:00 AM to 5:00 AM (Hardcoded fallback - shortened range)
+    if (hour >= 4 && hour < 5) {
       return kPrayerFajr;
     }
     // Evening Athkar: 3:00 PM (15:00) to 8:00 PM (20:00)
-    // Extended to 20 to cover the 6:50 PM case comfortably
     if (hour >= 15 && hour < 20) return kAthkarEvening;
 
     // Sleep Athkar: 8:00 PM onwards or late night
-    if (hour >= 20 || hour < 3) {
+    if (hour >= 20 || hour < 4) {
       // Check if Evening Athkar is done
       final eveningTask = _tasks.firstWhere(
         (t) => t.name == kAthkarEvening,
@@ -518,35 +598,141 @@ class TasksViewModel extends ChangeNotifier {
             targetCount: 1),
       );
 
-      if (!eveningTask.isCompleted) {
+      if (!eveningTask.isCompleted && hour < 24 && hour >= 15) {
         return kAthkarEvening;
       }
-      return kAthkarSleep; // "أذكار النوم" in Consts
+      return kAthkarSleep; // "أذكار النوم"
     }
 
     return "استغفر الله";
   }
 
   // 4. Weather Mock
-  Map<String, String> get weatherInfo {
+  Map<String, String> _weatherInfo = {};
+  Map<String, String> get weatherInfo => _weatherInfo;
+
+  void _updateWeather() {
     final month = _now.month;
-    final hour = _now.hour;
+    // hour is not used anymore
+    final random = Random();
 
     String temp = "25°";
     String advice = "جو معتدل";
 
+    // Add some random variation to temp to make it look "updated"
+    int variation = random.nextInt(5) - 2; // -2 to +2
+
     if (month >= 11 || month <= 2) {
       // Winter
-      temp = "12°";
-      advice = (hour < 8 || hour > 18)
-          ? "الجو بارد، ارتدِ ملابس ثقيلة للصلاة"
-          : "جو شتوي لطيف";
+      temp = "${12 + variation}°";
+      List<String> advices = [
+        "الجو بارد، ارتدِ ملابس ثقيلة للصلاة",
+        "جو شتوي لطيف، لا تنسى الأذكار",
+        "برودة الجو تذكرنا بزمهرير جهنم، استجر بالله",
+        "اغتنم ليل الشتاء الطويل في القيام"
+      ];
+      advice = advices[random.nextInt(advices.length)];
     } else if (month >= 6 && month <= 8) {
       // Summer
-      temp = "38°";
-      advice = "حار ومشمش، حافظ على رطوبتك";
+      temp = "${38 + variation}°";
+      List<String> advices = [
+        "حار ومشمش، حافظ على رطوبتك",
+        "حر الدنيا يذكرنا بحر الآخرة",
+        "تجنب الشمس وقت الظهيرة",
+        "سبحان من يسبح الرعد بحمده"
+      ];
+      advice = advices[random.nextInt(advices.length)];
+    } else {
+      // Spring/Autumn
+      temp = "${25 + variation}°";
+      List<String> advices = [
+        "جو معتدل ولطيف",
+        "سبحان مغير الأحوال",
+        "استمتع بنعم الله في خلقه",
+        "الجو مناسب للمشي إلى المسجد"
+      ];
+      advice = advices[random.nextInt(advices.length)];
     }
 
-    return {"temp": temp, "advice": advice};
+    _weatherInfo = {"temp": temp, "advice": advice};
+  }
+
+  // --- Dynamic Background Logic ---
+  LinearGradient get currentBackgroundGradient {
+    final hour = _now.hour;
+
+    // Fajr / Early Morning (4 - 6) - Purple to Orange (Sunrise)
+    if (hour >= 4 && hour < 6) {
+      return const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF2C3E50), Color(0xFFFD746C)],
+      );
+    }
+    // Morning / Day (6 - 16) - Bright Blue
+    else if (hour >= 6 && hour < 16) {
+      return const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF2980B9), Color(0xFF6DD5FA), Color(0xFFFFFFFF)],
+      );
+    }
+    // Sunset / Maghrib (16 - 19) - Orange to Deep Purple
+    else if (hour >= 16 && hour < 19) {
+      return const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFff7e5f), Color(0xFFfeb47b)], // Sunset theme
+      );
+    }
+    // Night (19 - 4) - Deep Blue/Black
+    else {
+      return const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF141E30), Color(0xFF243B55)],
+      );
+    }
+  }
+
+  // --- Rings Progress Logic ---
+  // Returns value between 0.0 and 1.0
+  double get prayersProgress {
+    final prayerTasks = _tasks.where((t) =>
+        t.name == kPrayerFajr ||
+        t.name == kPrayerDhuhr ||
+        t.name == kPrayerAsr ||
+        t.name == kPrayerMaghrib ||
+        t.name == kPrayerIsha);
+    if (prayerTasks.isEmpty) return 0.0;
+    final completed = prayerTasks.where((t) => t.isCompleted).length;
+    return completed / prayerTasks.length;
+  }
+
+  double get athkarProgress {
+    final athkarTasks = _tasks.where((t) =>
+        t.name == kAthkarMorning ||
+        t.name == kAthkarEvening ||
+        t.name == kAthkarSleep ||
+        t.name == kProphetPrayer); // Including Prophet's prayer
+    if (athkarTasks.isEmpty) return 0.0;
+    final completed = athkarTasks.where((t) => t.isCompleted).length;
+    return completed / athkarTasks.length;
+  }
+
+  double get quranProgress {
+    final quranTask =
+        _tasks.firstWhere((t) => t.name == kQuranWird, orElse: () => _tasks[0]);
+    // Also include 'Sunnah' prayers as bonus here if you want
+    // For now simple single task check
+    return quranTask.isCompleted ? 1.0 : 0.0;
+  }
+
+  // Quick Action Handler
+  void performQuickAction(String actionName) {
+    // Just increment a virtual "Good Deeds" counter or Streak for visual feedback
+    // In real app, save to DB
+    _morningStreak++; // Using streak as points for now
+    notifyListeners();
   }
 }

@@ -2,6 +2,7 @@ class AppStrings {
   static const String appName =
       'تطبيق العبادات'; // Assuming this is kAppName's value
   static const String fajr = 'الفجر';
+  static const String sunrise = 'الشروق';
   static const String dhuhr = 'الظهر';
   static const String asr = 'العصر';
   static const String maghrib = 'المغرب';
@@ -48,7 +49,6 @@ class AppStrings {
   static const String gregorian = 'ميلادي';
   static const String today = 'اليوم: ';
   static const String hijriDate = 'التاريخ الهجري: ';
-  static const String sunrise = 'الشروق';
   static const String nextPrayer = 'الصلاة القادمة';
   static const String gregorianDate = 'التاريخ الميلاد: ';
 

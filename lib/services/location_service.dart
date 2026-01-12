@@ -29,17 +29,22 @@ class LocationService {
 
       // Try cached first
       final cached = await Geolocator.getLastKnownPosition();
+
+      // If cached is available, check if it is recent enough (e.g. within 24 hours)
+      // or just return it immediately to speed up the app significantly.
+      // For Prayer App, city-level accuracy is fine, so 500 meters or even a few km is okay.
       if (cached != null) {
-        // Return cached immediately, but maybe the caller wants fresh?
-        // Logic in View could be: use cached, then try fresh in background.
-        // For simplicity here, we try fresh, if fails, return cached.
+        // Return cached immediately if we have it, then we can update quietly if needed.
+        return (position: cached, message: '');
       }
 
+      // If no cached location, we MUST fetch fresh.
       try {
         final position = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.medium,
-            timeLimit: Duration(seconds: 8),
+            accuracy:
+                LocationAccuracy.low, // Changed from medium to low for speed
+            timeLimit: Duration(seconds: 10),
           ),
         );
         return (position: position, message: '');

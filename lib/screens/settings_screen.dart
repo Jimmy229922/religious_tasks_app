@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -17,6 +18,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   Map<String, bool> adhanSettings = {
     'fajr': true,
+    'sunrise': true,
     'dhuhr': true,
     'asr': true,
     'maghrib': true,
@@ -37,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       adhanSettings['fajr'] = prefs.getBool('adhan_enabled_fajr') ?? true;
+      adhanSettings['sunrise'] = prefs.getBool('adhan_enabled_sunrise') ?? true;
       adhanSettings['dhuhr'] = prefs.getBool('adhan_enabled_dhuhr') ?? true;
       adhanSettings['asr'] = prefs.getBool('adhan_enabled_asr') ?? true;
       adhanSettings['maghrib'] = prefs.getBool('adhan_enabled_maghrib') ?? true;
@@ -146,10 +149,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildSectionHeader("تنبيهات الأذان"),
                   const SizedBox(height: 8),
                   _buildSwitchTile('fajr', AppStrings.fajr),
+                  _buildSwitchTile('sunrise', AppStrings.sunrise),
                   _buildSwitchTile('dhuhr', AppStrings.dhuhr),
                   _buildSwitchTile('asr', AppStrings.asr),
                   _buildSwitchTile('maghrib', AppStrings.maghrib),
                   _buildSwitchTile('isha', AppStrings.isha),
+
+                  const SizedBox(height: 20),
+
+                  // Section: Support
+                  _buildSectionHeader("تواصل معنا"),
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.email_outlined,
+                              color: Colors.blue),
+                          title: const Text("أرسل اقتراحاتك"),
+                          subtitle: const Text("ahmed9ahmed779@gmail.com"),
+                          trailing:
+                              const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () async {
+                            final Uri emailUri = Uri(
+                              scheme: 'mailto',
+                              path: 'ahmed9ahmed779@gmail.com',
+                              query: 'subject=اقتراح لتطبيق المهام الدينية',
+                            );
+                            try {
+                              await launchUrl(emailUri);
+                            } catch (e) {
+                              // Ignore
+                            }
+                          },
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.chat_bubble_outline,
+                              color: Colors.green),
+                          title: const Text("تواصل عبر واتساب"),
+                          subtitle: const Text("+201096304673"),
+                          trailing:
+                              const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () async {
+                            final Uri whatsappUri =
+                                Uri.parse('https://wa.me/201096304673');
+                            try {
+                              await launchUrl(whatsappUri,
+                                  mode: LaunchMode.externalApplication);
+                            } catch (e) {
+                              // Ignore
+                            }
+                          },
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.star_rate_rounded,
+                              color: Colors.amber),
+                          title: const Text("قيم التطبيق"),
+                          trailing:
+                              const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () {
+                            // Link to store
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

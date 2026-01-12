@@ -1,8 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../data/athkar_data.dart';
+import '../models/dhikr_item.dart';
 import '../services/athkar_tracking_service.dart';
+
 import '../services/storage_service.dart';
+
+enum AthkarType { morning, evening, sleep }
 
 class AthkarViewModel extends ChangeNotifier {
   bool _isLoading = true;
@@ -21,14 +25,17 @@ class AthkarViewModel extends ChangeNotifier {
 
   Future<void> _loadDailyData() async {
     _isLoading = true;
-    // notifyListeners(); // optional, depending on if we want to show loading spinner again on external reloads
+    // notifyListeners();
 
     final prefs = StorageService.instance.prefs;
     final todayKey = AthkarTrackingService.formatDay(DateTime.now());
-    final morning =
-        _loadProgress(prefs.getString, isMorning: true, todayKey: todayKey);
-    final evening =
-        _loadProgress(prefs.getString, isMorning: false, todayKey: todayKey);
+
+    final morning = _loadProgress(prefs.getString,
+        type: AthkarType.morning, todayKey: todayKey);
+    final evening = _loadProgress(prefs.getString,
+        type: AthkarType.evening, todayKey: todayKey);
+    final sleep = _loadProgress(prefs.getString,
+        type: AthkarType.sleep, todayKey: todayKey);
 
     final morningDays =
         await AthkarTrackingService.loadCompletedDays(isMorning: true);
@@ -42,6 +49,7 @@ class AthkarViewModel extends ChangeNotifier {
     _data = AthkarDataState(
       morning: morning,
       evening: evening,
+      sleep: sleep,
       streak: streak,
       todayComplete: todayComplete,
       encouragement: encouragement,
@@ -52,16 +60,41 @@ class AthkarViewModel extends ChangeNotifier {
 
   AthkarProgress _loadProgress(
     String? Function(String key) getString, {
-    required bool isMorning,
+    required AthkarType type,
     required String todayKey,
   }) {
-    final items = isMorning ? buildMorningAthkar() : buildEveningAthkar();
-    final total = items.fold<int>(0, (sum, item) => sum + item.count);
-    final dateKey = isMorning ? 'athkar_morning_date' : 'athkar_evening_date';
-    final progressKey =
-        isMorning ? 'athkar_morning_progress' : 'athkar_evening_progress';
+    List<DhikrItem> items;
+    String dateKey;
+    String progressKey;
 
-    if (getString(dateKey) != todayKey) {
+    switch (type) {
+      case AthkarType.morning:
+        items = buildMorningAthkar();
+        dateKey = 'athkar_morning_date';
+        progressKey = 'athkar_morning_progress';
+        break;
+      case AthkarType.evening:
+        items = buildEveningAthkar();
+        dateKey = 'athkar_evening_date';
+        progressKey = 'athkar_evening_progress';
+        break;
+      case AthkarType.sleep:
+        items = buildSleepAthkar();
+        dateKey = 'athkar_sleep_date';
+        progressKey = 'athkar_sleep_progress';
+        break;
+    }
+
+    final total = items.fold<int>(0, (sum, item) => sum + item.count);
+
+    if (getString(dateKey) != todayKey && type != AthkarType.sleep) {
+      // Sleep athkar might be done at night (next day logic?) or same day.
+      // For now, assume same day reset logic applies.
+      return AthkarProgress(current: 0, total: total);
+    }
+
+    // For sleep, we might want to check if logic differs, but keeping standard for now.
+    if (type == AthkarType.sleep && getString(dateKey) != todayKey) {
       return AthkarProgress(current: 0, total: total);
     }
 
@@ -134,6 +167,7 @@ class AthkarProgress {
 class AthkarDataState {
   final AthkarProgress morning;
   final AthkarProgress evening;
+  final AthkarProgress sleep;
   final int streak;
   final bool todayComplete;
   final String encouragement;
@@ -141,6 +175,7 @@ class AthkarDataState {
   AthkarDataState({
     required this.morning,
     required this.evening,
+    required this.sleep,
     required this.streak,
     required this.todayComplete,
     required this.encouragement,

@@ -1,7 +1,10 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import '../services/notifications_service.dart';
 import '../providers/theme_provider.dart';
@@ -18,10 +21,45 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  String _version = '';
+  String _dailyQuote = '';
+
+  final List<String> _quotes = [
+    'وَقُل رَّبِّ زِدْنِي عِلْمًا',
+    'فَاذْكُرُونِي أَذْكُرْكُمْ',
+    'أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ',
+    'إِنَّ اللَّهَ مَعَ الصَّابِرِينَ',
+    'وَمَا تَوْفِيقِي إِلَّا بِاللَّهِ',
+    'خَيْرُ النَّاسِ أَنْفَعُهُمْ لِلنَّاسِ',
+    'الدّالُّ عَلَى الْخَيْرِ كَفَاعِلِهِ',
+  ];
+
   @override
   void initState() {
     super.initState();
+    debugPrint("🚀 Splash Screen Init Started");
+    debugPrint(
+        "🎨 Colors should be Blue (0xFF1565C0) - If Green, it's old code");
+
+    // Remove the native splash screen immediately when this widget mounts
+    FlutterNativeSplash.remove();
+
+    _loadVersion();
+    _picksRandomQuote();
     _checkOnboardingAndNavigate();
+  }
+
+  void _picksRandomQuote() {
+    setState(() {
+      _dailyQuote = _quotes[Random().nextInt(_quotes.length)];
+    });
+  }
+
+  Future<void> _loadVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    setState(() {
+      _version = 'v${packageInfo.version}';
+    });
   }
 
   Future<void> _checkOnboardingAndNavigate() async {
@@ -32,7 +70,10 @@ class _SplashScreenState extends State<SplashScreen> {
       debugPrint("Notification init error: $e");
     }
 
-    await Future.delayed(const Duration(seconds: 3));
+    // Delay removed to make the transition faster
+    // If you want to force the user to read the quote, uncomment the line below:
+    // await Future.delayed(const Duration(seconds: 2));
+
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -95,29 +136,30 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: SizedBox.expand(
         child: DecoratedBox(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF1E5128), Color(0xFF43A047)],
+              colors: [Color(0xFF1565C0), Color(0xFF64B5F6)],
             ),
           ),
           child: SafeArea(
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 24.0, horizontal: 16),
+              padding:
+                  const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  SizedBox(height: 1),
+                  const SizedBox(height: 1),
                   Column(
                     children: [
-                      Icon(Icons.mosque, size: 100, color: Colors.white),
-                      SizedBox(height: 20),
-                      Text(
+                      const Icon(Icons.mosque, size: 100, color: Colors.white),
+                      const SizedBox(height: 20),
+                      const Text(
                         kAppName,
                         style: TextStyle(
                           fontSize: 32,
@@ -125,26 +167,43 @@ class _SplashScreenState extends State<SplashScreen> {
                           color: Colors.white,
                         ),
                       ),
-                      SizedBox(height: 20),
-                      CircularProgressIndicator(
+                      const SizedBox(height: 20),
+                      const CircularProgressIndicator(
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
-                      SizedBox(height: 10),
-                      Text(
-                        '\u062c\u0627\u0631\u064a\u0020\u062a\u062d\u0645\u064a\u0644\u0020\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u002e\u002e\u002e\u0020\u064a\u0631\u062c\u0649\u0020\u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631',
+                      const SizedBox(height: 10),
+                      const Text(
+                        'جاري تحميل البيانات... يرجى الانتظار',
                         style: TextStyle(color: Colors.white70, fontSize: 14),
                         textAlign: TextAlign.center,
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       Text(
-                        '\u0627\u062f\u0639\u0648\u0644\u064a\u0020\u0628\u0627\u0644\u062a\u064a\u0633\u064a\u0631',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        _dailyQuote,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontFamily:
+                              'Amiri', // Assuming you might have a font or default
+                          fontStyle: FontStyle.italic,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
-                  Text(
-                    '\u00a9\u00202026\u0020\u062c\u0645\u064a\u0639\u0020\u0627\u0644\u062d\u0642\u0648\u0642\u0020\u0645\u062d\u0641\u0648\u0638\u0629\u0020-\u0020\u0623\u062d\u0645\u062f\u0020\u062c\u0645\u0627\u0644',
-                    style: TextStyle(color: Colors.white60, fontSize: 12),
+                  Column(
+                    children: [
+                      Text(
+                        _version,
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        '© 2026 جميع الحقوق محفوظة - أحمد جمال',
+                        style: TextStyle(color: Colors.white60, fontSize: 12),
+                      ),
+                    ],
                   ),
                 ],
               ),

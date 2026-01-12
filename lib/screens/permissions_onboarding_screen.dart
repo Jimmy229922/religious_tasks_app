@@ -198,7 +198,7 @@ class _PermissionsOnboardingScreenState
               ElevatedButton(
                 onPressed: _finishOnboarding,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
+                  backgroundColor: const Color(0xFF1565C0), // Blue
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -232,10 +232,11 @@ class _PermissionsOnboardingScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isGranted ? Colors.teal.shade50 : Colors.grey[50],
+        color:
+            isGranted ? const Color(0xFFE3F2FD) : Colors.grey[50], // Blue shade
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isGranted ? Colors.teal : Colors.grey[300]!,
+          color: isGranted ? const Color(0xFF1565C0) : Colors.grey[300]!,
           width: isGranted ? 1.5 : 1,
         ),
       ),
@@ -244,7 +245,9 @@ class _PermissionsOnboardingScreenState
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isGranted ? Colors.teal.shade100 : Colors.grey[200],
+              color: isGranted
+                  ? const Color(0xFFBBDEFB)
+                  : Colors.grey[200], // Blue shade
               shape: BoxShape.circle,
             ),
             child: Icon(

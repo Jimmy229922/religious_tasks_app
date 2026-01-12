@@ -142,15 +142,20 @@ class NotificationManager {
     );
 
     // 3. Specific Adhan Channels (One for each prayer to allow custom sounds)
-    final prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    final prayers = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
     for (var prayer in prayers) {
+      String soundName = 'adhan_$prayer';
+      if (prayer == 'sunrise') {
+        soundName = 'prayer_reminder';
+      }
+
       await androidPlugin?.createNotificationChannel(
         AndroidNotificationChannel(
           'adhan_channel_$prayer', // e.g. adhan_channel_fajr
           '${AppStrings.notificationAdhanChannelName} - $prayer',
           description: AppStrings.notificationAdhanChannelDesc,
           importance: Importance.max,
-          sound: RawResourceAndroidNotificationSound('adhan_$prayer'),
+          sound: RawResourceAndroidNotificationSound(soundName),
           playSound: true,
         ),
       );
@@ -264,6 +269,13 @@ class NotificationManager {
         'tomorrow': tomorrow.fajr
       },
       {
+        'id': 106,
+        'key': 'sunrise',
+        'name': AppStrings.sunrise,
+        'today': today.sunrise,
+        'tomorrow': tomorrow.sunrise
+      },
+      {
         'id': 102,
         'key': 'dhuhr',
         'name': AppStrings.dhuhr,
@@ -346,6 +358,11 @@ class NotificationManager {
       final isAdhanEnabled = prefs.getBool('adhan_enabled_$key') ?? true;
 
       if (isAdhanEnabled) {
+        String soundName = 'adhan_$key';
+        if (key == 'sunrise') {
+          soundName = 'prayer_reminder';
+        }
+
         // Create specific details for this prayer to use its specific channel
         final adhanDetails = NotificationDetails(
             android: AndroidNotificationDetails(
@@ -354,8 +371,8 @@ class NotificationManager {
           channelDescription: AppStrings.notificationAdhanChannelDesc,
           importance: Importance.high,
           priority: Priority.high,
-          sound: RawResourceAndroidNotificationSound(
-              'adhan_$key'), // Specific sound
+          sound:
+              RawResourceAndroidNotificationSound(soundName), // Specific sound
           playSound: true,
         ));
 
@@ -433,6 +450,11 @@ class NotificationManager {
   /// Plays a test notification immediately for the specific prayer to verify audio
   Future<void> testAdhanNotification(
       String prayerKey, String prayerName) async {
+    String soundName = 'adhan_$prayerKey';
+    if (prayerKey == 'sunrise') {
+      soundName = 'prayer_reminder';
+    }
+
     final details = NotificationDetails(
         android: AndroidNotificationDetails(
       'adhan_channel_$prayerKey',
@@ -440,7 +462,7 @@ class NotificationManager {
       channelDescription: AppStrings.notificationAdhanChannelDesc,
       importance: Importance.high,
       priority: Priority.high,
-      sound: RawResourceAndroidNotificationSound('adhan_$prayerKey'),
+      sound: RawResourceAndroidNotificationSound(soundName),
       playSound: true,
     ));
 
