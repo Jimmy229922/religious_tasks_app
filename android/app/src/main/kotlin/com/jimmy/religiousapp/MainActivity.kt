@@ -1,4 +1,4 @@
-package com.example.religious_tasks_app
+package com.jimmy.religiousapp
 
 import io.flutter.embedding.android.FlutterActivity
 

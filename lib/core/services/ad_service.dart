@@ -10,11 +10,10 @@ class AdService {
   InterstitialAd? _interstitialAd;
   bool _isAdLoaded = false;
 
-  // Test ID for development. Verify this before release!
-  // Production IDs should be used when releasing to store.
+  // Production interstitial ad unit ID.
   final String _adUnitId = Platform.isAndroid
-      ? 'ca-app-pub-9685582860512381~2240553823' // Test Android Interstitial
-      : 'ca-app-pub-9685582860512381/2048982138'; // Test iOS Interstitial
+      ? 'ca-app-pub-9685582860512381/2048982138'
+      : 'ca-app-pub-9685582860512381/2048982138';
 
   Future<void> _initAdMobConfig() async {
     // 1. Set Content Rating to "G" (General Audiences) - safest level.

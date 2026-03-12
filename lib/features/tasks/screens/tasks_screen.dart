@@ -101,7 +101,7 @@ class _TasksScreenState extends State<TasksScreen> {
                               builder: (_) => const SettingsScreen())),
                     ),
                     title: Text(
-                      "رفيق مسلم",
+                      kAppName,
                       style: GoogleFonts.arefRuqaa(
                         fontWeight: FontWeight.bold,
                         fontSize: 26,

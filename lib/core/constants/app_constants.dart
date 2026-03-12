@@ -1,4 +1,4 @@
-const String kAppName = 'رفيق مسلم';
+const String kAppName = 'رفيق المسلم';
 const String kAthkarLabel = 'أذكار';
 const String kAthkarMorning = 'أذكار الصباح';
 const String kAthkarEvening = 'أذكار المساء';
