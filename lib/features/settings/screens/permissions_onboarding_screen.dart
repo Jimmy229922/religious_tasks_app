@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:religious_tasks_app/core/services/notifications_service.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import '../../tasks/screens/tasks_screen.dart';
 
@@ -116,6 +117,9 @@ class _PermissionsOnboardingScreenState
     // Save that we've finished onboarding
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_completed', true);
+    NotificationManager().init().catchError((Object error) {
+      debugPrint("Notification init error: $error");
+    });
 
     if (!mounted) return;
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);

@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="splash_app_name">رفيق المسلم</string>
+    <string name="splash_loading_message">جاري تحميل البيانات... يرجى الانتظار</string>
+    <string name="splash_footer">© 2026 جميع الحقوق محفوظة - أحمد جمال</string>
+    <string name="splash_version_format">v%1$s</string>
+    <string-array name="splash_quotes">
+        <item>وَقُل رَّبِّ زِدْنِي عِلْمًا</item>
+        <item>فَاذْكُرُونِي أَذْكُرْكُمْ</item>
+        <item>أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ</item>
+        <item>إِنَّ اللَّهَ مَعَ الصَّابِرِينَ</item>
+        <item>وَمَا تَوْفِيقِي إِلَّا بِاللَّهِ</item>
+        <item>خَيْرُ النَّاسِ أَنْفَعُهُمْ لِلنَّاسِ</item>
+        <item>الدَّالُّ عَلَى الْخَيْرِ كَفَاعِلِهِ</item>
+    </string-array>
 </resources>
