@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -53,6 +55,19 @@ class _NotificationSettingsScreenState
     await _preferencesService.setAdhanEnabled(prayerKey, value);
     await _reschedulePrayerNotifications(
       successMessage: 'تم تحديث إعدادات الأذان',
+    );
+  }
+
+  Future<void> _updateAdhanSoundType(AdhanSoundType? type) async {
+    if (type == null) return;
+
+    setState(() {
+      _preferences = _preferences.copyWith(adhanSoundType: type);
+    });
+
+    await _preferencesService.setAdhanSoundType(type);
+    await _reschedulePrayerNotifications(
+      successMessage: 'تم تحديث نوع صوت الأذان',
     );
   }
 
@@ -215,6 +230,52 @@ class _NotificationSettingsScreenState
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  _buildSectionHeader('صوت الأذان'),
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'اختر نوع التنبيه لوقت الأذان:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          RadioListTile<AdhanSoundType>(
+                            title: const Text('أذان كامل (صوت المؤذن)'),
+                            subtitle: const Text(
+                                'تشغيل الأذان كاملاً عند دخول وقت الصلاة'),
+                            value: AdhanSoundType.full,
+                            groupValue: _preferences.adhanSoundType,
+                            onChanged: _isApplying ? null : _updateAdhanSoundType,
+                          ),
+                          RadioListTile<AdhanSoundType>(
+                            title: const Text('تنبيه قصير'),
+                            subtitle:
+                                const Text('تشغيل صوت تنبيه بسيط لوقت الأذان'),
+                            value: AdhanSoundType.short,
+                            groupValue: _preferences.adhanSoundType,
+                            onChanged: _isApplying ? null : _updateAdhanSoundType,
+                          ),
+                          RadioListTile<AdhanSoundType>(
+                            title: const Text('صامت (إشعار فقط)'),
+                            subtitle:
+                                const Text('إظهار إشعار بدون صوت عند وقت الأذان'),
+                            value: AdhanSoundType.none,
+                            groupValue: _preferences.adhanSoundType,
+                            onChanged: _isApplying ? null : _updateAdhanSoundType,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   _buildSectionHeader('تنبيهات الأذان'),
                   ...NotificationPreferencesService.prayerKeys.map(
                     (prayerKey) => _buildPrayerSwitchTile(

@@ -64,7 +64,6 @@ class DhikrCard extends StatelessWidget {
     return InkWell(
       onTap: () {
         if (!isDone) {
-          HapticFeedback.lightImpact();
           onIncrement(index);
         }
       },
@@ -92,15 +91,13 @@ class DhikrCard extends StatelessWidget {
             color: isDone ? accent : border,
             width: isDone ? 2 : 1,
           ),
-          boxShadow: trueBlackMode
+          boxShadow: trueBlackMode || isDone
               ? []
               : [
                   BoxShadow(
-                    color: isDone
-                        ? accent.withValues(alpha: 0.15)
-                        : Colors.black.withValues(alpha: isDark ? 0.2 : 0.08),
-                    blurRadius: isDone ? 12 : 14,
-                    offset: const Offset(0, 6),
+                    color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
         ),
@@ -112,44 +109,34 @@ class DhikrCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  InkWell(
-                    onTap: () {
-                      if (!isDone) {
-                        HapticFeedback.lightImpact();
-                        onIncrement(index);
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: accent.withValues(alpha: 0.5), width: 1.5),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.touch_app, size: 16, color: accent),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${item.current} / ${item.count}',
-                            style: TextStyle(
-                              color: accent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: accent.withValues(alpha: 0.5), width: 1.5),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.touch_app, size: 16, color: accent),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${item.current} / ${item.count}',
+                          style: TextStyle(
+                            color: accent,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                   if (!isFocus)
-                    InkWell(
+                    GestureDetector(
                       onTap: () => onSpeak(index),
-                      borderRadius: BorderRadius.circular(20),
                       child: Padding(
                         padding: const EdgeInsets.all(6),
                         child: AnimatedSwitcher(

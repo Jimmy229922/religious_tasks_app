@@ -13,6 +13,7 @@ class NotificationPreferencesService {
   ];
   static const List<int> dhikrIntervalOptions = [10, 60, 90, 120];
 
+  static const String adhanSoundTypeKey = 'adhan_sound_type_v1';
   static const String hourlyDhikrEnabledKey = 'hourly_dhikr_enabled_v1';
   static const String hourlyDhikrIntervalKey =
       'hourly_dhikr_interval_minutes_v1';
@@ -26,6 +27,9 @@ class NotificationPreferencesService {
     final defaults = NotificationPreferences.defaults();
     final adhanEnabled = <String, bool>{};
     final storedInterval = prefs.getInt(hourlyDhikrIntervalKey);
+    final soundTypeIndex = prefs.getInt(adhanSoundTypeKey) ?? 
+        AdhanSoundType.full.index;
+    final adhanSoundType = AdhanSoundType.values[soundTypeIndex.clamp(0, AdhanSoundType.values.length - 1)];
 
     for (final prayerKey in prayerKeys) {
       adhanEnabled[prayerKey] =
@@ -34,6 +38,7 @@ class NotificationPreferencesService {
 
     return defaults.copyWith(
       adhanEnabled: adhanEnabled,
+      adhanSoundType: adhanSoundType,
       morningAthkarReminderEnabled:
           prefs.getBool(morningAthkarReminderEnabledKey) ??
               defaults.morningAthkarReminderEnabled,
@@ -52,6 +57,11 @@ class NotificationPreferencesService {
   Future<void> setAdhanEnabled(String prayerKey, bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('adhan_enabled_$prayerKey', value);
+  }
+
+  Future<void> setAdhanSoundType(AdhanSoundType type) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(adhanSoundTypeKey, type.index);
   }
 
   Future<void> setMorningAthkarReminderEnabled(bool value) async {

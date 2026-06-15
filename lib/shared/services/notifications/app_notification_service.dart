@@ -1,5 +1,6 @@
 import 'package:adhan/adhan.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,8 @@ class AppNotificationService {
       FlutterLocalNotificationsPlugin();
   final NotificationPreferencesService _preferencesService =
       NotificationPreferencesService();
+  static const MethodChannel _nativeAdhanChannel =
+      MethodChannel('religious_tasks_app/native_adhan');
 
   bool _isInitialized = false;
 
@@ -31,7 +34,7 @@ class AppNotificationService {
   static const String dhikrChannelId = 'athkar_reminders';
   static const String dhikrSound = 'dhikr_chime';
   static const String notificationChannelVersionKey =
-      'notification_channels_v5';
+      'notification_channels_v7';
 
   static const int _dhikrNotificationStartId = 4000;
   static const int _dhikrScheduleWindowMinutes = 48 * 60;
@@ -202,6 +205,7 @@ class AppNotificationService {
       final baseId = item['id'] as int;
       await _plugin.cancel(baseId);
       await _plugin.cancel(baseId + 100);
+      await _cancelNativeAdhan(baseId + 100);
     }
 
     const reminderDetails = NotificationDetails(
@@ -245,36 +249,17 @@ class AppNotificationService {
         continue;
       }
 
-      var soundName = 'adhan_$key';
-      if (key == 'sunrise') {
-        soundName = prayerReminderSound;
-      }
-
-      final adhanDetails = NotificationDetails(
-        android: AndroidNotificationDetails(
-          'adhan_channel_$key',
-          '${AppStrings.notificationAdhanChannelName} - $key',
-          channelDescription: AppStrings.notificationAdhanChannelDesc,
-          importance: Importance.high,
-          priority: Priority.high,
-          sound: RawResourceAndroidNotificationSound(soundName),
-          playSound: true,
-        ),
-      );
-
       var adhanTime = tz.TZDateTime.from(todayTime, tz.local);
       if (adhanTime.isBefore(now)) {
         adhanTime = tz.TZDateTime.from(tomorrowTime, tz.local);
       }
 
       if (adhanTime.isAfter(now)) {
-        await _safeZonedSchedule(
+        await _scheduleNativeAdhan(
           baseId + 100,
-          AppStrings.timeForAdhan,
-          '${AppStrings.nowPrayer} $name',
-          adhanTime,
-          adhanDetails,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          key,
+          name,
+          adhanTime.millisecondsSinceEpoch,
         );
       }
     }
@@ -361,11 +346,19 @@ class AppNotificationService {
   Future<void> testAdhanNotification(
       String prayerKey, String prayerName) async {
     await _ensureInitialized();
+    final preferences = await _preferencesService.load();
+
+    if (preferences.adhanSoundType == AdhanSoundType.full) {
+      await _playNativeAdhanNow(prayerKey, prayerName);
+      return;
+    }
 
     var soundName = 'adhan_$prayerKey';
     if (prayerKey == 'sunrise') {
       soundName = prayerReminderSound;
     }
+
+    final useSound = preferences.adhanSoundType == AdhanSoundType.short;
 
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -374,8 +367,8 @@ class AppNotificationService {
         channelDescription: AppStrings.notificationAdhanChannelDesc,
         importance: Importance.high,
         priority: Priority.high,
-        sound: RawResourceAndroidNotificationSound(soundName),
-        playSound: true,
+        sound: useSound ? RawResourceAndroidNotificationSound(soundName) : null,
+        playSound: useSound,
       ),
     );
 
@@ -574,6 +567,45 @@ class AppNotificationService {
       } else {
         debugPrint('Failed to schedule exact notification $id: $e');
       }
+    }
+  }
+
+  Future<void> _scheduleNativeAdhan(
+    int requestCode,
+    String prayerKey,
+    String prayerName,
+    int timeMillis,
+  ) async {
+    try {
+      await _nativeAdhanChannel.invokeMethod<void>('schedule', {
+        'requestCode': requestCode,
+        'prayerKey': prayerKey,
+        'prayerName': prayerName,
+        'timeMillis': timeMillis,
+      });
+    } catch (e) {
+      debugPrint('Failed to schedule native adhan $requestCode: $e');
+    }
+  }
+
+  Future<void> _cancelNativeAdhan(int requestCode) async {
+    try {
+      await _nativeAdhanChannel.invokeMethod<void>('cancel', {
+        'requestCode': requestCode,
+      });
+    } catch (e) {
+      debugPrint('Failed to cancel native adhan $requestCode: $e');
+    }
+  }
+
+  Future<void> _playNativeAdhanNow(String prayerKey, String prayerName) async {
+    try {
+      await _nativeAdhanChannel.invokeMethod<void>('playNow', {
+        'prayerKey': prayerKey,
+        'prayerName': prayerName,
+      });
+    } catch (e) {
+      debugPrint('Failed to play native adhan now: $e');
     }
   }
 }

@@ -1,5 +1,12 @@
+enum AdhanSoundType {
+  none,
+  short,
+  full,
+}
+
 class NotificationPreferences {
   final Map<String, bool> adhanEnabled;
+  final AdhanSoundType adhanSoundType;
   final bool morningAthkarReminderEnabled;
   final bool eveningAthkarReminderEnabled;
   final bool hourlyDhikrEnabled;
@@ -7,6 +14,7 @@ class NotificationPreferences {
 
   const NotificationPreferences({
     required this.adhanEnabled,
+    required this.adhanSoundType,
     required this.morningAthkarReminderEnabled,
     required this.eveningAthkarReminderEnabled,
     required this.hourlyDhikrEnabled,
@@ -23,6 +31,7 @@ class NotificationPreferences {
         'maghrib': true,
         'isha': true,
       },
+      adhanSoundType: AdhanSoundType.full,
       morningAthkarReminderEnabled: true,
       eveningAthkarReminderEnabled: true,
       hourlyDhikrEnabled: true,
@@ -32,6 +41,7 @@ class NotificationPreferences {
 
   NotificationPreferences copyWith({
     Map<String, bool>? adhanEnabled,
+    AdhanSoundType? adhanSoundType,
     bool? morningAthkarReminderEnabled,
     bool? eveningAthkarReminderEnabled,
     bool? hourlyDhikrEnabled,
@@ -39,6 +49,7 @@ class NotificationPreferences {
   }) {
     return NotificationPreferences(
       adhanEnabled: adhanEnabled ?? this.adhanEnabled,
+      adhanSoundType: adhanSoundType ?? this.adhanSoundType,
       morningAthkarReminderEnabled: morningAthkarReminderEnabled ??
           this.morningAthkarReminderEnabled,
       eveningAthkarReminderEnabled: eveningAthkarReminderEnabled ??

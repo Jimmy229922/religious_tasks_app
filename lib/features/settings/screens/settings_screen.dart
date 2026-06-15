@@ -9,6 +9,7 @@ import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/features/notifications/presentation/screens/notification_settings_screen.dart';
 import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
 import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
+import 'package:religious_tasks_app/shared/services/notifications/notification_preferences.dart';
 import 'package:religious_tasks_app/shared/services/notifications/notification_preferences_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -30,6 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'maghrib': true,
     'isha': true,
   };
+  AdhanSoundType _soundType = AdhanSoundType.full;
 
   bool _isLoading = true;
   bool _isRefreshingLocation = false;
@@ -44,8 +46,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await _prefsService.load();
     setState(() {
       adhanSettings = Map.from(prefs.adhanEnabled);
+      _soundType = prefs.adhanSoundType;
       _isLoading = false;
     });
+  }
+
+  void _updateSoundType(AdhanSoundType type) async {
+    setState(() {
+      _soundType = type;
+    });
+    await _prefsService.setAdhanSoundType(type);
+    _reschedulePrayers();
+  }
+
+  void _reschedulePrayers() async {
+    final tasksViewModel =
+        Provider.of<TasksViewModel>(context, listen: false);
+    if (tasksViewModel.prayerTimes != null &&
+        tasksViewModel.tomorrowPrayerTimes != null) {
+      await AppNotificationService().schedulePrayerNotifications(
+        today: tasksViewModel.prayerTimes!,
+        tomorrow: tasksViewModel.tomorrowPrayerTimes!,
+      );
+    }
   }
 
   void _updateSetting(String key, bool value) async {
@@ -54,19 +77,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     await _prefsService.setAdhanEnabled(key, value);
-
-    // Reschedule prayer notifications immediately
-    if (mounted) {
-      final tasksViewModel =
-          Provider.of<TasksViewModel>(context, listen: false);
-      if (tasksViewModel.prayerTimes != null &&
-          tasksViewModel.tomorrowPrayerTimes != null) {
-        await AppNotificationService().schedulePrayerNotifications(
-          today: tasksViewModel.prayerTimes!,
-          tomorrow: tasksViewModel.tomorrowPrayerTimes!,
-        );
-      }
-    }
+    _reschedulePrayers();
   }
 
   // Offset method removed
@@ -160,6 +171,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 20),
 
                   _buildSectionHeader("تنبيهات الأذان"),
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("نوع صوت التنبيه:",
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<AdhanSoundType>(
+                            initialValue: _soundType,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              contentPadding:
+                                  EdgeInsets.symmetric(horizontal: 12),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: AdhanSoundType.full,
+                                child: Text("أذان كامل (صوت المؤذن)"),
+                              ),
+                              DropdownMenuItem(
+                                value: AdhanSoundType.short,
+                                child: Text("تنبيه قصير"),
+                              ),
+                              DropdownMenuItem(
+                                value: AdhanSoundType.none,
+                                child: Text("صامت (إشعار فقط)"),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) _updateSoundType(val);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   _buildSwitchTile('fajr', AppStrings.fajr),
                   _buildSwitchTile('sunrise', AppStrings.sunrise),

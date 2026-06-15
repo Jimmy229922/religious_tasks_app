@@ -439,49 +439,112 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   }
 
   Widget _buildContent(BuildContext context) {
-    final children = <Widget>[
-      AthkarHeader(
-        title: widget.title,
-        isMorning: widget.isMorning,
-        totalTarget: _totalTarget,
-        totalCurrent: _totalCurrent,
-        progress: _overallProgress,
-        allDone: _allDone,
-      ),
-      AthkarControls(
-        isMorning: widget.isMorning,
-        isNightMode: _isNightMode,
-        showCompleted: _showCompleted,
-        focusMode: _focusMode,
-        fontScale: _fontScale,
-        minFontScale: _minFontScale,
-        maxFontScale: _maxFontScale,
-        onToggleShowCompleted: _toggleShowCompleted,
-        onToggleFocusMode: () => _toggleFocusMode(!_focusMode),
-        onFontScaleChanged: _setFontScale,
-        onStepFont: _stepFont,
-      ),
-    ];
-
     if (_focusMode) {
-      children.add(_buildFocusSection(context));
-    } else if (_visibleAthkar.isEmpty) {
-      children.add(AthkarEmptyState(
-        isMorning: widget.isMorning,
-        isNightMode: _isNightMode,
-        showCompleted: _showCompleted,
-        onShowCompleted: () => _toggleShowCompleted(true),
-      ));
-    } else {
-      for (int i = 0; i < _visibleAthkar.length; i++) {
-        children.add(_buildAnimatedItem(context, _visibleAthkar[i], i));
-      }
+      return ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.all(12),
+        children: [
+          AthkarHeader(
+            title: widget.title,
+            isMorning: widget.isMorning,
+            totalTarget: _totalTarget,
+            totalCurrent: _totalCurrent,
+            progress: _overallProgress,
+            allDone: _allDone,
+          ),
+          AthkarControls(
+            isMorning: widget.isMorning,
+            isNightMode: _isNightMode,
+            showCompleted: _showCompleted,
+            focusMode: _focusMode,
+            fontScale: _fontScale,
+            minFontScale: _minFontScale,
+            maxFontScale: _maxFontScale,
+            onToggleShowCompleted: _toggleShowCompleted,
+            onToggleFocusMode: () => _toggleFocusMode(!_focusMode),
+            onFontScaleChanged: _setFontScale,
+            onStepFont: _stepFont,
+          ),
+          _buildFocusSection(context),
+        ],
+      );
     }
 
-    return ListView(
+    if (_visibleAthkar.isEmpty) {
+      return ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.all(12),
+        children: [
+          AthkarHeader(
+            title: widget.title,
+            isMorning: widget.isMorning,
+            totalTarget: _totalTarget,
+            totalCurrent: _totalCurrent,
+            progress: _overallProgress,
+            allDone: _allDone,
+          ),
+          AthkarControls(
+            isMorning: widget.isMorning,
+            isNightMode: _isNightMode,
+            showCompleted: _showCompleted,
+            focusMode: _focusMode,
+            fontScale: _fontScale,
+            minFontScale: _minFontScale,
+            maxFontScale: _maxFontScale,
+            onToggleShowCompleted: _toggleShowCompleted,
+            onToggleFocusMode: () => _toggleFocusMode(!_focusMode),
+            onFontScaleChanged: _setFontScale,
+            onStepFont: _stepFont,
+          ),
+          AthkarEmptyState(
+            isMorning: widget.isMorning,
+            isNightMode: _isNightMode,
+            showCompleted: _showCompleted,
+            onShowCompleted: () => _toggleShowCompleted(true),
+          ),
+        ],
+      );
+    }
+
+    return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(12),
-      children: children,
+      itemCount: _visibleAthkar.length + 2,
+      addAutomaticKeepAlives: true,
+      addRepaintBoundaries: true,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return AthkarHeader(
+            title: widget.title,
+            isMorning: widget.isMorning,
+            totalTarget: _totalTarget,
+            totalCurrent: _totalCurrent,
+            progress: _overallProgress,
+            allDone: _allDone,
+          );
+        }
+        if (index == 1) {
+          return AthkarControls(
+            isMorning: widget.isMorning,
+            isNightMode: _isNightMode,
+            showCompleted: _showCompleted,
+            focusMode: _focusMode,
+            fontScale: _fontScale,
+            minFontScale: _minFontScale,
+            maxFontScale: _maxFontScale,
+            onToggleShowCompleted: _toggleShowCompleted,
+            onToggleFocusMode: () => _toggleFocusMode(!_focusMode),
+            onFontScaleChanged: _setFontScale,
+            onStepFont: _stepFont,
+          );
+        }
+        final dhikrIndex = index - 2;
+        return _buildAnimatedItem(
+          context,
+          _visibleAthkar[dhikrIndex],
+          dhikrIndex,
+        );
+      },
     );
   }
 
@@ -516,15 +579,17 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = _isNightMode
+        ? ThemeData.dark().copyWith(
+            scaffoldBackgroundColor: Colors.black,
+            appBarTheme: const AppBarTheme(backgroundColor: Colors.black),
+          )
+        : ThemeData.light().copyWith(
+            scaffoldBackgroundColor: const Color(0xFFFAFAFA),
+          );
+
     return Theme(
-      data: _isNightMode
-          ? ThemeData.dark().copyWith(
-              scaffoldBackgroundColor: Colors.black,
-              appBarTheme: const AppBarTheme(backgroundColor: Colors.black),
-            )
-          : ThemeData.light().copyWith(
-              scaffoldBackgroundColor: const Color(0xFFFAFAFA),
-            ),
+      data: theme,
       child: Builder(builder: (context) {
         final isDark = _isNightMode;
 
