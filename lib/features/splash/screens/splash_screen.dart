@@ -1,22 +1,19 @@
-import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
-import 'package:religious_tasks_app/core/constants/app_constants.dart';
-import 'package:religious_tasks_app/core/services/notifications_service.dart';
-import 'package:religious_tasks_app/core/services/storage_service.dart';
+import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
-import '../../settings/screens/permissions_onboarding_screen.dart';
+import 'package:religious_tasks_app/core/constants/app_constants.dart';
 import '../../tasks/screens/tasks_screen.dart';
+import '../../settings/screens/permissions_onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   final ThemeProvider themeProvider;
-
   const SplashScreen({super.key, required this.themeProvider});
 
   @override
@@ -24,8 +21,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  static const Duration _minimumSplashDuration = Duration(milliseconds: 1200);
-  static const Duration _quoteRotationDuration = Duration(milliseconds: 1400);
+  String _version = '';
+  String _dailyQuote = '';
 
   final List<String> _quotes = [
     'وَقُل رَّبِّ زِدْنِي عِلْمًا',
@@ -34,103 +31,75 @@ class _SplashScreenState extends State<SplashScreen> {
     'إِنَّ اللَّهَ مَعَ الصَّابِرِينَ',
     'وَمَا تَوْفِيقِي إِلَّا بِاللَّهِ',
     'خَيْرُ النَّاسِ أَنْفَعُهُمْ لِلنَّاسِ',
-    'الدَّالُّ عَلَى الْخَيْرِ كَفَاعِلِهِ',
+    'الدّالُّ عَلَى الْخَيْرِ كَفَاعِلِهِ',
   ];
-
-  late final Stopwatch _splashStopwatch;
-  Timer? _quoteTimer;
-  int _quoteIndex = 0;
-  String _version = '';
 
   @override
   void initState() {
     super.initState();
-    _splashStopwatch = Stopwatch()..start();
-    _quoteIndex = Random().nextInt(_quotes.length);
+    debugPrint("🚀 Splash Screen Init Started");
+    
+    // Remove the native splash immediately to reveal our Flutter Mosque splash
+    // This prevents the "grey" native screen from staying too long
+    FlutterNativeSplash.remove();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      FlutterNativeSplash.remove();
-    });
-
-    _startQuoteRotation();
     _loadVersion();
-    _resolveStartup();
+    _picksRandomQuote();
+    _checkOnboardingAndNavigate();
   }
 
-  @override
-  void dispose() {
-    _quoteTimer?.cancel();
-    super.dispose();
-  }
-
-  void _startQuoteRotation() {
-    _quoteTimer = Timer.periodic(_quoteRotationDuration, (_) {
-      if (!mounted) return;
-      setState(() {
-        _quoteIndex = (_quoteIndex + 1) % _quotes.length;
-      });
+  void _picksRandomQuote() {
+    setState(() {
+      _dailyQuote = _quotes[Random().nextInt(_quotes.length)];
     });
   }
 
   Future<void> _loadVersion() async {
     final packageInfo = await PackageInfo.fromPlatform();
-    if (!mounted) return;
     setState(() {
       _version = 'v${packageInfo.version}';
     });
   }
 
-  Future<void> _resolveStartup() async {
-    try {
-      await NotificationManager().init();
-    } catch (e) {
-      debugPrint("Notification init error: $e");
-    }
+  Future<void> _checkOnboardingAndNavigate() async {
+    // 1. Start initialization tasks
+    final initFuture = AppNotificationService().init();
+    
+    // 2. Load preferences
+    final prefsFuture = SharedPreferences.getInstance();
 
-    try {
-      final prefs = StorageService.instance.prefs;
-      final onboardingCompleted =
-          prefs.getBool('onboarding_completed') ?? false;
+    // 3. Keep the mosque screen visible for at least 3 seconds
+    await Future.wait([
+      initFuture,
+      prefsFuture,
+      Future.delayed(const Duration(seconds: 3)),
+    ]);
 
-      if (onboardingCompleted) {
-        await _finishWith(
-          TasksScreen(themeProvider: widget.themeProvider),
-        );
-        return;
-      }
-
-      final allGranted = await _areAllPermissionsGranted();
-      if (!mounted) return;
-
-      if (allGranted) {
-        await prefs.setBool('onboarding_completed', true);
-        await _finishWith(
-          TasksScreen(themeProvider: widget.themeProvider),
-        );
-      } else {
-        await _finishWith(const PermissionsOnboardingScreen());
-      }
-    } catch (e) {
-      debugPrint("Startup resolution error: $e");
-      await _finishWith(
-        TasksScreen(themeProvider: widget.themeProvider),
-      );
-    }
-  }
-
-  Future<void> _finishWith(Widget screen) async {
-    await _ensureMinimumSplashDuration();
-    _quoteTimer?.cancel();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => screen),
-    );
-  }
+    
+    final prefs = await prefsFuture;
+    final bool onboardingCompleted =
+        prefs.getBool('onboarding_completed') ?? false;
 
-  Future<void> _ensureMinimumSplashDuration() async {
-    final remaining = _minimumSplashDuration - _splashStopwatch.elapsed;
-    if (remaining > Duration.zero) {
-      await Future.delayed(remaining);
+    if (!mounted) return;
+
+    if (onboardingCompleted) {
+      _navigateToHome();
+    } else {
+      // Check if all permissions are already granted
+      bool allGranted = await _areAllPermissionsGranted();
+      if (allGranted) {
+        // Mark as completed silently and go home
+        await prefs.setBool('onboarding_completed', true);
+        _navigateToHome();
+      } else {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const PermissionsOnboardingScreen()),
+        );
+      }
     }
   }
 
@@ -141,11 +110,29 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!notif.isGranted || !loc.isGranted) return false;
 
     if (Platform.isAndroid) {
+      // Check exact alarm if needed (often granted by default on older androids,
+      // but strictly required on Android 12+)
+      // Note: On some devices/versions status might be restricted/denied.
+      // We'll check if it is explicitly denied.
       final alarm = await Permission.scheduleExactAlarm.status;
+      // If it is permanently denied or denied, we might want to show onboarding.
+      // However, scheduleExactAlarm is tricky. Let's assume if it is NOT granted, we show onboarding.
+      // But verify if the platform actually supports asking for it.
+      // For simplicity, if it's denied, return false.
       if (!alarm.isGranted) return false;
     }
 
     return true;
+  }
+
+  void _navigateToHome() {
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+          builder: (context) =>
+              TasksScreen(themeProvider: widget.themeProvider)),
+    );
   }
 
   @override
@@ -163,9 +150,10 @@ class _SplashScreenState extends State<SplashScreen> {
           child: SafeArea(
             child: Padding(
               padding:
-                  const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(height: 1),
                   Column(
@@ -191,19 +179,16 @@ class _SplashScreenState extends State<SplashScreen> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 24),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 350),
-                        child: Text(
-                          _quotes[_quoteIndex],
-                          key: ValueKey<int>(_quoteIndex),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontFamily: 'Amiri',
-                            fontStyle: FontStyle.italic,
-                          ),
-                          textAlign: TextAlign.center,
+                      Text(
+                        _dailyQuote,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontFamily:
+                              'Amiri', // Assuming you might have a font or default
+                          fontStyle: FontStyle.italic,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -212,9 +197,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       Text(
                         _version,
                         style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
+                            color: Colors.white70, fontSize: 14),
                       ),
                       const SizedBox(height: 4),
                       const Text(

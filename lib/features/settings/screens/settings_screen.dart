@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:religious_tasks_app/core/constants/strings.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
+import 'package:religious_tasks_app/features/notifications/presentation/screens/notification_settings_screen.dart';
 import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
+import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
+import 'package:religious_tasks_app/shared/services/notifications/notification_preferences_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,6 +19,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final NotificationPreferencesService _prefsService =
+      NotificationPreferencesService();
+
   Map<String, bool> adhanSettings = {
     'fajr': true,
     'sunrise': true,
@@ -28,7 +33,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _isLoading = true;
   bool _isRefreshingLocation = false;
-  // int _hijriOffset = 0; // Removed
 
   @override
   void initState() {
@@ -37,26 +41,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _prefsService.load();
     setState(() {
-      adhanSettings['fajr'] = prefs.getBool('adhan_enabled_fajr') ?? true;
-      adhanSettings['sunrise'] = prefs.getBool('adhan_enabled_sunrise') ?? true;
-      adhanSettings['dhuhr'] = prefs.getBool('adhan_enabled_dhuhr') ?? true;
-      adhanSettings['asr'] = prefs.getBool('adhan_enabled_asr') ?? true;
-      adhanSettings['maghrib'] = prefs.getBool('adhan_enabled_maghrib') ?? true;
-      adhanSettings['isha'] = prefs.getBool('adhan_enabled_isha') ?? true;
-      // _hijriOffset = prefs.getInt('hijri_offset') ?? 0; // Removed
+      adhanSettings = Map.from(prefs.adhanEnabled);
       _isLoading = false;
     });
   }
 
-  void _updateSetting(String key, bool value) {
+  void _updateSetting(String key, bool value) async {
     setState(() {
       adhanSettings[key] = value;
     });
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setBool('adhan_enabled_$key', value);
-    });
+
+    await _prefsService.setAdhanEnabled(key, value);
+
+    // Reschedule prayer notifications immediately
+    if (mounted) {
+      final tasksViewModel =
+          Provider.of<TasksViewModel>(context, listen: false);
+      if (tasksViewModel.prayerTimes != null &&
+          tasksViewModel.tomorrowPrayerTimes != null) {
+        await AppNotificationService().schedulePrayerNotifications(
+          today: tasksViewModel.prayerTimes!,
+          tomorrow: tasksViewModel.tomorrowPrayerTimes!,
+        );
+      }
+    }
   }
 
   // Offset method removed
@@ -157,6 +167,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildSwitchTile('asr', AppStrings.asr),
                   _buildSwitchTile('maghrib', AppStrings.maghrib),
                   _buildSwitchTile('isha', AppStrings.isha),
+
+                  const SizedBox(height: 20),
+                  _buildSectionHeader("إشعارات الأذكار والدعاء"),
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    child: ListTile(
+                      leading: const Icon(Icons.notifications_active,
+                          color: Colors.teal),
+                      title: const Text("متابعة الإشعارات"),
+                      subtitle: const Text(
+                          "تفعيل أذكار الصباح والمساء والتذكير المتكرر بالأذكار والأدعية"),
+                      trailing:
+                          const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationSettingsScreen(),
+                          ),
+                        ).then((_) => _loadSettings());
+                      },
+                    ),
+                  ),
 
                   const SizedBox(height: 20),
 
@@ -303,9 +338,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         value: adhanSettings[key] ?? true,
         onChanged: (val) => _updateSetting(key, val),
-        secondary: Icon(
-          Icons.mosque,
-          color: adhanSettings[key] == true ? Colors.teal : Colors.grey,
+        secondary: IconButton(
+          icon: Icon(
+            Icons.volume_up_rounded,
+            color: adhanSettings[key] == true ? Colors.teal : Colors.grey,
+          ),
+          tooltip: "تجربة الصوت",
+          onPressed: () {
+            AppNotificationService().testAdhanNotification(key, title);
+          },
         ),
         activeTrackColor: Colors.teal,
       ),

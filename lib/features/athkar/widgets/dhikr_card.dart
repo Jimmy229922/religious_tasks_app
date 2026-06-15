@@ -63,7 +63,10 @@ class DhikrCard extends StatelessWidget {
 
     return InkWell(
       onTap: () {
-        if (!isDone) onIncrement(index);
+        if (!isDone) {
+          HapticFeedback.lightImpact();
+          onIncrement(index);
+        }
       },
       onLongPress: () async {
         final shareText =
@@ -111,7 +114,10 @@ class DhikrCard extends StatelessWidget {
                 children: [
                   InkWell(
                     onTap: () {
-                      if (!isDone) onIncrement(index);
+                      if (!isDone) {
+                        HapticFeedback.lightImpact();
+                        onIncrement(index);
+                      }
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: Container(

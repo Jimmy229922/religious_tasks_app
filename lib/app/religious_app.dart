@@ -4,17 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../core/constants/app_constants.dart';
+import '../features/splash/screens/splash_screen.dart';
 import '../core/theme/theme_provider.dart';
-import '../features/settings/screens/permissions_onboarding_screen.dart';
-import '../features/tasks/screens/tasks_screen.dart';
 
 class ReligiousApp extends StatelessWidget {
-  final bool showPermissionsOnboarding;
-
-  const ReligiousApp({
-    super.key,
-    required this.showPermissionsOnboarding,
-  });
+  const ReligiousApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -58,9 +52,7 @@ class ReligiousApp extends StatelessWidget {
         textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
       ),
       themeMode: themeProvider.themeMode,
-      home: showPermissionsOnboarding
-          ? const PermissionsOnboardingScreen()
-          : TasksScreen(themeProvider: themeProvider),
+      home: SplashScreen(themeProvider: themeProvider),
     );
   }
 }

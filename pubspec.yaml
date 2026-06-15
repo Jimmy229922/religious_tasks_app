@@ -34,7 +34,7 @@ dependencies:
   package_info_plus: ^8.3.1
   flutter_native_splash: ^2.4.4
   url_launcher: ^6.3.2
-  google_mobile_ads: ^7.0.0
+  home_widget: ^0.7.0
 
 dev_dependencies:
   flutter_test:
@@ -43,15 +43,15 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
 
 flutter_native_splash:
-  color: "#1565C0"
-  image: assets/icon/app_icon.png
+  color: "#ffffff"
+  color_dark: "#121212"
   android: true
   ios: false
   android_12:
-    color: "#1565C0"
-    image: assets/icon/app_icon.png
+    color: "#ffffff"
+    color_dark: "#121212"
 
-flutter_icons:
+flutter_launcher_icons:
   android: true
   ios: false # disable iOS icon generation on this Windows setup (missing ios/Runner)
   image_path: "assets/icon/app_icon.png"

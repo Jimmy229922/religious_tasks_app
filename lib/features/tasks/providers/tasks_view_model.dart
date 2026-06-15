@@ -5,25 +5,27 @@ import 'dart:math';
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'package:religious_tasks_app/core/constants/app_constants.dart';
 import 'package:religious_tasks_app/core/constants/strings.dart';
 import '../models/task_item.dart';
 import 'package:religious_tasks_app/core/services/location_service.dart';
-import 'package:religious_tasks_app/core/services/notifications_service.dart';
+import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
 import 'package:religious_tasks_app/core/services/storage_service.dart';
 
 class TasksViewModel extends ChangeNotifier {
   final StorageService _storage = StorageService.instance;
   final LocationService _locationService = LocationService();
-  final NotificationManager _notificationManager = NotificationManager();
+  final AppNotificationService _notificationService = AppNotificationService();
 
   static const String _dateKey = 'last_opened_date_v2';
   static const String _tasksKey = 'saved_tasks_v2';
   static const String _athkarStreaksKey = 'athkar_streaks_v1';
   static const String _quranSurahKey = 'quran_last_surah';
   static const String _quranAyahKey = 'quran_last_ayah';
+  static const String _prayerWidgetName = 'PrayerWidgetProvider';
 
   List<TaskItem> _tasks = [];
   List<TaskItem> get tasks => _tasks;
@@ -295,6 +297,7 @@ class TasksViewModel extends ChangeNotifier {
       // This prevents the entire UI from rebuilding every second just for the countdown
       if (newNow.minute != _now.minute) {
         _now = newNow;
+        _updatePrayerWidget();
         notifyListeners();
       } else {
         _now = newNow;
@@ -476,8 +479,59 @@ class TasksViewModel extends ChangeNotifier {
     notifyListeners();
 
     // Schedule notifications
-    await _notificationManager.schedulePrayerNotifications(
+    await _notificationService.schedulePrayerNotifications(
         today: todayTimes, tomorrow: tomorrowTimes);
+    await _updatePrayerWidget();
+  }
+
+  Future<void> _updatePrayerWidget() async {
+    if (_prayerTimes == null) return;
+
+    try {
+      final next = _prayerTimes!.nextPrayer();
+      final nextPrayer = next == Prayer.none ? Prayer.fajr : next;
+      final nextTime = next == Prayer.none
+          ? _tomorrowPrayerTimes?.fajr
+          : _prayerTimes!.timeForPrayer(nextPrayer);
+
+      if (nextTime == null) return;
+
+      final duration = nextTime.difference(DateTime.now());
+      final safeDuration = duration.isNegative ? Duration.zero : duration;
+      final hours = safeDuration.inHours;
+      final minutes = safeDuration.inMinutes % 60;
+      final remaining = hours > 0
+          ? '$hours\u0633 $minutes\u062f'
+          : '$minutes\u062f';
+
+      await HomeWidget.saveWidgetData<String>(
+          'prayer_name', _getPrayerNameForWidget(nextPrayer));
+      await HomeWidget.saveWidgetData<String>(
+          'prayer_time', intl.DateFormat.jm('ar').format(nextTime));
+      await HomeWidget.saveWidgetData<String>('remaining_time', remaining);
+      await HomeWidget.updateWidget(androidName: _prayerWidgetName);
+    } catch (e) {
+      debugPrint("Prayer widget update failed: $e");
+    }
+  }
+
+  String _getPrayerNameForWidget(Prayer p) {
+    switch (p) {
+      case Prayer.fajr:
+        return '\u0627\u0644\u0641\u062c\u0631';
+      case Prayer.sunrise:
+        return '\u0627\u0644\u0634\u0631\u0648\u0642';
+      case Prayer.dhuhr:
+        return '\u0627\u0644\u0638\u0647\u0631';
+      case Prayer.asr:
+        return '\u0627\u0644\u0639\u0635\u0631';
+      case Prayer.maghrib:
+        return '\u0627\u0644\u0645\u063a\u0631\u0628';
+      case Prayer.isha:
+        return '\u0627\u0644\u0639\u0634\u0627\u0621';
+      default:
+        return '';
+    }
   }
 
   void _updateTaskDescriptions() {

@@ -4,6 +4,7 @@ import 'package:religious_tasks_app/core/services/storage_service.dart';
 
 class TasbeehViewModel extends ChangeNotifier {
   static const String _prefsKey = 'custom_tasbeeh_athkar';
+  static const String _totalCountKey = 'total_tasbeeh_count_v1';
   static const String customOption = '__custom__';
 
   static const List<String> _defaultAthkar = [
@@ -18,18 +19,27 @@ class TasbeehViewModel extends ChangeNotifier {
   ];
 
   int _counter = 0;
+  int _totalCounter = 0;
   String _selectedDhikr = _defaultAthkar.first;
   bool _isCustomInput = false;
   List<String> _customAthkar = [];
   final TextEditingController customController = TextEditingController();
 
   int get counter => _counter;
+  int get totalCounter => _totalCounter;
   String get selectedDhikr => _selectedDhikr;
   bool get isCustomInput => _isCustomInput;
   List<String> get allAthkar => [..._defaultAthkar, ..._customAthkar];
 
   TasbeehViewModel() {
     _loadCustomAthkar();
+    _loadTotalCount();
+  }
+
+  Future<void> _loadTotalCount() async {
+    final prefs = StorageService.instance.prefs;
+    _totalCounter = prefs.getInt(_totalCountKey) ?? 0;
+    notifyListeners();
   }
 
   @override
@@ -51,7 +61,9 @@ class TasbeehViewModel extends ChangeNotifier {
 
   void increment() {
     _counter++;
+    _totalCounter++;
     HapticFeedback.lightImpact();
+    StorageService.instance.prefs.setInt(_totalCountKey, _totalCounter);
     notifyListeners();
   }
 

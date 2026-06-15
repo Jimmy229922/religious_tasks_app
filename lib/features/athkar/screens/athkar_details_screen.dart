@@ -8,7 +8,6 @@ import '../models/dhikr_item.dart';
 import 'package:religious_tasks_app/core/services/athkar_tracking_service.dart';
 import 'package:religious_tasks_app/core/services/storage_service.dart';
 import 'package:religious_tasks_app/core/services/audio_service.dart';
-import 'package:religious_tasks_app/core/services/ad_service.dart';
 import '../widgets/dhikr_card.dart';
 import '../widgets/details/athkar_header.dart';
 import '../widgets/details/athkar_controls.dart';
@@ -320,11 +319,6 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   Future<void> _exitScreen() async {
     if (_allDone) {
       await AthkarTrackingService.markCompleted(isMorning: widget.isMorning);
-
-      // Show Interstitial Ad for Morning/Evening Athkar completion
-      if (widget.title.contains("الصباح") || widget.title.contains("المساء")) {
-        await AdService.instance.showInterstitialAd();
-      }
     }
     if (!mounted) return;
     Navigator.of(context).pop(_allDone);
@@ -346,7 +340,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
       transitionBuilder: (child, animation) {
         return SizeTransition(
           sizeFactor: animation,
-          axisAlignment: -1,
+          alignment: Alignment.topCenter,
           child: FadeTransition(
             opacity: animation,
             child: SlideTransition(
@@ -404,7 +398,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
               opacity: animation,
               child: SizeTransition(
                 sizeFactor: animation,
-                axisAlignment: -1,
+                alignment: Alignment.topCenter,
                 child: ScaleTransition(
                   scale: Tween<double>(begin: 0.8, end: 1.0).animate(animation),
                   child: child,

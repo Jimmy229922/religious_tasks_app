@@ -5,9 +5,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
-import '../../tasks/screens/tasks_screen.dart';
+import 'package:religious_tasks_app/features/tasks/screens/tasks_screen.dart';
+import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
 
 class PermissionsOnboardingScreen extends StatefulWidget {
   const PermissionsOnboardingScreen({super.key});

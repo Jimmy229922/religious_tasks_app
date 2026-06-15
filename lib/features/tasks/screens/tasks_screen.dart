@@ -13,13 +13,13 @@ import '../widgets/header_section.dart';
 import '../widgets/quick_access_section.dart';
 import '../widgets/daily_inspiration_card.dart';
 import '../widgets/prayer_countdown_card.dart';
-import '../widgets/motivational_stats_dialog.dart';
 
 import '../../athkar/screens/athkar_details_screen.dart';
 import '../../tasbeeh/screens/custom_tasbeeh_screen.dart';
 import '../../athkar/screens/prophet_prayers_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../athkar/screens/surah_kahf_screen.dart';
+import '../../statistics/screens/statistics_screen.dart';
 
 class TasksScreen extends StatefulWidget {
   final ThemeProvider themeProvider;
@@ -83,12 +83,15 @@ class _TasksScreenState extends State<TasksScreen> {
                       IconButton(
                         icon: const Icon(Icons.bar_chart_rounded,
                             color: Colors.white),
-                        onPressed: () => MotivationalStatsDialog.show(
+                        onPressed: () => Navigator.push(
                           context,
-                          isDark: isDark,
-                          morningStreak: vm.morningStreak,
-                          eveningStreak: vm.eveningStreak,
-                          sleepStreak: vm.sleepStreak,
+                          MaterialPageRoute(
+                            builder: (_) => StatisticsScreen(
+                              morningStreak: vm.morningStreak,
+                              eveningStreak: vm.eveningStreak,
+                              sleepStreak: vm.sleepStreak,
+                            ),
+                          ),
                         ),
                       ),
                     ],
