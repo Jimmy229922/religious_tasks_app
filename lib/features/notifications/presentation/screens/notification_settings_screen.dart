@@ -122,14 +122,27 @@ class _NotificationSettingsScreenState
   }
 
   Future<void> _updateFloatingDhikrEnabled(bool value) async {
-    await _runApplyingTask(() async {
+    if (_isApplying) return;
+
+    setState(() {
+      _isApplying = true;
+    });
+
+    try {
       var nextValue = value;
 
       if (value) {
-        final granted =
+        final alreadyGranted =
             await _notificationService.ensureFloatingDhikrPermission();
-        if (!granted) {
-          nextValue = false;
+        if (!alreadyGranted) {
+          // If not granted, the system settings should have opened.
+          // We don't want to stay in "loading" state forever if the user
+          // takes time in settings.
+          setState(() {
+            _isApplying = false;
+          });
+          _showMessage('يرجى تفعيل صلاحية الظهور فوق التطبيقات');
+          return;
         }
       } else {
         await _notificationService.closeDhikrOverlay();
@@ -147,14 +160,19 @@ class _NotificationSettingsScreenState
         settings: updatedPreferences,
       );
 
-      if (!value || nextValue) {
-        _showMessage(nextValue
-            ? 'تم تفعيل الأذكار العائمة'
-            : 'تم تعطيل الأذكار العائمة');
-      } else {
-        _showMessage('لم يتم منح صلاحية الظهور فوق التطبيقات');
+      _showMessage(nextValue
+          ? 'تم تفعيل الأذكار العائمة'
+          : 'تم تعطيل الأذكار العائمة');
+    } catch (e) {
+      debugPrint('Error updating floating dhikr: $e');
+      _showMessage('حدثت مشكلة أثناء تحديث الأذكار العائمة');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isApplying = false;
+        });
       }
-    });
+    }
   }
 
   Future<void> _rescheduleRecurringNotifications({

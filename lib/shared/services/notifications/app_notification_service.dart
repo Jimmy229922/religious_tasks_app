@@ -29,6 +29,7 @@ class AppNotificationService {
       MethodChannel('religious_tasks_app/native_adhan');
 
   bool _isInitialized = false;
+  Future<void>? _initFuture;
 
   static const String prayerChannelId = 'prayer_reminders';
   static const String prayerReminderSound = 'prayer_reminder';
@@ -36,7 +37,7 @@ class AppNotificationService {
   static const String dhikrChannelId = 'athkar_reminders';
   static const String dhikrSound = 'dhikr_chime';
   static const String notificationChannelVersionKey =
-      'notification_channels_v9';
+      'notification_channels_v10';
 
   static const int _dhikrNotificationStartId = 4000;
   static const int _dhikrScheduleWindowMinutes = 48 * 60;
@@ -359,14 +360,20 @@ class AppNotificationService {
   }
 
   Future<bool> ensureFloatingDhikrPermission() async {
-    if (await overlay.FlutterOverlayWindow.isPermissionGranted()) {
-      return true;
-    }
+    try {
+      if (await overlay.FlutterOverlayWindow.isPermissionGranted()) {
+        return true;
+      }
 
-    final bool? granted =
-        await overlay.FlutterOverlayWindow.requestPermission();
-    return granted == true ||
-        await overlay.FlutterOverlayWindow.isPermissionGranted();
+      // Request permission - this might open system settings
+      await overlay.FlutterOverlayWindow.requestPermission();
+
+      // Return current status - we don't want to wait forever if settings didn't return a value
+      return await overlay.FlutterOverlayWindow.isPermissionGranted();
+    } catch (e) {
+      debugPrint('Error checking/requesting overlay permission: $e');
+      return false;
+    }
   }
 
   Future<void> closeDhikrOverlay() async {
@@ -418,8 +425,8 @@ class AppNotificationService {
       alignment: overlay.OverlayAlignment.topRight,
       visibility: overlay.NotificationVisibility.visibilityPublic,
       positionGravity: overlay.PositionGravity.right,
-      height: 180,
-      width: 750,
+      height: 200,
+      width: 800,
     );
 
     await Future.delayed(const Duration(milliseconds: 300));
@@ -448,10 +455,12 @@ class AppNotificationService {
         'adhan_channel_$prayerKey',
         '${AppStrings.notificationAdhanChannelName} - $prayerKey',
         channelDescription: AppStrings.notificationAdhanChannelDesc,
-        importance: Importance.high,
-        priority: Priority.high,
+        importance: Importance.max,
+        priority: Priority.max,
         sound: useSound ? RawResourceAndroidNotificationSound(soundName) : null,
         playSound: useSound,
+        fullScreenIntent: true,
+        category: AndroidNotificationCategory.alarm,
       ),
     );
 
@@ -479,11 +488,7 @@ class AppNotificationService {
     final phrase = _dhikrPhrases[DateTime.now().minute % _dhikrPhrases.length];
     final title = _dhikrTitles[DateTime.now().hour % _dhikrTitles.length];
 
-    if (preferences.floatingDhikrEnabled) {
-      await showDhikrOverlay(phrase);
-      return;
-    }
-
+    // Always show a standard notification during test for confirmation
     await _plugin.show(
       889,
       title,
@@ -495,13 +500,24 @@ class AppNotificationService {
           channelDescription: AppStrings.notificationDhikrChannelDesc,
           importance: Importance.max,
           priority: Priority.max,
-          sound: const RawResourceAndroidNotificationSound(dhikrSound),
+          sound: const RawResourceAndroidNotificationSound('dhikr_chime'),
           playSound: true,
           styleInformation: BigTextStyleInformation(phrase),
           visibility: NotificationVisibility.public,
+          fullScreenIntent: true,
+          category: AndroidNotificationCategory.reminder,
         ),
       ),
     );
+
+    // If floating is enabled, try to show it as well
+    if (preferences.floatingDhikrEnabled) {
+      try {
+        await showDhikrOverlay(phrase);
+      } catch (e) {
+        debugPrint('Overlay test failed: $e');
+      }
+    }
   }
 
   Future<void> _ensureInitialized() async {
@@ -509,6 +525,17 @@ class AppNotificationService {
       return;
     }
 
+    if (_initFuture != null) {
+      return _initFuture;
+    }
+
+    _initFuture = _doInitialize();
+    await _initFuture;
+    _isInitialized = true;
+    _initFuture = null;
+  }
+
+  Future<void> _doInitialize() async {
     await _configureLocalTimeZone();
 
     const initializationSettings = InitializationSettings(
@@ -522,12 +549,19 @@ class AppNotificationService {
 
     final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    await androidPlugin?.requestNotificationsPermission();
+
+    // Request notification permission separately to avoid conflicts
+    if (kDebugMode) print("Requesting notification permission...");
+    
+    // Non-blocking permission request
+    androidPlugin?.requestNotificationsPermission().then((granted) {
+       if (kDebugMode) print("Notification permission status: $granted");
+    }).catchError((e) {
+       if (kDebugMode) print("Notification permission error: $e");
+    });
 
     await _resetChannelsIfNeeded(androidPlugin);
     await _createChannels(androidPlugin);
-
-    _isInitialized = true;
   }
 
   Future<void> _resetChannelsIfNeeded(
@@ -562,7 +596,7 @@ class AppNotificationService {
         prayerChannelId,
         AppStrings.notificationPrayerChannelName,
         description: AppStrings.notificationPrayerChannelDesc,
-        importance: Importance.high,
+        importance: Importance.max,
         sound: RawResourceAndroidNotificationSound(prayerReminderSound),
         playSound: true,
       ),
