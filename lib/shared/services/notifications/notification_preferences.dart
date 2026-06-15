@@ -11,6 +11,7 @@ class NotificationPreferences {
   final bool eveningAthkarReminderEnabled;
   final bool hourlyDhikrEnabled;
   final int hourlyDhikrIntervalMinutes;
+  final bool floatingDhikrEnabled;
 
   const NotificationPreferences({
     required this.adhanEnabled,
@@ -19,6 +20,7 @@ class NotificationPreferences {
     required this.eveningAthkarReminderEnabled,
     required this.hourlyDhikrEnabled,
     required this.hourlyDhikrIntervalMinutes,
+    required this.floatingDhikrEnabled,
   });
 
   factory NotificationPreferences.defaults() {
@@ -36,6 +38,7 @@ class NotificationPreferences {
       eveningAthkarReminderEnabled: true,
       hourlyDhikrEnabled: true,
       hourlyDhikrIntervalMinutes: 60,
+      floatingDhikrEnabled: false,
     );
   }
 
@@ -46,6 +49,7 @@ class NotificationPreferences {
     bool? eveningAthkarReminderEnabled,
     bool? hourlyDhikrEnabled,
     int? hourlyDhikrIntervalMinutes,
+    bool? floatingDhikrEnabled,
   }) {
     return NotificationPreferences(
       adhanEnabled: adhanEnabled ?? this.adhanEnabled,
@@ -57,6 +61,7 @@ class NotificationPreferences {
       hourlyDhikrEnabled: hourlyDhikrEnabled ?? this.hourlyDhikrEnabled,
       hourlyDhikrIntervalMinutes:
           hourlyDhikrIntervalMinutes ?? this.hourlyDhikrIntervalMinutes,
+      floatingDhikrEnabled: floatingDhikrEnabled ?? this.floatingDhikrEnabled,
     );
   }
 

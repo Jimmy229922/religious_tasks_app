@@ -21,6 +21,7 @@ class NotificationPreferencesService {
       'morning_athkar_reminder_enabled_v1';
   static const String eveningAthkarReminderEnabledKey =
       'evening_athkar_reminder_enabled_v1';
+  static const String floatingDhikrEnabledKey = 'floating_dhikr_enabled_v1';
 
   Future<NotificationPreferences> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -51,6 +52,8 @@ class NotificationPreferencesService {
           dhikrIntervalOptions.contains(storedInterval)
               ? storedInterval!
               : defaults.hourlyDhikrIntervalMinutes,
+      floatingDhikrEnabled:
+          prefs.getBool(floatingDhikrEnabledKey) ?? defaults.floatingDhikrEnabled,
     );
   }
 
@@ -82,5 +85,10 @@ class NotificationPreferencesService {
   Future<void> setHourlyDhikrIntervalMinutes(int minutes) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(hourlyDhikrIntervalKey, minutes);
+  }
+
+  Future<void> setFloatingDhikrEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(floatingDhikrEnabledKey, value);
   }
 }

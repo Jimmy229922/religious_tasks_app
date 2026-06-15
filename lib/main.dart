@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
@@ -12,10 +13,23 @@ import 'core/theme/theme_provider.dart';
 import 'features/athkar/providers/athkar_view_model.dart';
 import 'features/tasbeeh/providers/tasbeeh_view_model.dart';
 import 'features/tasks/providers/tasks_view_model.dart';
+import 'shared/widgets/dhikr_overlay.dart';
+
+@pragma("vm:entry-point")
+void overlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: DhikrOverlay(),
+    ),
+  );
+}
 
 void main() async {
   debugPrint("🟢 Application Main Function Started");
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  await AndroidAlarmManager.initialize();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);

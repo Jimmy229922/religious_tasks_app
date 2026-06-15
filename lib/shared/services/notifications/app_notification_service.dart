@@ -1,7 +1,9 @@
 import 'package:adhan/adhan.dart';
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart' as overlay;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -34,13 +36,14 @@ class AppNotificationService {
   static const String dhikrChannelId = 'athkar_reminders';
   static const String dhikrSound = 'dhikr_chime';
   static const String notificationChannelVersionKey =
-      'notification_channels_v7';
+      'notification_channels_v9';
 
   static const int _dhikrNotificationStartId = 4000;
   static const int _dhikrScheduleWindowMinutes = 48 * 60;
   static const int _maxDhikrScheduleCount = _dhikrScheduleWindowMinutes ~/ 10;
   static const int _morningAthkarNotificationId = 3001;
   static const int _eveningAthkarNotificationId = 3002;
+  static const int _dhikrAlarmId = 5000;
 
   static const List<String> _dhikrPhrases = [
     'سبحان الله',
@@ -104,10 +107,11 @@ class AppNotificationService {
         dhikrChannelId,
         AppStrings.notificationDhikrChannelName,
         channelDescription: AppStrings.notificationDhikrChannelDesc,
-        importance: Importance.high,
-        priority: Priority.high,
+        importance: Importance.max,
+        priority: Priority.max,
         sound: RawResourceAndroidNotificationSound(dhikrSound),
         playSound: true,
+        visibility: NotificationVisibility.public,
       ),
     );
 
@@ -271,6 +275,9 @@ class AppNotificationService {
     await _ensureInitialized();
     final preferences = settings ?? await _preferencesService.load();
 
+    // Cancel both types of dhikr reminders to be safe
+    await AndroidAlarmManager.cancel(_dhikrAlarmId);
+
     try {
       final pendingNotifications = await _plugin.pendingNotificationRequests();
       int cancelCount = 0;
@@ -289,7 +296,6 @@ class AppNotificationService {
         if (shouldCancel) {
           await _plugin.cancel(id);
           cancelCount++;
-          // Yield to UI thread every few cancellations to prevent jank
           if (cancelCount % 3 == 0) {
             await Future.delayed(const Duration(milliseconds: 10));
           }
@@ -303,44 +309,121 @@ class AppNotificationService {
       return;
     }
 
-    final now = tz.TZDateTime.now(tz.local);
-    final intervalMinutes = preferences.hourlyDhikrIntervalMinutes;
+    if (preferences.floatingDhikrEnabled) {
+      await _scheduleFloatingDhikrAlarm(preferences.hourlyDhikrIntervalMinutes);
+    } else {
+      // Schedule standard local notifications
+      final now = tz.TZDateTime.now(tz.local);
+      final intervalMinutes = preferences.hourlyDhikrIntervalMinutes;
 
-    // Calculate how many to schedule, but cap it at 64 to avoid Android limit exceptions
-    // Some devices limit the app to 50 or 500 total alarms. 64 is safe and covers ~10 hours even for 10min intervals.
-    int reqCount = (_dhikrScheduleWindowMinutes / intervalMinutes).ceil();
-    final scheduleCount = reqCount > 64 ? 64 : reqCount;
+      int reqCount = (_dhikrScheduleWindowMinutes / intervalMinutes).ceil();
+      final scheduleCount = reqCount > 64 ? 64 : reqCount;
 
-    for (var i = 1; i <= scheduleCount; i++) {
-      final scheduledTime = now.add(Duration(minutes: intervalMinutes * i));
-      final phrase = _dhikrPhrases[(i + now.day) % _dhikrPhrases.length];
-      final title = _dhikrTitles[(i + now.hour) % _dhikrTitles.length];
+      for (var i = 1; i <= scheduleCount; i++) {
+        final scheduledTime = now.add(Duration(minutes: intervalMinutes * i));
+        final phrase = _dhikrPhrases[(i + now.day) % _dhikrPhrases.length];
+        final title = _dhikrTitles[(i + now.hour) % _dhikrTitles.length];
 
-      await _safeZonedSchedule(
-        _dhikrNotificationStartId + i - 1,
-        title,
-        phrase,
-        scheduledTime,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            dhikrChannelId,
-            AppStrings.notificationDhikrChannelName,
-            channelDescription: AppStrings.notificationDhikrChannelDesc,
-            importance: Importance.defaultImportance,
-            priority: Priority.defaultPriority,
-            sound: const RawResourceAndroidNotificationSound(dhikrSound),
-            playSound: true,
-            styleInformation: BigTextStyleInformation(phrase),
+        await _safeZonedSchedule(
+          _dhikrNotificationStartId + i - 1,
+          title,
+          phrase,
+          scheduledTime,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              dhikrChannelId,
+              AppStrings.notificationDhikrChannelName,
+              channelDescription: AppStrings.notificationDhikrChannelDesc,
+              importance: Importance.max,
+              priority: Priority.max,
+              sound: const RawResourceAndroidNotificationSound(dhikrSound),
+              playSound: true,
+              styleInformation: BigTextStyleInformation(phrase),
+              visibility: NotificationVisibility.public,
+            ),
           ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      );
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        );
 
-      // Yield to UI thread occasionally to prevent scrolling jank
-      if (i % 3 == 0) {
-        await Future.delayed(const Duration(milliseconds: 10));
+        if (i % 3 == 0) {
+          await Future.delayed(const Duration(milliseconds: 10));
+        }
       }
     }
+  }
+
+  @pragma('vm:entry-point')
+  static Future<void> dhikrAlarmCallback() async {
+    final phrase = _dhikrPhrases[DateTime.now().minute % _dhikrPhrases.length];
+    await _showFloatingDhikrText(phrase);
+  }
+
+  Future<bool> ensureFloatingDhikrPermission() async {
+    if (await overlay.FlutterOverlayWindow.isPermissionGranted()) {
+      return true;
+    }
+
+    final bool? granted =
+        await overlay.FlutterOverlayWindow.requestPermission();
+    return granted == true ||
+        await overlay.FlutterOverlayWindow.isPermissionGranted();
+  }
+
+  Future<void> closeDhikrOverlay() async {
+    if (await overlay.FlutterOverlayWindow.isActive()) {
+      await overlay.FlutterOverlayWindow.closeOverlay();
+    }
+  }
+
+  Future<void> _scheduleFloatingDhikrAlarm(int intervalMinutes) async {
+    try {
+      await AndroidAlarmManager.periodic(
+        Duration(minutes: intervalMinutes),
+        _dhikrAlarmId,
+        dhikrAlarmCallback,
+        exact: true,
+        wakeup: true,
+        rescheduleOnReboot: true,
+      );
+    } catch (e) {
+      debugPrint('Failed to schedule exact floating dhikr alarm: $e');
+      await AndroidAlarmManager.periodic(
+        Duration(minutes: intervalMinutes),
+        _dhikrAlarmId,
+        dhikrAlarmCallback,
+        exact: false,
+        wakeup: true,
+        rescheduleOnReboot: true,
+      );
+    }
+  }
+
+  static Future<void> _showFloatingDhikrText(String text) async {
+    final bool isGranted =
+        await overlay.FlutterOverlayWindow.isPermissionGranted();
+    if (!isGranted) {
+      return;
+    }
+
+    if (await overlay.FlutterOverlayWindow.isActive()) {
+      await overlay.FlutterOverlayWindow.shareData(text);
+      return;
+    }
+
+    await overlay.FlutterOverlayWindow.showOverlay(
+      enableDrag: true,
+      overlayTitle: "Dhikr",
+      overlayContent: text,
+      flag: overlay.OverlayFlag.defaultFlag,
+      alignment: overlay.OverlayAlignment.topRight,
+      visibility: overlay.NotificationVisibility.visibilityPublic,
+      positionGravity: overlay.PositionGravity.right,
+      height: 180,
+      width: 750,
+    );
+
+    await Future.delayed(const Duration(milliseconds: 300));
+    await overlay.FlutterOverlayWindow.shareData(text);
   }
 
   Future<void> testAdhanNotification(
@@ -380,11 +463,26 @@ class AppNotificationService {
     );
   }
 
+  Future<void> showDhikrOverlay(String text) async {
+    final bool isGranted = await ensureFloatingDhikrPermission();
+    if (!isGranted) {
+      return;
+    }
+
+    await _showFloatingDhikrText(text);
+  }
+
   Future<void> testDhikrNotification() async {
     await _ensureInitialized();
+    final preferences = await _preferencesService.load();
 
     final phrase = _dhikrPhrases[DateTime.now().minute % _dhikrPhrases.length];
     final title = _dhikrTitles[DateTime.now().hour % _dhikrTitles.length];
+
+    if (preferences.floatingDhikrEnabled) {
+      await showDhikrOverlay(phrase);
+      return;
+    }
 
     await _plugin.show(
       889,
@@ -395,11 +493,12 @@ class AppNotificationService {
           dhikrChannelId,
           AppStrings.notificationDhikrChannelName,
           channelDescription: AppStrings.notificationDhikrChannelDesc,
-          importance: Importance.high,
-          priority: Priority.high,
+          importance: Importance.max,
+          priority: Priority.max,
           sound: const RawResourceAndroidNotificationSound(dhikrSound),
           playSound: true,
           styleInformation: BigTextStyleInformation(phrase),
+          visibility: NotificationVisibility.public,
         ),
       ),
     );
@@ -474,9 +573,10 @@ class AppNotificationService {
         dhikrChannelId,
         AppStrings.notificationDhikrChannelName,
         description: AppStrings.notificationDhikrChannelDesc,
-        importance: Importance.defaultImportance,
+        importance: Importance.max,
         sound: RawResourceAndroidNotificationSound(dhikrSound),
         playSound: true,
+        showBadge: true,
       ),
     );
 

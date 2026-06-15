@@ -121,6 +121,42 @@ class _NotificationSettingsScreenState
     );
   }
 
+  Future<void> _updateFloatingDhikrEnabled(bool value) async {
+    await _runApplyingTask(() async {
+      var nextValue = value;
+
+      if (value) {
+        final granted =
+            await _notificationService.ensureFloatingDhikrPermission();
+        if (!granted) {
+          nextValue = false;
+        }
+      } else {
+        await _notificationService.closeDhikrOverlay();
+      }
+
+      final updatedPreferences =
+          _preferences.copyWith(floatingDhikrEnabled: nextValue);
+
+      setState(() {
+        _preferences = updatedPreferences;
+      });
+
+      await _preferencesService.setFloatingDhikrEnabled(nextValue);
+      await _notificationService.scheduleDhikrNotifications(
+        settings: updatedPreferences,
+      );
+
+      if (!value || nextValue) {
+        _showMessage(nextValue
+            ? 'تم تفعيل الأذكار العائمة'
+            : 'تم تعطيل الأذكار العائمة');
+      } else {
+        _showMessage('لم يتم منح صلاحية الظهور فوق التطبيقات');
+      }
+    });
+  }
+
   Future<void> _rescheduleRecurringNotifications({
     String? successMessage,
   }) async {
@@ -303,6 +339,12 @@ class _NotificationSettingsScreenState
                         'يمكنك الآن اختيار التذكير كل 10 دقائق أو بفواصل أطول',
                     value: _preferences.hourlyDhikrEnabled,
                     onChanged: _updateHourlyDhikrEnabled,
+                  ),
+                  _buildReminderTile(
+                    title: 'الأذكار العائمة (على الشاشة)',
+                    subtitle: 'إظهار الأذكار بشكل عائم فوق التطبيقات',
+                    value: _preferences.floatingDhikrEnabled,
+                    onChanged: _updateFloatingDhikrEnabled,
                   ),
                   if (_preferences.hourlyDhikrEnabled)
                     Card(
