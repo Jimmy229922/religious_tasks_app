@@ -109,7 +109,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final tasksViewModel = Provider.of<TasksViewModel>(context, listen: false);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -130,17 +129,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     elevation: 2,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
-                    child: SwitchListTile(
-                      title: const Text("الوضع الليلي",
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      secondary: Icon(
-                          isDark ? Icons.dark_mode : Icons.light_mode,
-                          color: Colors.indigo),
-                      value: isDark,
-                      activeTrackColor: Colors.indigo,
-                      onChanged: (val) {
-                        themeProvider.toggleTheme(val);
-                      },
+                    child: Column(
+                      children: [
+                        ListTile(
+                          title: const Text("نمط السمة", style: TextStyle(fontWeight: FontWeight.bold)),
+                          leading: Icon(
+                            themeProvider.appThemeMode == AppThemeMode.dark 
+                              ? Icons.dark_mode 
+                              : themeProvider.appThemeMode == AppThemeMode.light 
+                                ? Icons.light_mode 
+                                : Icons.auto_awesome, 
+                            color: Colors.indigo
+                          ),
+                          trailing: DropdownButton<AppThemeMode>(
+                            value: themeProvider.appThemeMode,
+                            underline: const SizedBox(),
+                            onChanged: (AppThemeMode? newValue) {
+                              if (newValue != null) {
+                                themeProvider.setThemeMode(newValue);
+                              }
+                            },
+                            items: const [
+                              DropdownMenuItem(value: AppThemeMode.light, child: Text("فاتح")),
+                              DropdownMenuItem(value: AppThemeMode.dark, child: Text("داكن")),
+                              DropdownMenuItem(value: AppThemeMode.system, child: Text("تلقائي (النظام)")),
+                              DropdownMenuItem(value: AppThemeMode.dynamic, child: Text("تفاعلي (مع الصلاة)")),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 

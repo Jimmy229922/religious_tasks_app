@@ -14,6 +14,8 @@ class ReligiousApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // Access theme provider
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final hour = DateTime.now().hour;
+    final seedColor = themeProvider.getDynamicSeedColor(hour);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -31,8 +33,8 @@ class ReligiousApp extends StatelessWidget {
         useMaterial3: true,
         brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1565C0),
-          primary: const Color(0xFF1565C0),
+          seedColor: seedColor,
+          primary: seedColor,
           secondary: const Color(0xFFE65100),
           surface: const Color(0xFFF5F5F5),
         ),
@@ -44,8 +46,8 @@ class ReligiousApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF000000), // OLED Pure Black
         colorScheme: ColorScheme.fromSeed(
           brightness: Brightness.dark,
-          seedColor: const Color(0xFF90CAF9),
-          primary: const Color(0xFF90CAF9),
+          seedColor: seedColor,
+          primary: seedColor,
           secondary: const Color(0xFFFFB74D),
           surface: const Color(0xFF000000), // OLED Pure Black
         ),

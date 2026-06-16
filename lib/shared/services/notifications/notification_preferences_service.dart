@@ -11,7 +11,7 @@ class NotificationPreferencesService {
     'maghrib',
     'isha',
   ];
-  static const List<int> dhikrIntervalOptions = [10, 60, 90, 120];
+  static const List<int> dhikrIntervalOptions = [5, 10, 60, 90, 120];
 
   static const String adhanSoundTypeKey = 'adhan_sound_type_v1';
   static const String hourlyDhikrEnabledKey = 'hourly_dhikr_enabled_v1';

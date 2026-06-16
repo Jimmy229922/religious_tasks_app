@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,9 +27,11 @@ class _NotificationSettingsScreenState
   final AppNotificationService _notificationService = AppNotificationService();
 
   NotificationPreferences _preferences = NotificationPreferences.defaults();
+  List<String> _customDhikrs = [];
+  final TextEditingController _dhikrController = TextEditingController();
   bool _isLoading = true;
   bool _isApplying = false;
-  bool _allPermissionsGranted = true;
+  bool _isAllPermissionsGranted = true;
 
   Timer? _countdownTimer;
   Duration? _remainingDhikrTime;
@@ -55,7 +58,7 @@ class _NotificationSettingsScreenState
 
     if (mounted) {
       setState(() {
-        _allPermissionsGranted = statusNotif && statusLoc && statusBattery && statusOverlay && statusAlarm;
+        _isAllPermissionsGranted = statusNotif && statusLoc && statusBattery && statusOverlay && statusAlarm;
       });
     }
   }
@@ -71,11 +74,17 @@ class _NotificationSettingsScreenState
     final sharedPrefs = await SharedPreferences.getInstance();
     final startTimeMillis =
         sharedPrefs.getInt(AppNotificationService.dhikrCycleStartTimeKey);
+    
+    final customDhikrsJson = sharedPrefs.getString(AppNotificationService.customDhikrKey);
+    final List<String> customDhikrs = customDhikrsJson != null 
+        ? List<String>.from(jsonDecode(customDhikrsJson)) 
+        : [];
 
     if (!mounted) return;
 
     setState(() {
       _preferences = preferences;
+      _customDhikrs = customDhikrs;
       _dhikrStartTime = startTimeMillis != null
           ? DateTime.fromMillisecondsSinceEpoch(startTimeMillis)
           : null;
@@ -98,13 +107,17 @@ class _NotificationSettingsScreenState
       final diffSeconds = now.difference(_dhikrStartTime!).inSeconds;
       final intervalSeconds = _preferences.hourlyDhikrIntervalMinutes * 60;
 
+      // Calculate elapsed seconds in current interval
+      final elapsedInInterval = diffSeconds % intervalSeconds;
+      
+      // If diffSeconds is negative (shouldn't happen with current logic but for safety)
       if (diffSeconds < 0) {
-        setState(() =>
-            _remainingDhikrTime = Duration(minutes: _preferences.hourlyDhikrIntervalMinutes));
+        final remaining = intervalSeconds + diffSeconds; // diffSeconds is negative
+        setState(() => _remainingDhikrTime = Duration(seconds: remaining));
         return;
       }
 
-      final remainingSeconds = intervalSeconds - (diffSeconds % intervalSeconds);
+      final remainingSeconds = intervalSeconds - elapsedInInterval;
       setState(() {
         _remainingDhikrTime = Duration(seconds: remainingSeconds);
       });
@@ -327,7 +340,11 @@ class _NotificationSettingsScreenState
       await task();
     } catch (e, stack) {
       debugPrint('Error updating notifications: $e\n$stack');
-      _showMessage('حدثت مشكلة أثناء تحديث الإشعارات');
+      String errorMessage = 'حدثت مشكلة أثناء تحديث الإشعارات';
+      if (e is String) {
+        errorMessage = e;
+      }
+      _showMessage(errorMessage);
     } finally {
       if (mounted) {
         setState(() {
@@ -342,6 +359,34 @@ class _NotificationSettingsScreenState
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _addCustomDhikr() async {
+    final text = _dhikrController.text.trim();
+    if (text.isEmpty) return;
+
+    final sharedPrefs = await SharedPreferences.getInstance();
+    final updatedList = [..._customDhikrs, text];
+    await sharedPrefs.setString(AppNotificationService.customDhikrKey, jsonEncode(updatedList));
+    
+    _dhikrController.clear();
+    await _loadPreferences();
+    _showMessage('تم إضافة الذكر المخصص');
+    
+    // Reschedule to include new dhikr
+    await _notificationService.scheduleDhikrNotifications(settings: _preferences, forceReschedule: true);
+  }
+
+  Future<void> _deleteCustomDhikr(int index) async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+    final updatedList = List<String>.from(_customDhikrs)..removeAt(index);
+    await sharedPrefs.setString(AppNotificationService.customDhikrKey, jsonEncode(updatedList));
+    
+    await _loadPreferences();
+    _showMessage('تم حذف الذكر');
+    
+    // Reschedule
+    await _notificationService.scheduleDhikrNotifications(settings: _preferences, forceReschedule: true);
   }
 
   @override
@@ -500,7 +545,58 @@ class _NotificationSettingsScreenState
                         ),
                       ),
                     ),
-                  if (!_allPermissionsGranted) ...[
+                  const SizedBox(height: 20),
+                  _buildSectionHeader('الأذكار المخصصة'),
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _dhikrController,
+                                  decoration: const InputDecoration(
+                                    hintText: 'أضف ذكراً مخصصاً هنا...',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton.filled(
+                                onPressed: _addCustomDhikr,
+                                icon: const Icon(Icons.add),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.teal,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_customDhikrs.isNotEmpty) ...[
+                            const Divider(height: 32),
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _customDhikrs.length,
+                              separatorBuilder: (_, __) => const Divider(),
+                              itemBuilder: (context, index) => ListTile(
+                                title: Text(_customDhikrs[index]),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                  onPressed: () => _deleteCustomDhikr(index),
+                                ),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (!_isAllPermissionsGranted) ...[
                     const SizedBox(height: 20),
                     _buildSectionHeader('نصيحة لضمان وصول الإشعارات'),
                     Card(
@@ -703,6 +799,9 @@ class _NotificationSettingsScreenState
   }
 
   String _intervalLabel(int minutes) {
+    if (minutes == 5) {
+      return 'كل 5 دقائق';
+    }
     if (minutes == 10) {
       return 'كل 10 دقائق';
     }

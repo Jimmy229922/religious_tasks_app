@@ -24,6 +24,8 @@ class TasksViewModel extends ChangeNotifier {
   static const String _dateKey = 'last_opened_date_v2';
   static const String _tasksKey = 'saved_tasks_v2';
   static const String _athkarStreaksKey = 'athkar_streaks_v1';
+  static const String _badgesKey = 'earned_badges_v1';
+  static const String _totalDhikrCountKey = 'total_dhikr_count_v1';
   static const String _quranSurahKey = 'quran_last_surah';
   static const String _quranAyahKey = 'quran_last_ayah';
   static const String _prayerWidgetName = 'PrayerWidgetProvider';
@@ -37,12 +39,16 @@ class TasksViewModel extends ChangeNotifier {
   int _sleepStreak = 0;
   String _lastSurah = "الفاتحة";
   int _lastAyah = 1;
+  List<String> _earnedBadges = [];
+  int _totalDhikrCount = 0;
 
   int get morningStreak => _morningStreak;
   int get eveningStreak => _eveningStreak;
   int get sleepStreak => _sleepStreak;
   String get lastSurah => _lastSurah;
   int get lastAyah => _lastAyah;
+  List<String> get earnedBadges => _earnedBadges;
+  int get totalDhikrCount => _totalDhikrCount;
 
   bool _isLoadingLocation = false;
   bool get isLoadingLocation => _isLoadingLocation;
@@ -204,8 +210,50 @@ class TasksViewModel extends ChangeNotifier {
     _initTasks();
     _initLocationAndPrayers();
     _loadQuranProgress();
+    _loadBadges();
+    _loadTotalDhikr();
     _startClock();
     _initRandomContent();
+  }
+
+  void _loadBadges() {
+    final badgesJson = _storage.getString(_badgesKey);
+    if (badgesJson != null) {
+      _earnedBadges = List<String>.from(jsonDecode(badgesJson));
+    }
+  }
+
+  void _loadTotalDhikr() {
+    final count = _storage.getString(_totalDhikrCountKey);
+    _totalDhikrCount = count != null ? int.parse(count) : 0;
+  }
+
+  Future<void> _checkMilestones() async {
+    bool changed = false;
+    
+    // Milestone: 1000 Dhikr
+    if (_totalDhikrCount >= 1000 && !_earnedBadges.contains('dhikr_1000')) {
+      _earnedBadges.add('dhikr_1000');
+      changed = true;
+    }
+
+    // Milestone: 7 day streak (Morning)
+    if (_morningStreak >= 7 && !_earnedBadges.contains('streak_morning_7')) {
+      _earnedBadges.add('streak_morning_7');
+      changed = true;
+    }
+
+    if (changed) {
+      await _storage.setString(_badgesKey, jsonEncode(_earnedBadges));
+      notifyListeners();
+    }
+  }
+
+  Future<void> addToTotalDhikr(int amount) async {
+    _totalDhikrCount += amount;
+    await _storage.setString(_totalDhikrCountKey, _totalDhikrCount.toString());
+    await _checkMilestones();
+    notifyListeners();
   }
 
   void _initRandomContent() {

@@ -47,7 +47,7 @@ class NotificationPreferences {
       morningAthkarReminderEnabled: true,
       eveningAthkarReminderEnabled: true,
       hourlyDhikrEnabled: true,
-      hourlyDhikrIntervalMinutes: 60,
+      hourlyDhikrIntervalMinutes: 10,
       floatingDhikrEnabled: false,
     );
   }

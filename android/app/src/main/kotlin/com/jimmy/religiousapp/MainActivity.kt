@@ -3,6 +3,8 @@ package com.jimmy.religiousapp
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import android.content.Intent
+import android.os.Build
 
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -16,13 +18,14 @@ class MainActivity : FlutterActivity() {
                         val prayerKey = call.argument<String>("prayerKey")
                         val prayerName = call.argument<String>("prayerName")
                         val timeMillis = call.argument<Long>("timeMillis")
+                        val soundType = call.argument<Int>("soundType") ?: 0
 
                         if (requestCode == null || prayerKey == null || prayerName == null || timeMillis == null) {
                             result.error("INVALID_ARGS", "Missing native adhan schedule arguments", null)
                             return@setMethodCallHandler
                         }
 
-                        NativeAdhanScheduler.schedule(this, requestCode, prayerKey, prayerName, timeMillis)
+                        NativeAdhanScheduler.schedule(this, requestCode, prayerKey, prayerName, timeMillis, soundType)
                         result.success(null)
                     }
                     "cancel" -> {
@@ -38,12 +41,15 @@ class MainActivity : FlutterActivity() {
                     "playNow" -> {
                         val prayerKey = call.argument<String>("prayerKey") ?: "fajr"
                         val prayerName = call.argument<String>("prayerName") ?: "الصلاة"
-                        val intent = android.content.Intent(this, AdhanPlaybackService::class.java).apply {
+                        val soundType = call.argument<Int>("soundType") ?: 0
+                        
+                        val intent = Intent(this, AdhanPlaybackService::class.java).apply {
                             putExtra(AdhanPlaybackService.EXTRA_PRAYER_KEY, prayerKey)
                             putExtra(AdhanPlaybackService.EXTRA_PRAYER_NAME, prayerName)
+                            putExtra(AdhanPlaybackService.EXTRA_SOUND_TYPE, soundType)
                         }
 
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                             startForegroundService(intent)
                         } else {
                             startService(intent)

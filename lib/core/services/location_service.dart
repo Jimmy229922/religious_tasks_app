@@ -16,7 +16,12 @@ class LocationService {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        return (position: null, message: AppStrings.enableLocationService);
+        // Prompt user to enable location services
+        await Geolocator.openLocationSettings();
+        // Check again
+        if (!await Geolocator.isLocationServiceEnabled()) {
+          return (position: null, message: AppStrings.enableLocationService);
+        }
       }
 
       final status = await Permission.location.request();

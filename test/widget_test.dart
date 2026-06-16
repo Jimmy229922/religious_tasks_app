@@ -1,23 +1,39 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:religious_tasks_app/app/religious_app.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
+import 'package:religious_tasks_app/shared/services/notifications/notification_preferences.dart';
 
 void main() {
-  testWidgets('App title smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const ReligiousApp());
+  test('ThemeProvider uses system mode by default', () {
+    final provider = ThemeProvider();
 
-    // Verify that our app title is visible.
-    expect(find.text('مهامي اليومية'), findsOneWidget);
+    expect(provider.appThemeMode, AppThemeMode.system);
+    expect(provider.themeMode, ThemeMode.system);
+  });
 
-    // Verify that we have tasks.
-    expect(find.text('صلاة الفجر'), findsOneWidget);
+  test('ThemeProvider changes theme mode correctly', () {
+    final provider = ThemeProvider();
+
+    provider.setThemeMode(AppThemeMode.dark);
+    expect(provider.appThemeMode, AppThemeMode.dark);
+    expect(provider.themeMode, ThemeMode.dark);
+
+    provider.setThemeMode(AppThemeMode.light);
+    expect(provider.appThemeMode, AppThemeMode.light);
+    expect(provider.themeMode, ThemeMode.light);
+  });
+
+  test('NotificationPreferences defaults match expected notification setup', () {
+    final preferences = NotificationPreferences.defaults();
+
+    expect(preferences.adhanSoundType, AdhanSoundType.full);
+    expect(preferences.hourlyDhikrEnabled, isTrue);
+    expect(preferences.hourlyDhikrIntervalMinutes, 10);
+    expect(preferences.morningAthkarReminderEnabled, isTrue);
+    expect(preferences.eveningAthkarReminderEnabled, isTrue);
+    expect(preferences.floatingDhikrEnabled, isFalse);
+    expect(preferences.isAdhanEnabled('fajr'), isTrue);
+    expect(preferences.getPrayerOffset('fajr'), 0);
   });
 }

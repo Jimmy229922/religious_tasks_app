@@ -47,79 +47,82 @@ class _TasksScreenState extends State<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final vm = Provider.of<TasksViewModel>(context);
+    // We use a Consumer here so only the main content rebuilds if needed,
+    // but the Scaffold structure is stable.
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-        decoration: BoxDecoration(
-          color: isDark ? Colors.black : null,
-          gradient: isDark
-              ? null // No gradient in OLED mode, just pure black
-              : const LinearGradient(
-                  colors: [
-                    Color(0xFF0F2027),
-                    Color(0xFF203A43),
-                    Color(0xFF2C5364)
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-        ),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Directionality(
-            textDirection: TextDirection.rtl,
-            child: SafeArea(
-              child: NestedScrollView(
-                physics: const BouncingScrollPhysics(),
-                headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                  SliverAppBar(
-                    floating: true,
-                    pinned: true,
-                    backgroundColor: Colors.transparent,
-                    elevation: 0,
-                    actions: [
-                      IconButton(
-                        icon: const Icon(Icons.bar_chart_rounded,
-                            color: Colors.white),
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => StatisticsScreen(
-                              morningStreak: vm.morningStreak,
-                              eveningStreak: vm.eveningStreak,
-                              sleepStreak: vm.sleepStreak,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                    leading: IconButton(
-                      icon: const Icon(Icons.settings_outlined,
-                          color: Colors.white),
-                      onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const SettingsScreen())),
-                    ),
-                    title: Text(
-                      kAppName,
-                      style: GoogleFonts.arefRuqaa(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 26,
-                        color: Colors.white,
-                      ),
-                    ),
-                    centerTitle: true,
-                  ),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black : null,
+        gradient: isDark
+            ? null
+            : const LinearGradient(
+                colors: [
+                  Color(0xFF0F2027),
+                  Color(0xFF203A43),
+                  Color(0xFF2C5364)
                 ],
-                body: RefreshIndicator(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: Consumer<TasksViewModel>(
+              builder: (context, vm, child) {
+                return RefreshIndicator(
                   onRefresh: () => _handleRefresh(vm, isDark),
                   child: CustomScrollView(
+                    physics: const BouncingScrollPhysics(),
                     slivers: [
+                      SliverAppBar(
+                        floating: true,
+                        pinned: true,
+                        backgroundColor: Colors.transparent,
+                        elevation: 0,
+                        actions: [
+                          IconButton(
+                            icon: const Icon(Icons.bar_chart_rounded,
+                                color: Colors.white),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => StatisticsScreen(
+                                  morningStreak: vm.morningStreak,
+                                  eveningStreak: vm.eveningStreak,
+                                  sleepStreak: vm.sleepStreak,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        leading: IconButton(
+                          icon: const Icon(Icons.settings_outlined,
+                              color: Colors.white),
+                          onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const SettingsScreen())),
+                        ),
+                        title: Text(
+                          kAppName,
+                          style: GoogleFonts.arefRuqaa(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 26,
+                            color: Colors.white,
+                          ),
+                        ),
+                        centerTitle: true,
+                      ),
                       SliverToBoxAdapter(
-                          child: HeaderSection(vm: vm, isDark: isDark)),
+                        child: RepaintBoundary(
+                          child: HeaderSection(vm: vm, isDark: isDark),
+                        ),
+                      ),
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -171,23 +174,77 @@ class _TasksScreenState extends State<TasksScreen> {
                       ],
                       SliverToBoxAdapter(
                           child: _buildGratitudeSection(context, vm, isDark)),
+                      if (vm.earnedBadges.isNotEmpty)
+                        SliverToBoxAdapter(child: _buildBadgesSection(vm, isDark)),
                       const SliverToBoxAdapter(child: SizedBox(height: 80)),
                     ],
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
-        ));
+        ),
+      ),
+    );
   }
 
   // --- Helper Widgets ---
 
+  Widget _buildBadgesSection(TasksViewModel vm, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              "أوسمتك المستحقة",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: vm.earnedBadges.map((badgeId) {
+                String title = "";
+                IconData icon = Icons.star;
+                Color color = Colors.amber;
+
+                if (badgeId == 'dhikr_1000') {
+                  title = "الذاكر الـ 1000";
+                  icon = Icons.auto_awesome;
+                } else if (badgeId == 'streak_morning_7') {
+                  title = "سبعيني الصباح";
+                  icon = Icons.wb_sunny;
+                  color = Colors.orange;
+                }
+
+                return Card(
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      children: [
+                        Icon(icon, color: color, size: 40),
+                        const SizedBox(height: 4),
+                        Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGratitudeSection(
       BuildContext context, TasksViewModel vm, bool isDark) {
-    // Pick from VM (randomized on refresh)
     final blessingOfDay = vm.currentBlessing.isEmpty
-        ? "نعمة الإسلام" // Fallback if VM init delayed
+        ? "نعمة الإسلام"
         : vm.currentBlessing;
 
     return Container(
@@ -258,7 +315,7 @@ class _TasksScreenState extends State<TasksScreen> {
       padding: const EdgeInsets.all(12),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFF5E35B1), // Deep Purple
+        color: const Color(0xFF5E35B1),
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
           BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
@@ -288,7 +345,6 @@ class _TasksScreenState extends State<TasksScreen> {
   Widget _buildContextAwareSuggestion(
       BuildContext context, TasksViewModel vm, bool isDark) {
     return Container(
-      // width: double.infinity,
       decoration: BoxDecoration(
         color:
             isDark ? Colors.teal.withValues(alpha: 0.2) : Colors.teal.shade50,
@@ -345,13 +401,12 @@ class _TasksScreenState extends State<TasksScreen> {
       Navigator.push(context,
           MaterialPageRoute(builder: (_) => const CustomTasbeehScreen()));
     } else if (text == "أذكار النوم") {
-      // Navigate to Sleep Athkar Details
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => const AthkarDetailsScreen(
             title: "أذكار النوم",
-            isMorning: false, // Use night styling
+            isMorning: false,
           ),
         ),
       );
@@ -408,23 +463,26 @@ class _TasksScreenState extends State<TasksScreen> {
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, localIndex) {
-            // Need to find global index in vm.tasks to toggle correctly
-            // This is a bit inefficient (searching), but lists are small.
-            // Better: helper in VM to toggle by object or name.
-            // For now, let's find the index in original list.
             final task = tasks[localIndex];
-            final globalIndex = vm.tasks.indexOf(task);
-
-            if (globalIndex == -1) return const SizedBox.shrink();
-
+            // Get original index to avoid search if possible, or just pass the task object
             return TaskItemWidget(
               task: task,
-              index: globalIndex, // Pass global index for VM operations
+              index: localIndex, 
               isDark: isDark,
               now: vm.now,
               prayerTimes: vm.prayerTimes,
-              onTap: () => _handleTaskTap(context, vm, globalIndex, task),
-              onIncrement: () => vm.incrementCounter(globalIndex),
+              onTap: () {
+                final globalIndex = vm.tasks.indexOf(task);
+                if (globalIndex != -1) {
+                  _handleTaskTap(context, vm, globalIndex, task);
+                }
+              },
+              onIncrement: () {
+                final globalIndex = vm.tasks.indexOf(task);
+                if (globalIndex != -1) {
+                  vm.incrementCounter(globalIndex);
+                }
+              },
             );
           },
           childCount: tasks.length,
@@ -456,7 +514,6 @@ class _TasksScreenState extends State<TasksScreen> {
                   builder: (_) =>
                       AthkarDetailsScreen(title: title, isMorning: isMorning)))
           .then((_) async {
-        // Refresh status on return
         if (!context.mounted) return;
         final athkarVM = Provider.of<AthkarViewModel>(context, listen: false);
         await athkarVM.loadDailyData();
@@ -478,16 +535,6 @@ class _TasksScreenState extends State<TasksScreen> {
           .then((_) async {
         final prefs = await SharedPreferences.getInstance();
         final count = prefs.getInt('prophet_prayer_counter') ?? 0;
-        // Mark as completed only if target (e.g. 100 or 200) reached?
-        // Or if count > 0?
-        // Let's assume if user returns, we check if they did meaningful progress.
-        // But better: Don't force true.
-        // If count == 0, force false.
-        // If count > 0, we can leave it or check target.
-        // Let's rely on what the screen logic did, or just sync.
-
-        // Fix: If count is 0, uncheck. If count >= task.targetCount, check.
-        // Otherwise, leave as is (User might be in progress).
         if (count == 0) {
           vm.toggleTask(index, completionValue: false);
         } else if (count >= (task.targetCount ?? 200)) {
@@ -609,9 +656,9 @@ class _TasksScreenState extends State<TasksScreen> {
                 ),
               ),
               if (progress == 1.0)
-                Text(
+                const Text(
                   "ممتاز! 🎉",
-                  style: GoogleFonts.cairo(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Colors.amber,

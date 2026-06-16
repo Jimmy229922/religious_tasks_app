@@ -12,10 +12,11 @@ object NativeAdhanScheduler {
         requestCode: Int,
         prayerKey: String,
         prayerName: String,
-        timeMillis: Long
+        timeMillis: Long,
+        soundType: Int
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val pendingIntent = pendingIntent(context, requestCode, prayerKey, prayerName)
+        val pendingIntent = pendingIntent(context, requestCode, prayerKey, prayerName, soundType)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timeMillis, pendingIntent)
@@ -31,18 +32,20 @@ object NativeAdhanScheduler {
 
     fun cancel(context: Context, requestCode: Int) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        alarmManager.cancel(pendingIntent(context, requestCode, "", ""))
+        alarmManager.cancel(pendingIntent(context, requestCode, "", "", 0))
     }
 
     private fun pendingIntent(
         context: Context,
         requestCode: Int,
         prayerKey: String,
-        prayerName: String
+        prayerName: String,
+        soundType: Int
     ): PendingIntent {
         val intent = Intent(context, AdhanAlarmReceiver::class.java).apply {
             putExtra(AdhanPlaybackService.EXTRA_PRAYER_KEY, prayerKey)
             putExtra(AdhanPlaybackService.EXTRA_PRAYER_NAME, prayerName)
+            putExtra(AdhanPlaybackService.EXTRA_SOUND_TYPE, soundType)
         }
 
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or

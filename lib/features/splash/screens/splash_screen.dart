@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
@@ -104,22 +104,18 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<bool> _areAllPermissionsGranted() async {
-    final notif = await Permission.notification.status;
-    final loc = await Permission.locationWhenInUse.status;
+    final notificationGranted = await Permission.notification.isGranted;
+    final locationGranted = await Permission.locationWhenInUse.isGranted;
 
-    if (!notif.isGranted || !loc.isGranted) return false;
+    if (!notificationGranted || !locationGranted) {
+      return false;
+    }
 
     if (Platform.isAndroid) {
-      // Check exact alarm if needed (often granted by default on older androids,
-      // but strictly required on Android 12+)
-      // Note: On some devices/versions status might be restricted/denied.
-      // We'll check if it is explicitly denied.
-      final alarm = await Permission.scheduleExactAlarm.status;
-      // If it is permanently denied or denied, we might want to show onboarding.
-      // However, scheduleExactAlarm is tricky. Let's assume if it is NOT granted, we show onboarding.
-      // But verify if the platform actually supports asking for it.
-      // For simplicity, if it's denied, return false.
-      if (!alarm.isGranted) return false;
+      final exactAlarmGranted = await Permission.scheduleExactAlarm.isGranted;
+      if (!exactAlarmGranted) {
+        return false;
+      }
     }
 
     return true;

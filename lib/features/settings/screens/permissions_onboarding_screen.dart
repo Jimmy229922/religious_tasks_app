@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
+import 'package:religious_tasks_app/shared/services/notifications/notification_preferences_service.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import '../../tasks/screens/tasks_screen.dart';
 
@@ -153,6 +154,13 @@ class _PermissionsOnboardingScreenState
     // Save that we've finished onboarding
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_completed', true);
+
+    // تفعيل الأذكار العائمة تلقائياً لو المستخدم وافق على الصلاحية
+    if (_overlayStatus.isGranted) {
+      final prefsService = NotificationPreferencesService();
+      await prefsService.setFloatingDhikrEnabled(true);
+    }
+
     AppNotificationService().init().catchError((Object error) {
       debugPrint("Notification init error: $error");
     });
@@ -204,8 +212,7 @@ class _PermissionsOnboardingScreenState
                   children: [
                     _buildPermissionCard(
                       title: "الإشعارات",
-                      description:
-                          "عشان نقدر نبعتلك الأذان وتذكيرات الأوراد في وقتها.",
+                      description: "لتلقي تنبيهات الأذان والأذكار في مواعيدها.",
                       icon: Icons.notifications_active,
                       status: _notificationStatus,
                       onTap: () => _requestPermission(Permission.notification),
@@ -213,8 +220,7 @@ class _PermissionsOnboardingScreenState
                     const SizedBox(height: 16),
                     _buildPermissionCard(
                       title: "الموقع الجغرافي",
-                      description:
-                          "لتحديد مواقيت الصلاة واتجاه القبلة بدقة حسب مكانك.",
+                      description: "لحساب مواقيت الصلاة والقبلة بدقة لمكانك الحالي.",
                       icon: Icons.location_on,
                       status: _locationStatus,
                       onTap: () =>
@@ -224,8 +230,7 @@ class _PermissionsOnboardingScreenState
                       const SizedBox(height: 16),
                       _buildPermissionCard(
                         title: "المنبه الدقيق",
-                        description:
-                            "لضمان ان الأذان يشتغل في ميعاده بالظبط حتى لو الموبايل مقفول.",
+                        description: "لضمان انطلاق صوت الأذان في الوقت المحدد تماماً.",
                         icon: Icons.alarm,
                         status: _exactAlarmStatus,
                         onTap: () =>
@@ -234,8 +239,7 @@ class _PermissionsOnboardingScreenState
                       const SizedBox(height: 16),
                       _buildPermissionCard(
                         title: "إلغاء قيود البطارية",
-                        description:
-                            "يسمح للتطبيق بالعمل في الخلفية دون أن يقفله النظام لتوفير الطاقة.",
+                        description: "لضمان استمرار عمل التنبيهات والأذكار دون توقف في الخلفية.",
                         icon: Icons.battery_charging_full,
                         status: _ignoreBatteryStatus,
                         onTap: () =>
@@ -244,8 +248,7 @@ class _PermissionsOnboardingScreenState
                       const SizedBox(height: 16),
                       _buildPermissionCard(
                         title: "الظهور فوق التطبيقات",
-                        description:
-                            "مطلوب لإظهار الأذكار العائمة على الشاشة أثناء استخدامك لموبايلك.",
+                        description: "لعرض الأذكار العائمة على الشاشة أثناء استخدامك للهاتف.",
                         icon: Icons.layers,
                         status: _overlayStatus,
                         onTap: () =>

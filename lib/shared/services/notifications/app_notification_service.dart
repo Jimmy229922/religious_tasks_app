@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:adhan/adhan.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -12,6 +13,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../../core/constants/strings.dart';
 import 'notification_preferences.dart';
 import 'notification_preferences_service.dart';
+import 'dhikr_background_refresher.dart';
 
 class AppNotificationService {
   static final AppNotificationService _instance =
@@ -37,15 +39,15 @@ class AppNotificationService {
   static const String dhikrChannelId = 'athkar_reminders';
   static const String dhikrSound = 'dhikr_chime';
   static const String notificationChannelVersionKey =
-      'notification_channels_v10';
+      'notification_channels_v11';
 
   static const int _dhikrNotificationStartId = 4000;
   static const int _dhikrScheduleWindowMinutes = 48 * 60;
-  static const int _maxDhikrScheduleCount = _dhikrScheduleWindowMinutes ~/ 10;
   static const int _morningAthkarNotificationId = 3001;
   static const int _eveningAthkarNotificationId = 3002;
   static const int _dhikrAlarmId = 5000;
   static const String dhikrCycleStartTimeKey = 'dhikr_cycle_start_time';
+  static const String customDhikrKey = 'user_custom_dhikrs_v1';
 
   static const List<String> _dhikrPhrases = [
     'سبحان الله',
@@ -163,48 +165,12 @@ class AppNotificationService {
     final preferences = await _preferencesService.load();
     final now = tz.TZDateTime.now(tz.local);
     final items = [
-      {
-        'id': 101,
-        'key': 'fajr',
-        'name': AppStrings.fajr,
-        'today': today.fajr,
-        'tomorrow': tomorrow.fajr,
-      },
-      {
-        'id': 106,
-        'key': 'sunrise',
-        'name': AppStrings.sunrise,
-        'today': today.sunrise,
-        'tomorrow': tomorrow.sunrise,
-      },
-      {
-        'id': 102,
-        'key': 'dhuhr',
-        'name': AppStrings.dhuhr,
-        'today': today.dhuhr,
-        'tomorrow': tomorrow.dhuhr,
-      },
-      {
-        'id': 103,
-        'key': 'asr',
-        'name': AppStrings.asr,
-        'today': today.asr,
-        'tomorrow': tomorrow.asr,
-      },
-      {
-        'id': 104,
-        'key': 'maghrib',
-        'name': AppStrings.maghrib,
-        'today': today.maghrib,
-        'tomorrow': tomorrow.maghrib,
-      },
-      {
-        'id': 105,
-        'key': 'isha',
-        'name': AppStrings.isha,
-        'today': today.isha,
-        'tomorrow': tomorrow.isha,
-      },
+      {'id': 101, 'key': 'fajr', 'name': AppStrings.fajr, 'today': today.fajr, 'tomorrow': tomorrow.fajr},
+      {'id': 106, 'key': 'sunrise', 'name': AppStrings.sunrise, 'today': today.sunrise, 'tomorrow': tomorrow.sunrise},
+      {'id': 102, 'key': 'dhuhr', 'name': AppStrings.dhuhr, 'today': today.dhuhr, 'tomorrow': tomorrow.dhuhr},
+      {'id': 103, 'key': 'asr', 'name': AppStrings.asr, 'today': today.asr, 'tomorrow': tomorrow.asr},
+      {'id': 104, 'key': 'maghrib', 'name': AppStrings.maghrib, 'today': today.maghrib, 'tomorrow': tomorrow.maghrib},
+      {'id': 105, 'key': 'isha', 'name': AppStrings.isha, 'today': today.isha, 'tomorrow': tomorrow.isha},
     ];
 
     for (final item in items) {
@@ -233,27 +199,18 @@ class AppNotificationService {
       final tomorrowTime = item['tomorrow'] as DateTime;
       final baseId = item['id'] as int;
 
-      var reminderTime = tz.TZDateTime.from(todayTime, tz.local)
-          .subtract(const Duration(minutes: 5));
+      // 1. Reminder (5 min before)
+      var reminderTime = tz.TZDateTime.from(todayTime, tz.local).subtract(const Duration(minutes: 5));
       if (reminderTime.isBefore(now)) {
-        reminderTime = tz.TZDateTime.from(tomorrowTime, tz.local)
-            .subtract(const Duration(minutes: 5));
+        reminderTime = tz.TZDateTime.from(tomorrowTime, tz.local).subtract(const Duration(minutes: 5));
       }
 
       if (reminderTime.isAfter(now)) {
-        await _safeZonedSchedule(
-          baseId,
-          '${AppStrings.remainingTimeTitle} $name',
-          AppStrings.prepareForPrayer,
-          reminderTime,
-          reminderDetails,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        );
+        await _safeZonedSchedule(baseId, '${AppStrings.remainingTimeTitle} $name', AppStrings.prepareForPrayer, reminderTime, reminderDetails, androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle);
       }
 
-      if (!preferences.isAdhanEnabled(key)) {
-        continue;
-      }
+      // 2. Adhan Notification (at time)
+      if (!preferences.isAdhanEnabled(key)) continue;
 
       var adhanTime = tz.TZDateTime.from(todayTime, tz.local);
       if (adhanTime.isBefore(now)) {
@@ -266,6 +223,7 @@ class AppNotificationService {
           key,
           name,
           adhanTime.millisecondsSinceEpoch,
+          preferences.adhanSoundType.index, // Pass sound type index to native
         );
       }
     }
@@ -277,18 +235,17 @@ class AppNotificationService {
   }) async {
     await _ensureInitialized();
     final preferences = settings ?? await _preferencesService.load();
-
     final sharedPrefs = await SharedPreferences.getInstance();
+    
     final savedInterval = sharedPrefs.getInt('saved_dhikr_interval');
     final savedStartTime = sharedPrefs.getInt(dhikrCycleStartTimeKey);
 
-    // التحقق هل نحتاج لإعادة الجدولة فعلاً؟
-    // لو المدة متغيرة أو ده أول مرة أو المستخدم طلب "إعادة جدولة" يدوياً
     bool intervalChanged = savedInterval != preferences.hourlyDhikrIntervalMinutes;
     bool shouldInitCycle = savedStartTime == null || intervalChanged || forceReschedule;
 
     if (!preferences.hourlyDhikrEnabled) {
       await AndroidAlarmManager.cancel(_dhikrAlarmId);
+      await AndroidAlarmManager.cancel(DhikrBackgroundRefresher.refreshAlarmId);
       await _cancelAllDhikrNotifications();
       return;
     }
@@ -298,29 +255,46 @@ class AppNotificationService {
       await sharedPrefs.setInt(dhikrCycleStartTimeKey, now.millisecondsSinceEpoch);
       await sharedPrefs.setInt('saved_dhikr_interval', preferences.hourlyDhikrIntervalMinutes);
       
-      // Cancel existing ones before fresh start
       await AndroidAlarmManager.cancel(_dhikrAlarmId);
       await _cancelAllDhikrNotifications();
-    } else {
-      // إذا كانت الدورة شغالة والوقت متسجل، لا نفعل شيئاً لنحافظ على "المرحلة" الحالية للعداد
-      // إلا لو كنا نريد التأكد من وجود منبهات مجدولة (اختياري)
-      return;
+
+      await AndroidAlarmManager.periodic(
+        const Duration(hours: 4),
+        DhikrBackgroundRefresher.refreshAlarmId,
+        DhikrBackgroundRefresher.refreshCallback,
+        exact: false,
+        wakeup: false,
+        rescheduleOnReboot: true,
+      );
     }
 
     if (preferences.floatingDhikrEnabled) {
       await _scheduleFloatingDhikrAlarm(preferences.hourlyDhikrIntervalMinutes);
     } else {
-      // Schedule standard local notifications
+      await AndroidAlarmManager.cancel(_dhikrAlarmId);
       final now = tz.TZDateTime.now(tz.local);
       final intervalMinutes = preferences.hourlyDhikrIntervalMinutes;
+
+      final cycleStartMillis = sharedPrefs.getInt(dhikrCycleStartTimeKey) ?? now.millisecondsSinceEpoch;
+      final cycleStart = tz.TZDateTime.fromMillisecondsSinceEpoch(tz.local, cycleStartMillis);
+      final intervalSeconds = intervalMinutes * 60;
+      final secondsSinceStart = now.difference(cycleStart).inSeconds;
+      final elapsedCycles = secondsSinceStart < 0 ? 0 : (secondsSinceStart ~/ intervalSeconds);
+      final lastGridPoint = cycleStart.add(Duration(seconds: elapsedCycles * intervalSeconds));
+
+      final customDhikrsJson = sharedPrefs.getString(customDhikrKey);
+      final List<String> userDhikrs = customDhikrsJson != null ? List<String>.from(jsonDecode(customDhikrsJson)) : [];
+      final allPhrases = [..._dhikrPhrases, ...userDhikrs];
 
       int reqCount = (_dhikrScheduleWindowMinutes / intervalMinutes).ceil();
       final scheduleCount = reqCount > 64 ? 64 : reqCount;
 
       for (var i = 1; i <= scheduleCount; i++) {
-        final scheduledTime = now.add(Duration(minutes: intervalMinutes * i));
-        final phrase = _dhikrPhrases[(i + now.day) % _dhikrPhrases.length];
-        final title = _dhikrTitles[(i + now.hour) % _dhikrTitles.length];
+        final scheduledTime = lastGridPoint.add(Duration(minutes: intervalMinutes * i));
+        if (scheduledTime.isBefore(now)) continue;
+
+        String phrase = scheduledTime.weekday == DateTime.friday ? 'اللهم صل وسلم على نبينا محمد' : allPhrases[(i + scheduledTime.day) % allPhrases.length];
+        final title = _dhikrTitles[(i + scheduledTime.hour) % _dhikrTitles.length];
 
         await _safeZonedSchedule(
           _dhikrNotificationStartId + i - 1,
@@ -340,12 +314,8 @@ class AppNotificationService {
               visibility: NotificationVisibility.public,
             ),
           ),
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, // تحويلها لـ Exact لضمان العمل في الخلفية
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         );
-
-        if (i % 3 == 0) {
-          await Future.delayed(const Duration(milliseconds: 10));
-        }
       }
     }
   }
@@ -355,8 +325,7 @@ class AppNotificationService {
       final pendingNotifications = await _plugin.pendingNotificationRequests();
       for (final request in pendingNotifications) {
         final id = request.id;
-        if (id >= _dhikrNotificationStartId &&
-            id < _dhikrNotificationStartId + _maxDhikrScheduleCount) {
+        if (id >= _dhikrNotificationStartId && id < _dhikrNotificationStartId + 1000) {
           await _plugin.cancel(id);
         }
       }
@@ -367,23 +336,27 @@ class AppNotificationService {
 
   @pragma('vm:entry-point')
   static Future<void> dhikrAlarmCallback() async {
-    final phrase = _dhikrPhrases[DateTime.now().minute % _dhikrPhrases.length];
-    await _showFloatingDhikrText(phrase);
+    try {
+      final sharedPrefs = await SharedPreferences.getInstance();
+      final customDhikrsJson = sharedPrefs.getString(customDhikrKey);
+      final List<String> userDhikrs = customDhikrsJson != null ? List<String>.from(jsonDecode(customDhikrsJson)) : [];
+      final allPhrases = [..._dhikrPhrases, ...userDhikrs];
+      
+      final now = DateTime.now();
+      String phrase = now.weekday == DateTime.friday ? 'اللهم صل وسلم على نبينا محمد' : allPhrases[now.minute % allPhrases.length];
+
+      await _showFloatingDhikrText(phrase);
+    } catch (e) {
+      debugPrint("Dhikr alarm callback failed: $e");
+    }
   }
 
   Future<bool> ensureFloatingDhikrPermission() async {
     try {
-      if (await overlay.FlutterOverlayWindow.isPermissionGranted()) {
-        return true;
-      }
-
-      // Request permission - this might open system settings
+      if (await overlay.FlutterOverlayWindow.isPermissionGranted()) return true;
       await overlay.FlutterOverlayWindow.requestPermission();
-
-      // Return current status - we don't want to wait forever if settings didn't return a value
       return await overlay.FlutterOverlayWindow.isPermissionGranted();
     } catch (e) {
-      debugPrint('Error checking/requesting overlay permission: $e');
       return false;
     }
   }
@@ -395,34 +368,19 @@ class AppNotificationService {
   }
 
   Future<void> _scheduleFloatingDhikrAlarm(int intervalMinutes) async {
-    try {
-      await AndroidAlarmManager.periodic(
-        Duration(minutes: intervalMinutes),
-        _dhikrAlarmId,
-        dhikrAlarmCallback,
-        exact: true,
-        wakeup: true,
-        rescheduleOnReboot: true,
-      );
-    } catch (e) {
-      debugPrint('Failed to schedule exact floating dhikr alarm: $e');
-      await AndroidAlarmManager.periodic(
-        Duration(minutes: intervalMinutes),
-        _dhikrAlarmId,
-        dhikrAlarmCallback,
-        exact: false,
-        wakeup: true,
-        rescheduleOnReboot: true,
-      );
-    }
+    await AndroidAlarmManager.cancel(_dhikrAlarmId);
+    await AndroidAlarmManager.periodic(
+      Duration(minutes: intervalMinutes),
+      _dhikrAlarmId,
+      dhikrAlarmCallback,
+      exact: true,
+      wakeup: true,
+      rescheduleOnReboot: true,
+    );
   }
 
   static Future<void> _showFloatingDhikrText(String text) async {
-    final bool isGranted =
-        await overlay.FlutterOverlayWindow.isPermissionGranted();
-    if (!isGranted) {
-      return;
-    }
+    if (!(await overlay.FlutterOverlayWindow.isPermissionGranted())) return;
 
     if (await overlay.FlutterOverlayWindow.isActive()) {
       await overlay.FlutterOverlayWindow.shareData(text);
@@ -431,7 +389,7 @@ class AppNotificationService {
 
     await overlay.FlutterOverlayWindow.showOverlay(
       enableDrag: true,
-      overlayTitle: "Dhikr",
+      overlayTitle: "الذكر اليومي",
       overlayContent: text,
       flag: overlay.OverlayFlag.defaultFlag,
       alignment: overlay.OverlayAlignment.topRight,
@@ -441,69 +399,25 @@ class AppNotificationService {
       width: 800,
     );
 
-    await Future.delayed(const Duration(milliseconds: 300));
+    // Give some time for overlay to initialize before sharing data
+    await Future.delayed(const Duration(milliseconds: 600));
     await overlay.FlutterOverlayWindow.shareData(text);
   }
 
-  Future<void> testAdhanNotification(
-      String prayerKey, String prayerName) async {
+  Future<void> testAdhanNotification(String prayerKey, String prayerName) async {
     await _ensureInitialized();
     final preferences = await _preferencesService.load();
-
-    if (preferences.adhanSoundType == AdhanSoundType.full) {
-      await _playNativeAdhanNow(prayerKey, prayerName);
-      return;
-    }
-
-    var soundName = 'adhan_$prayerKey';
-    if (prayerKey == 'sunrise') {
-      soundName = prayerReminderSound;
-    }
-
-    final useSound = preferences.adhanSoundType == AdhanSoundType.short;
-
-    final details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        'adhan_channel_$prayerKey',
-        '${AppStrings.notificationAdhanChannelName} - $prayerKey',
-        channelDescription: AppStrings.notificationAdhanChannelDesc,
-        importance: Importance.max,
-        priority: Priority.max,
-        sound: useSound ? RawResourceAndroidNotificationSound(soundName) : null,
-        playSound: useSound,
-        fullScreenIntent: true,
-        category: AndroidNotificationCategory.alarm,
-      ),
-    );
-
-    await _plugin.show(
-      888,
-      'تجربة صوت الأذان',
-      'حان الآن وقت صلاة $prayerName',
-      details,
-    );
-  }
-
-  Future<void> showDhikrOverlay(String text) async {
-    final bool isGranted = await ensureFloatingDhikrPermission();
-    if (!isGranted) {
-      return;
-    }
-
-    await _showFloatingDhikrText(text);
+    await _playNativeAdhanNow(prayerKey, prayerName, preferences.adhanSoundType.index);
   }
 
   Future<void> testDhikrNotification() async {
     await _ensureInitialized();
     final preferences = await _preferencesService.load();
-
     final phrase = _dhikrPhrases[DateTime.now().minute % _dhikrPhrases.length];
-    final title = _dhikrTitles[DateTime.now().hour % _dhikrTitles.length];
-
-    // Always show a standard notification during test for confirmation
+    
     await _plugin.show(
       889,
-      title,
+      _dhikrTitles[DateTime.now().hour % _dhikrTitles.length],
       phrase,
       NotificationDetails(
         android: AndroidNotificationDetails(
@@ -512,34 +426,22 @@ class AppNotificationService {
           channelDescription: AppStrings.notificationDhikrChannelDesc,
           importance: Importance.max,
           priority: Priority.max,
-          sound: const RawResourceAndroidNotificationSound('dhikr_chime'),
+          sound: const RawResourceAndroidNotificationSound(dhikrSound),
           playSound: true,
           styleInformation: BigTextStyleInformation(phrase),
           visibility: NotificationVisibility.public,
-          category: AndroidNotificationCategory.reminder,
         ),
       ),
     );
 
-    // If floating is enabled, try to show it as well
     if (preferences.floatingDhikrEnabled) {
-      try {
-        await showDhikrOverlay(phrase);
-      } catch (e) {
-        debugPrint('Overlay test failed: $e');
-      }
+      await _showFloatingDhikrText(phrase);
     }
   }
 
   Future<void> _ensureInitialized() async {
-    if (_isInitialized) {
-      return;
-    }
-
-    if (_initFuture != null) {
-      return _initFuture;
-    }
-
+    if (_isInitialized) return;
+    if (_initFuture != null) return _initFuture;
     _initFuture = _doInitialize();
     await _initFuture;
     _isInitialized = true;
@@ -548,230 +450,69 @@ class AppNotificationService {
 
   Future<void> _doInitialize() async {
     await _configureLocalTimeZone();
-
-    const initializationSettings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-    );
-
-    await _plugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (_) {},
-    );
-
-    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-
-    // Request notification permission separately to avoid conflicts
-    if (kDebugMode) print("Requesting notification permission...");
+    const initializationSettings = InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher'));
+    await _plugin.initialize(initializationSettings);
     
-    // Non-blocking permission request
-    androidPlugin?.requestNotificationsPermission().then((granted) {
-       if (kDebugMode) print("Notification permission status: $granted");
-    }).catchError((e) {
-       if (kDebugMode) print("Notification permission error: $e");
-    });
-
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await _resetChannelsIfNeeded(androidPlugin);
     await _createChannels(androidPlugin);
   }
 
-  Future<void> _resetChannelsIfNeeded(
-    AndroidFlutterLocalNotificationsPlugin? androidPlugin,
-  ) async {
+  Future<void> _resetChannelsIfNeeded(AndroidFlutterLocalNotificationsPlugin? androidPlugin) async {
     final sharedPrefs = await SharedPreferences.getInstance();
-    final shouldResetChannels =
-        !(sharedPrefs.getBool(notificationChannelVersionKey) ?? false);
-
-    if (!shouldResetChannels) {
-      return;
-    }
+    if (sharedPrefs.getBool(notificationChannelVersionKey) ?? false) return;
 
     await androidPlugin?.deleteNotificationChannel(prayerChannelId);
     await androidPlugin?.deleteNotificationChannel(adhanChannelId);
     await androidPlugin?.deleteNotificationChannel(dhikrChannelId);
-
-    for (final prayerKey in NotificationPreferencesService.prayerKeys) {
-      await androidPlugin
-          ?.deleteNotificationChannel('adhan_channel_$prayerKey');
-    }
-
     await _plugin.cancelAll();
     await sharedPrefs.setBool(notificationChannelVersionKey, true);
   }
 
-  Future<void> _createChannels(
-    AndroidFlutterLocalNotificationsPlugin? androidPlugin,
-  ) async {
+  Future<void> _createChannels(AndroidFlutterLocalNotificationsPlugin? androidPlugin) async {
     await androidPlugin?.createNotificationChannel(
-      const AndroidNotificationChannel(
-        prayerChannelId,
-        AppStrings.notificationPrayerChannelName,
-        description: AppStrings.notificationPrayerChannelDesc,
-        importance: Importance.max,
-        sound: RawResourceAndroidNotificationSound(prayerReminderSound),
-        playSound: true,
-      ),
+      const AndroidNotificationChannel(prayerChannelId, AppStrings.notificationPrayerChannelName, importance: Importance.max, sound: RawResourceAndroidNotificationSound(prayerReminderSound), playSound: true),
     );
-
     await androidPlugin?.createNotificationChannel(
-      const AndroidNotificationChannel(
-        dhikrChannelId,
-        AppStrings.notificationDhikrChannelName,
-        description: AppStrings.notificationDhikrChannelDesc,
-        importance: Importance.max,
-        sound: RawResourceAndroidNotificationSound(dhikrSound),
-        playSound: true,
-        showBadge: true,
-      ),
+      const AndroidNotificationChannel(dhikrChannelId, AppStrings.notificationDhikrChannelName, importance: Importance.max, sound: RawResourceAndroidNotificationSound(dhikrSound), playSound: true),
     );
-
-    for (final prayerKey in NotificationPreferencesService.prayerKeys) {
-      var soundName = 'adhan_$prayerKey';
-      if (prayerKey == 'sunrise') {
-        soundName = prayerReminderSound;
-      }
-
-      await androidPlugin?.createNotificationChannel(
-        AndroidNotificationChannel(
-          'adhan_channel_$prayerKey',
-          '${AppStrings.notificationAdhanChannelName} - $prayerKey',
-          description: AppStrings.notificationAdhanChannelDesc,
-          importance: Importance.max,
-          sound: RawResourceAndroidNotificationSound(soundName),
-          playSound: true,
-        ),
-      );
-    }
   }
 
   Future<void> _configureLocalTimeZone() async {
     try {
       tz_data.initializeTimeZones();
-      final rawTimeZone = await FlutterTimezone.getLocalTimezone();
-      var timeZoneName = rawTimeZone.toString();
-
-      if (timeZoneName.startsWith('TimezoneInfo(')) {
-        final parts = timeZoneName.split(',');
-        if (parts.isNotEmpty) {
-          timeZoneName = parts[0].replaceAll('TimezoneInfo(', '').trim();
-        }
-      }
-
+      final dynamic res = await FlutterTimezone.getLocalTimezone();
+      // استخراج الاسم سواء كان الرد نصاً أو كائناً
+      final String timeZoneName = res is String ? res : res.name.toString();
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+    } catch (e) {
       try {
-        tz.setLocalLocation(tz.getLocation(timeZoneName));
+        tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
       } catch (_) {
-        if (timeZoneName.contains('Cairo') || timeZoneName.contains('Egypt')) {
-          tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
-        } else {
-          tz.setLocalLocation(tz.getLocation('UTC'));
-        }
-      }
-    } catch (error) {
-      debugPrint('Failed to set location: $error');
-      try {
         tz.setLocalLocation(tz.getLocation('UTC'));
-      } catch (_) {}
+      }
     }
   }
 
-  Future<void> _safeZonedSchedule(
-    int id,
-    String? title,
-    String? body,
-    tz.TZDateTime scheduledDate,
-    NotificationDetails notificationDetails, {
-    required AndroidScheduleMode androidScheduleMode,
-    DateTimeComponents? matchDateTimeComponents,
-  }) async {
+  Future<void> _safeZonedSchedule(int id, String? title, String? body, tz.TZDateTime scheduledDate, NotificationDetails details, {required AndroidScheduleMode androidScheduleMode, DateTimeComponents? matchDateTimeComponents}) async {
     try {
-      await _plugin.zonedSchedule(
-        id,
-        title,
-        body,
-        scheduledDate,
-        notificationDetails,
-        androidScheduleMode: androidScheduleMode,
-        matchDateTimeComponents: matchDateTimeComponents,
-      );
+      await _plugin.zonedSchedule(id, title, body, scheduledDate, details, androidScheduleMode: androidScheduleMode, matchDateTimeComponents: matchDateTimeComponents);
     } catch (e) {
       if (androidScheduleMode == AndroidScheduleMode.exactAllowWhileIdle) {
-        // Fallback to inexact if exact alarms are denied by Android 14+
-        try {
-          await _plugin.zonedSchedule(
-            id,
-            title,
-            body,
-            scheduledDate,
-            notificationDetails,
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-            matchDateTimeComponents: matchDateTimeComponents,
-          );
-        } catch (e2) {
-          debugPrint('Failed to schedule inexact fallback for $id: $e2');
-        }
-      } else {
-        debugPrint('Failed to schedule exact notification $id: $e');
+        await _plugin.zonedSchedule(id, title, body, scheduledDate, details, androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle, matchDateTimeComponents: matchDateTimeComponents);
       }
     }
   }
 
-  Future<void> _scheduleNativeAdhan(
-    int requestCode,
-    String prayerKey,
-    String prayerName,
-    int timeMillis,
-  ) async {
-    try {
-      await _nativeAdhanChannel.invokeMethod<void>('schedule', {
-        'requestCode': requestCode,
-        'prayerKey': prayerKey,
-        'prayerName': prayerName,
-        'timeMillis': timeMillis,
-      });
-    } catch (e) {
-      debugPrint('Failed to schedule native adhan $requestCode: $e');
-    }
+  Future<void> _scheduleNativeAdhan(int requestCode, String prayerKey, String prayerName, int timeMillis, int soundType) async {
+    await _nativeAdhanChannel.invokeMethod<void>('schedule', {'requestCode': requestCode, 'prayerKey': prayerKey, 'prayerName': prayerName, 'timeMillis': timeMillis, 'soundType': soundType});
   }
 
   Future<void> _cancelNativeAdhan(int requestCode) async {
-    try {
-      await _nativeAdhanChannel.invokeMethod<void>('cancel', {
-        'requestCode': requestCode,
-      });
-    } catch (e) {
-      debugPrint('Failed to cancel native adhan $requestCode: $e');
-    }
+    await _nativeAdhanChannel.invokeMethod<void>('cancel', {'requestCode': requestCode});
   }
 
-  Future<void> _playNativeAdhanNow(String prayerKey, String prayerName) async {
-    try {
-      await _nativeAdhanChannel.invokeMethod<void>('playNow', {
-        'prayerKey': prayerKey,
-        'prayerName': prayerName,
-      });
-    } catch (e) {
-      debugPrint('Failed to play native adhan now: $e');
-    }
-  }
-
-  Future<Duration?> getRemainingDhikrTime() async {
-    final sharedPrefs = await SharedPreferences.getInstance();
-    final startTimeMillis = sharedPrefs.getInt(dhikrCycleStartTimeKey);
-    if (startTimeMillis == null) return null;
-
-    final preferences = await _preferencesService.load();
-    if (!preferences.hourlyDhikrEnabled) return null;
-
-    final intervalMinutes = preferences.hourlyDhikrIntervalMinutes;
-    final startTime = DateTime.fromMillisecondsSinceEpoch(startTimeMillis);
-    final now = DateTime.now();
-
-    final diffSeconds = now.difference(startTime).inSeconds;
-    if (diffSeconds < 0) return Duration(minutes: intervalMinutes);
-    
-    final intervalSeconds = intervalMinutes * 60;
-    final remainingSeconds = intervalSeconds - (diffSeconds % intervalSeconds);
-
-    return Duration(seconds: remainingSeconds);
+  Future<void> _playNativeAdhanNow(String prayerKey, String prayerName, int soundType) async {
+    await _nativeAdhanChannel.invokeMethod<void>('playNow', {'prayerKey': prayerKey, 'prayerName': prayerName, 'soundType': soundType});
   }
 }
