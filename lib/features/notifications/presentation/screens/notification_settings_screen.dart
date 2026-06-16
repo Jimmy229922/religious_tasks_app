@@ -1,7 +1,9 @@
-// ignore_for_file: deprecated_member_use
-
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'package:religious_tasks_app/core/constants/strings.dart';
 import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
@@ -26,20 +28,86 @@ class _NotificationSettingsScreenState
   NotificationPreferences _preferences = NotificationPreferences.defaults();
   bool _isLoading = true;
   bool _isApplying = false;
+  bool _allPermissionsGranted = true;
+
+  Timer? _countdownTimer;
+  Duration? _remainingDhikrTime;
+  DateTime? _dhikrStartTime;
 
   @override
   void initState() {
     super.initState();
     _loadPreferences();
+    _checkAllPermissions();
+    _startCountdownTimer();
+  }
+
+  Future<void> _checkAllPermissions() async {
+    final statusNotif = await Permission.notification.isGranted;
+    final statusLoc = await Permission.locationWhenInUse.isGranted;
+    final statusBattery = await Permission.ignoreBatteryOptimizations.isGranted;
+    final statusOverlay = await Permission.systemAlertWindow.isGranted;
+    
+    bool statusAlarm = true;
+    if (Platform.isAndroid) {
+      statusAlarm = await Permission.scheduleExactAlarm.isGranted;
+    }
+
+    if (mounted) {
+      setState(() {
+        _allPermissionsGranted = statusNotif && statusLoc && statusBattery && statusOverlay && statusAlarm;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadPreferences() async {
     final preferences = await _preferencesService.load();
+    final sharedPrefs = await SharedPreferences.getInstance();
+    final startTimeMillis =
+        sharedPrefs.getInt(AppNotificationService.dhikrCycleStartTimeKey);
+
     if (!mounted) return;
 
     setState(() {
       _preferences = preferences;
+      _dhikrStartTime = startTimeMillis != null
+          ? DateTime.fromMillisecondsSinceEpoch(startTimeMillis)
+          : null;
       _isLoading = false;
+    });
+  }
+
+  void _startCountdownTimer() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      if (!_preferences.hourlyDhikrEnabled || _dhikrStartTime == null) {
+        if (_remainingDhikrTime != null) {
+          setState(() => _remainingDhikrTime = null);
+        }
+        return;
+      }
+
+      final now = DateTime.now();
+      final diffSeconds = now.difference(_dhikrStartTime!).inSeconds;
+      final intervalSeconds = _preferences.hourlyDhikrIntervalMinutes * 60;
+
+      if (diffSeconds < 0) {
+        setState(() =>
+            _remainingDhikrTime = Duration(minutes: _preferences.hourlyDhikrIntervalMinutes));
+        return;
+      }
+
+      final remainingSeconds = intervalSeconds - (diffSeconds % intervalSeconds);
+      setState(() {
+        _remainingDhikrTime = Duration(seconds: remainingSeconds);
+      });
     });
   }
 
@@ -115,9 +183,15 @@ class _NotificationSettingsScreenState
     });
 
     await _preferencesService.setHourlyDhikrIntervalMinutes(minutes);
-    await _rescheduleRecurringNotifications(
-      successMessage: 'تم تحديث مدة التذكير المتكرر',
-    );
+    // نمرر forceReschedule: true هنا لأن المستخدم غير الإعدادات بنفسه
+    await _runApplyingTask(() async {
+      await _notificationService.scheduleDhikrNotifications(
+        settings: _preferences,
+        forceReschedule: true,
+      );
+      await _loadPreferences();
+      _showMessage('تم تحديث مدة التذكير المتكرر');
+    });
   }
 
   Future<void> _updateFloatingDhikrEnabled(bool value) async {
@@ -179,6 +253,7 @@ class _NotificationSettingsScreenState
   }) async {
     await _runApplyingTask(() async {
       await _notificationService.syncRecurringSchedules();
+      await _loadPreferences(); // تحديث وقت البداية بعد الجدولة الجديدة
       if (successMessage != null) {
         _showMessage(successMessage);
       }
@@ -300,29 +375,20 @@ class _NotificationSettingsScreenState
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          RadioListTile<AdhanSoundType>(
-                            title: const Text('أذان كامل (صوت المؤذن)'),
-                            subtitle: const Text(
-                                'تشغيل الأذان كاملاً عند دخول وقت الصلاة'),
+                          _buildModernRadioTile(
+                            title: 'أذان كامل (صوت المؤذن)',
+                            subtitle: 'تشغيل الأذان كاملاً عند دخول وقت الصلاة',
                             value: AdhanSoundType.full,
-                            groupValue: _preferences.adhanSoundType,
-                            onChanged: _isApplying ? null : _updateAdhanSoundType,
                           ),
-                          RadioListTile<AdhanSoundType>(
-                            title: const Text('تنبيه قصير'),
-                            subtitle:
-                                const Text('تشغيل صوت تنبيه بسيط لوقت الأذان'),
+                          _buildModernRadioTile(
+                            title: 'تنبيه قصير',
+                            subtitle: 'تشغيل صوت تنبيه بسيط لوقت الأذان',
                             value: AdhanSoundType.short,
-                            groupValue: _preferences.adhanSoundType,
-                            onChanged: _isApplying ? null : _updateAdhanSoundType,
                           ),
-                          RadioListTile<AdhanSoundType>(
-                            title: const Text('صامت (إشعار فقط)'),
-                            subtitle:
-                                const Text('إظهار إشعار بدون صوت عند وقت الأذان'),
+                          _buildModernRadioTile(
+                            title: 'صامت (إشعار فقط)',
+                            subtitle: 'إظهار إشعار بدون صوت عند وقت الأذان',
                             value: AdhanSoundType.none,
-                            groupValue: _preferences.adhanSoundType,
-                            onChanged: _isApplying ? null : _updateAdhanSoundType,
                           ),
                         ],
                       ),
@@ -372,33 +438,109 @@ class _NotificationSettingsScreenState
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
-                        child: DropdownButtonFormField<int>(
-                          key:
-                              ValueKey(_preferences.hourlyDhikrIntervalMinutes),
-                          initialValue: _preferences.hourlyDhikrIntervalMinutes,
-                          decoration: const InputDecoration(
-                            labelText: 'مدة التذكير المتكرر',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: NotificationPreferencesService
-                              .dhikrIntervalOptions
-                              .map(
-                                (minutes) => DropdownMenuItem(
-                                  value: minutes,
-                                  child: Text(_intervalLabel(minutes)),
+                        child: Column(
+                          children: [
+                            DropdownButtonFormField<int>(
+                              key: ValueKey(_preferences.hourlyDhikrIntervalMinutes),
+                              initialValue: _preferences.hourlyDhikrIntervalMinutes,
+                              decoration: const InputDecoration(
+                                labelText: 'مدة التذكير المتكرر',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.timer_outlined),
+                              ),
+                              items: NotificationPreferencesService.dhikrIntervalOptions
+                                  .map(
+                                    (minutes) => DropdownMenuItem(
+                                      value: minutes,
+                                      child: Text(_intervalLabel(minutes)),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: _isApplying
+                                  ? null
+                                  : (value) {
+                                      if (value != null) {
+                                        _updateHourlyInterval(value);
+                                      }
+                                    },
+                            ),
+                            if (_remainingDhikrTime != null) ...[
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.teal.withValues(alpha: 0.2)),
                                 ),
-                              )
-                              .toList(),
-                          onChanged: _isApplying
-                              ? null
-                              : (value) {
-                                  if (value != null) {
-                                    _updateHourlyInterval(value);
-                                  }
-                                },
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'التذكير القادم خلال:',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.teal,
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatDuration(_remainingDhikrTime!),
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.teal,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ),
+                  if (!_allPermissionsGranted) ...[
+                    const SizedBox(height: 20),
+                    _buildSectionHeader('نصيحة لضمان وصول الإشعارات'),
+                    Card(
+                      color: Colors.amber.shade50,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.amber.shade200),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.info_outline, color: Colors.amber),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'لضمان استمرار الأذكار حتى عند غلق التطبيق، يرجى تفعيل "التشغيل التلقائي" وإلغاء "قيود البطارية" من إعدادات النظام.',
+                                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            TextButton.icon(
+                              onPressed: () async {
+                                await openAppSettings();
+                                // إعادة الفحص بعد العودة من الإعدادات
+                                Future.delayed(const Duration(seconds: 1), () => _checkAllPermissions());
+                              },
+                              icon: const Icon(Icons.settings_applications),
+                              label: const Text('افتح إعدادات التطبيق الآن'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   _buildSectionHeader('أدوات سريعة'),
                   Card(
@@ -442,6 +584,26 @@ class _NotificationSettingsScreenState
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildModernRadioTile({
+    required String title,
+    required String subtitle,
+    required AdhanSoundType value,
+  }) {
+    return ListTile(
+      title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+      leading: Radio<AdhanSoundType>(
+        value: value,
+        // ignore: deprecated_member_use
+        groupValue: _preferences.adhanSoundType,
+        // ignore: deprecated_member_use
+        onChanged: _isApplying ? null : _updateAdhanSoundType,
+      ),
+      contentPadding: EdgeInsets.zero,
+      onTap: _isApplying ? null : () => _updateAdhanSoundType(value),
     );
   }
 
@@ -548,5 +710,15 @@ class _NotificationSettingsScreenState
       return 'كل 60 دقيقة';
     }
     return 'كل $minutes دقيقة';
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String minutes = twoDigits(duration.inMinutes.remainder(60));
+    String seconds = twoDigits(duration.inSeconds.remainder(60));
+    if (duration.inHours > 0) {
+      return "${twoDigits(duration.inHours)}:$minutes:$seconds";
+    }
+    return "$minutes:$seconds";
   }
 }

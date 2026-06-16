@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
@@ -10,19 +11,37 @@ class DhikrOverlay extends StatefulWidget {
 
 class _DhikrOverlayState extends State<DhikrOverlay> {
   String _dhikr = "سبحان الله";
+  Timer? _closeTimer;
 
   @override
   void initState() {
     super.initState();
     _loadInitialData();
+    _startAutoCloseTimer();
     // Listen for data updates if we want to change the text dynamically
     FlutterOverlayWindow.overlayListener.listen((data) {
       if (data != null && data is String) {
         setState(() {
           _dhikr = data;
         });
+        _startAutoCloseTimer();
       }
     });
+  }
+
+  void _startAutoCloseTimer() {
+    _closeTimer?.cancel();
+    _closeTimer = Timer(const Duration(seconds: 10), () async {
+      if (mounted) {
+         await FlutterOverlayWindow.closeOverlay();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _closeTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadInitialData() async {

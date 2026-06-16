@@ -45,6 +45,7 @@ class AppNotificationService {
   static const int _morningAthkarNotificationId = 3001;
   static const int _eveningAthkarNotificationId = 3002;
   static const int _dhikrAlarmId = 5000;
+  static const String dhikrCycleStartTimeKey = 'dhikr_cycle_start_time';
 
   static const List<String> _dhikrPhrases = [
     'سبحان الله',
@@ -272,41 +273,37 @@ class AppNotificationService {
 
   Future<void> scheduleDhikrNotifications({
     NotificationPreferences? settings,
+    bool forceReschedule = false,
   }) async {
     await _ensureInitialized();
     final preferences = settings ?? await _preferencesService.load();
 
-    // Cancel both types of dhikr reminders to be safe
-    await AndroidAlarmManager.cancel(_dhikrAlarmId);
+    final sharedPrefs = await SharedPreferences.getInstance();
+    final savedInterval = sharedPrefs.getInt('saved_dhikr_interval');
+    final savedStartTime = sharedPrefs.getInt(dhikrCycleStartTimeKey);
 
-    try {
-      final pendingNotifications = await _plugin.pendingNotificationRequests();
-      int cancelCount = 0;
-
-      for (final request in pendingNotifications) {
-        final id = request.id;
-        bool shouldCancel = false;
-
-        if (id >= 200 && id < 488 && (id < 201 || id > 206)) {
-          shouldCancel = true;
-        } else if (id >= _dhikrNotificationStartId &&
-            id < _dhikrNotificationStartId + _maxDhikrScheduleCount) {
-          shouldCancel = true;
-        }
-
-        if (shouldCancel) {
-          await _plugin.cancel(id);
-          cancelCount++;
-          if (cancelCount % 3 == 0) {
-            await Future.delayed(const Duration(milliseconds: 10));
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Failed to cancel old dhikr notifications: $e');
-    }
+    // التحقق هل نحتاج لإعادة الجدولة فعلاً؟
+    // لو المدة متغيرة أو ده أول مرة أو المستخدم طلب "إعادة جدولة" يدوياً
+    bool intervalChanged = savedInterval != preferences.hourlyDhikrIntervalMinutes;
+    bool shouldInitCycle = savedStartTime == null || intervalChanged || forceReschedule;
 
     if (!preferences.hourlyDhikrEnabled) {
+      await AndroidAlarmManager.cancel(_dhikrAlarmId);
+      await _cancelAllDhikrNotifications();
+      return;
+    }
+
+    if (shouldInitCycle) {
+      final now = tz.TZDateTime.now(tz.local);
+      await sharedPrefs.setInt(dhikrCycleStartTimeKey, now.millisecondsSinceEpoch);
+      await sharedPrefs.setInt('saved_dhikr_interval', preferences.hourlyDhikrIntervalMinutes);
+      
+      // Cancel existing ones before fresh start
+      await AndroidAlarmManager.cancel(_dhikrAlarmId);
+      await _cancelAllDhikrNotifications();
+    } else {
+      // إذا كانت الدورة شغالة والوقت متسجل، لا نفعل شيئاً لنحافظ على "المرحلة" الحالية للعداد
+      // إلا لو كنا نريد التأكد من وجود منبهات مجدولة (اختياري)
       return;
     }
 
@@ -343,13 +340,28 @@ class AppNotificationService {
               visibility: NotificationVisibility.public,
             ),
           ),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, // تحويلها لـ Exact لضمان العمل في الخلفية
         );
 
         if (i % 3 == 0) {
           await Future.delayed(const Duration(milliseconds: 10));
         }
       }
+    }
+  }
+
+  Future<void> _cancelAllDhikrNotifications() async {
+    try {
+      final pendingNotifications = await _plugin.pendingNotificationRequests();
+      for (final request in pendingNotifications) {
+        final id = request.id;
+        if (id >= _dhikrNotificationStartId &&
+            id < _dhikrNotificationStartId + _maxDhikrScheduleCount) {
+          await _plugin.cancel(id);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error canceling dhikr notifications: $e');
     }
   }
 
@@ -504,7 +516,6 @@ class AppNotificationService {
           playSound: true,
           styleInformation: BigTextStyleInformation(phrase),
           visibility: NotificationVisibility.public,
-          fullScreenIntent: true,
           category: AndroidNotificationCategory.reminder,
         ),
       ),
@@ -741,5 +752,26 @@ class AppNotificationService {
     } catch (e) {
       debugPrint('Failed to play native adhan now: $e');
     }
+  }
+
+  Future<Duration?> getRemainingDhikrTime() async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+    final startTimeMillis = sharedPrefs.getInt(dhikrCycleStartTimeKey);
+    if (startTimeMillis == null) return null;
+
+    final preferences = await _preferencesService.load();
+    if (!preferences.hourlyDhikrEnabled) return null;
+
+    final intervalMinutes = preferences.hourlyDhikrIntervalMinutes;
+    final startTime = DateTime.fromMillisecondsSinceEpoch(startTimeMillis);
+    final now = DateTime.now();
+
+    final diffSeconds = now.difference(startTime).inSeconds;
+    if (diffSeconds < 0) return Duration(minutes: intervalMinutes);
+    
+    final intervalSeconds = intervalMinutes * 60;
+    final remainingSeconds = intervalSeconds - (diffSeconds % intervalSeconds);
+
+    return Duration(seconds: remainingSeconds);
   }
 }

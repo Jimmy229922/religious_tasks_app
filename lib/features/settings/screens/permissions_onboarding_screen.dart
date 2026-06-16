@@ -17,28 +17,44 @@ class PermissionsOnboardingScreen extends StatefulWidget {
 }
 
 class _PermissionsOnboardingScreenState
-    extends State<PermissionsOnboardingScreen> {
+    extends State<PermissionsOnboardingScreen> with WidgetsBindingObserver {
   // Permission statuses
   PermissionStatus _notificationStatus = PermissionStatus.denied;
   PermissionStatus _locationStatus = PermissionStatus.denied;
   PermissionStatus _exactAlarmStatus = PermissionStatus.denied;
+  PermissionStatus _ignoreBatteryStatus = PermissionStatus.denied;
+  PermissionStatus _overlayStatus = PermissionStatus.denied;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkPermissions();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // تحديث الصلاحيات فور العودة للتطبيق من الإعدادات
+    if (state == AppLifecycleState.resumed) {
+      _checkPermissions();
+    }
   }
 
   Future<void> _checkPermissions() async {
     final notif = await Permission.notification.status;
     final loc = await Permission.locationWhenInUse.status;
+    final battery = await Permission.ignoreBatteryOptimizations.status;
+    final overlay = await Permission.systemAlertWindow.status;
 
     PermissionStatus alarm =
         PermissionStatus.granted; // Default for older android
     if (Platform.isAndroid) {
-      // scheduleExactAlarm acts differently on 12+.
-      // We usually check ignoreBatteryOptimizations or just request it if needed.
-      // Actually scheduleExactAlarm permission status can be checked.
       alarm = await Permission.scheduleExactAlarm.status;
     }
 
@@ -47,13 +63,34 @@ class _PermissionsOnboardingScreenState
         _notificationStatus = notif;
         _locationStatus = loc;
         _exactAlarmStatus = alarm;
+        _ignoreBatteryStatus = battery;
+        _overlayStatus = overlay;
       });
     }
   }
 
   Future<void> _requestPermission(Permission permission) async {
+    if (permission == Permission.ignoreBatteryOptimizations) {
+      // محاولة الطلب المباشر أولاً
+      final status = await permission.request();
+      if (!status.isGranted) {
+        // إذا لم يظهر الحوار، نفتح إعدادات التطبيق مباشرة
+        // في شاومي، إعدادات البطارية موجودة داخل إعدادات التطبيق
+        await openAppSettings();
+      }
+      // تحديث الحالة فوراً
+      await _checkPermissions();
+      return;
+    }
+
+    if (permission == Permission.systemAlertWindow) {
+      // صلاحية الظهور فوق التطبيقات تحتاج فتح الإعدادات دائماً
+      await permission.request();
+      await _checkPermissions();
+      return;
+    }
+
     final status = await permission.request();
-    // Update state
     await _checkPermissions();
 
     if (status.isPermanentlyDenied) {
@@ -193,6 +230,26 @@ class _PermissionsOnboardingScreenState
                         status: _exactAlarmStatus,
                         onTap: () =>
                             _requestPermission(Permission.scheduleExactAlarm),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildPermissionCard(
+                        title: "إلغاء قيود البطارية",
+                        description:
+                            "يسمح للتطبيق بالعمل في الخلفية دون أن يقفله النظام لتوفير الطاقة.",
+                        icon: Icons.battery_charging_full,
+                        status: _ignoreBatteryStatus,
+                        onTap: () =>
+                            _requestPermission(Permission.ignoreBatteryOptimizations),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildPermissionCard(
+                        title: "الظهور فوق التطبيقات",
+                        description:
+                            "مطلوب لإظهار الأذكار العائمة على الشاشة أثناء استخدامك لموبايلك.",
+                        icon: Icons.layers,
+                        status: _overlayStatus,
+                        onTap: () =>
+                            _requestPermission(Permission.systemAlertWindow),
                       ),
                     ],
                   ],
