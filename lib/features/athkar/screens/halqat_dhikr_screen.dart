@@ -1,7 +1,6 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class HalqatDhikrScreen extends StatefulWidget {
   const HalqatDhikrScreen({super.key});
@@ -73,10 +72,10 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title:
             const Icon(Icons.check_circle, color: Colors.greenAccent, size: 50),
-        content: Text(
+        content: const Text(
           "تقبل الله منك! أتممت حلقة الذكر.",
           textAlign: TextAlign.center,
-          style: GoogleFonts.cairo(color: Colors.white, fontSize: 18),
+          style: TextStyle(color: Colors.white, fontSize: 18),
         ),
         actions: [
           TextButton(
@@ -84,7 +83,7 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
               Navigator.pop(ctx); // Close dialog
               Navigator.pop(context); // Close screen
             },
-            child: Text("تم", style: GoogleFonts.cairo(color: Colors.white)),
+            child: const Text("تم", style: TextStyle(color: Colors.white)),
           ),
           TextButton(
             onPressed: () {
@@ -93,8 +92,8 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
                 _startNewSession(); // Restart
               });
             },
-            child: Text("حلقة جديدة",
-                style: GoogleFonts.cairo(color: Colors.tealAccent)),
+            child: const Text("حلقة جديدة",
+                style: TextStyle(color: Colors.tealAccent)),
           )
         ],
       ),
@@ -107,8 +106,8 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("حلقة الذكر",
-            style: GoogleFonts.arefRuqaa(fontWeight: FontWeight.bold)),
+        title: const Text("حلقة الذكر",
+            style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'ArefRuqaa')),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -130,7 +129,7 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
               const SizedBox(height: 20),
               Text(
                 "ردد كل ذكر ${3} مرات",
-                style: GoogleFonts.cairo(
+                style: TextStyle(
                     fontSize: 18,
                     color: isDark ? Colors.white70 : Colors.teal[800]),
               ),
@@ -190,10 +189,11 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
                 else
                   Text(
                     "${item.current}",
-                    style: GoogleFonts.ibmPlexMono(
+                    style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87),
+                        color: isDark ? Colors.white : Colors.black87,
+                        fontFamily: 'IBMPlexMono'),
                   ),
               ],
             ),
@@ -201,7 +201,7 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
             Expanded(
               child: Text(
                 item.text,
-                style: GoogleFonts.cairo(
+                style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : Colors.black87,

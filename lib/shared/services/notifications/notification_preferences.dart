@@ -6,6 +6,7 @@ enum AdhanSoundType {
 
 class NotificationPreferences {
   final Map<String, bool> adhanEnabled;
+  final Map<String, int> prayerOffsets; // Minutes offset for each prayer
   final AdhanSoundType adhanSoundType;
   final bool morningAthkarReminderEnabled;
   final bool eveningAthkarReminderEnabled;
@@ -15,6 +16,7 @@ class NotificationPreferences {
 
   const NotificationPreferences({
     required this.adhanEnabled,
+    required this.prayerOffsets,
     required this.adhanSoundType,
     required this.morningAthkarReminderEnabled,
     required this.eveningAthkarReminderEnabled,
@@ -33,6 +35,14 @@ class NotificationPreferences {
         'maghrib': true,
         'isha': true,
       },
+      prayerOffsets: {
+        'fajr': 0,
+        'sunrise': 0,
+        'dhuhr': 0,
+        'asr': 0,
+        'maghrib': 0,
+        'isha': 0,
+      },
       adhanSoundType: AdhanSoundType.full,
       morningAthkarReminderEnabled: true,
       eveningAthkarReminderEnabled: true,
@@ -44,6 +54,7 @@ class NotificationPreferences {
 
   NotificationPreferences copyWith({
     Map<String, bool>? adhanEnabled,
+    Map<String, int>? prayerOffsets,
     AdhanSoundType? adhanSoundType,
     bool? morningAthkarReminderEnabled,
     bool? eveningAthkarReminderEnabled,
@@ -53,6 +64,7 @@ class NotificationPreferences {
   }) {
     return NotificationPreferences(
       adhanEnabled: adhanEnabled ?? this.adhanEnabled,
+      prayerOffsets: prayerOffsets ?? this.prayerOffsets,
       adhanSoundType: adhanSoundType ?? this.adhanSoundType,
       morningAthkarReminderEnabled: morningAthkarReminderEnabled ??
           this.morningAthkarReminderEnabled,
@@ -66,4 +78,5 @@ class NotificationPreferences {
   }
 
   bool isAdhanEnabled(String prayerKey) => adhanEnabled[prayerKey] ?? true;
+  int getPrayerOffset(String prayerKey) => prayerOffsets[prayerKey] ?? 0;
 }

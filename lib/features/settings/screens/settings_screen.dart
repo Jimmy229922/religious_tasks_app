@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:religious_tasks_app/core/constants/strings.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
@@ -31,6 +30,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'maghrib': true,
     'isha': true,
   };
+  Map<String, int> prayerOffsets = {
+    'fajr': 0,
+    'sunrise': 0,
+    'dhuhr': 0,
+    'asr': 0,
+    'maghrib': 0,
+    'isha': 0,
+  };
   AdhanSoundType _soundType = AdhanSoundType.full;
 
   bool _isLoading = true;
@@ -46,6 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await _prefsService.load();
     setState(() {
       adhanSettings = Map.from(prefs.adhanEnabled);
+      prayerOffsets = Map.from(prefs.prayerOffsets);
       _soundType = prefs.adhanSoundType;
       _isLoading = false;
     });
@@ -77,6 +85,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     await _prefsService.setAdhanEnabled(key, value);
+    _reschedulePrayers();
+  }
+
+  void _updateOffset(String key, int value) async {
+    setState(() {
+      prayerOffsets[key] = value;
+    });
+
+    await _prefsService.setPrayerOffset(key, value);
+
+    // Refresh ViewModel to apply offsets immediately
+    if (mounted) {
+      final tasksViewModel = Provider.of<TasksViewModel>(context, listen: false);
+      await tasksViewModel.refreshLocation(); // This will recalculate everything with new offsets
+    }
     _reschedulePrayers();
   }
 
@@ -362,7 +385,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.only(bottom: 8.0, right: 4.0),
       child: Text(
         title,
-        style: GoogleFonts.cairo(
+        style: const TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
           color: Colors.teal,
@@ -376,31 +399,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
       elevation: 2,
       margin: const EdgeInsets.symmetric(vertical: 4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: SwitchListTile(
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        subtitle: Text(
-          adhanSettings[key] == true ? "مفعل" : "معطل",
-          style: TextStyle(
-            color: adhanSettings[key] == true ? Colors.green : Colors.grey,
-            fontSize: 12,
+      child: Column(
+        children: [
+          SwitchListTile(
+            title: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            subtitle: Text(
+              adhanSettings[key] == true ? "مفعل" : "معطل",
+              style: TextStyle(
+                color: adhanSettings[key] == true ? Colors.green : Colors.grey,
+                fontSize: 12,
+              ),
+            ),
+            value: adhanSettings[key] ?? true,
+            onChanged: (val) => _updateSetting(key, val),
+            secondary: IconButton(
+              icon: Icon(
+                Icons.volume_up_rounded,
+                color: adhanSettings[key] == true ? Colors.teal : Colors.grey,
+              ),
+              tooltip: "تجربة الصوت",
+              onPressed: () {
+                AppNotificationService().testAdhanNotification(key, title);
+              },
+            ),
+            activeTrackColor: Colors.teal,
           ),
-        ),
-        value: adhanSettings[key] ?? true,
-        onChanged: (val) => _updateSetting(key, val),
-        secondary: IconButton(
-          icon: Icon(
-            Icons.volume_up_rounded,
-            color: adhanSettings[key] == true ? Colors.teal : Colors.grey,
+          Padding(
+            padding:
+                const EdgeInsets.only(left: 16, right: 16, bottom: 12, top: 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("تعديل يدوي (بالدقائق):",
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                Row(
+                  children: [
+                    _buildOffsetButton(key, -1),
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        "${prayerOffsets[key] ?? 0}",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.teal),
+                      ),
+                    ),
+                    _buildOffsetButton(key, 1),
+                  ],
+                ),
+              ],
+            ),
           ),
-          tooltip: "تجربة الصوت",
-          onPressed: () {
-            AppNotificationService().testAdhanNotification(key, title);
-          },
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOffsetButton(String key, int delta) {
+    return InkWell(
+      onTap: () {
+        final current = prayerOffsets[key] ?? 0;
+        _updateOffset(key, current + delta);
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+          borderRadius: BorderRadius.circular(8),
         ),
-        activeTrackColor: Colors.teal,
+        child: Icon(
+          delta > 0 ? Icons.add : Icons.remove,
+          size: 16,
+          color: Colors.teal,
+        ),
       ),
     );
   }

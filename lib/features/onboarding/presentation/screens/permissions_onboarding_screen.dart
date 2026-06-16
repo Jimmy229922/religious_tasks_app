@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -103,10 +102,10 @@ class _PermissionsOnboardingScreenState
 
     if (!isAllGranted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
             "مينفعش نبدا من غير ما ناخد كل الصلاحيات عشان التطبيق يشتغل صح",
-            style: GoogleFonts.cairo(color: Colors.white),
+            style: TextStyle(color: Colors.white),
           ),
           backgroundColor: Colors.red,
         ),
@@ -144,10 +143,10 @@ class _PermissionsOnboardingScreenState
               const SizedBox(height: 20),
               Icon(Icons.security, size: 80, color: Colors.teal.shade800),
               const SizedBox(height: 20),
-              Text(
+              const Text(
                 "إعداد التطبيق",
                 textAlign: TextAlign.center,
-                style: GoogleFonts.cairo(
+                style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
@@ -157,7 +156,7 @@ class _PermissionsOnboardingScreenState
               Text(
                 "عشان نقدر نفيدك بكل مميزات التطبيق، محتاجين تسمحلنا بالصلاحيات دي",
                 textAlign: TextAlign.center,
-                style: GoogleFonts.cairo(
+                style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[600],
                 ),
@@ -208,9 +207,9 @@ class _PermissionsOnboardingScreenState
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(
+                child: const Text(
                   "ابدأ الرحلة",
-                  style: GoogleFonts.cairo(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -267,7 +266,7 @@ class _PermissionsOnboardingScreenState
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.cairo(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: isGranted ? Colors.teal[800] : Colors.black87,
@@ -276,7 +275,7 @@ class _PermissionsOnboardingScreenState
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: GoogleFonts.cairo(
+                  style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],
                   ),
@@ -295,9 +294,9 @@ class _PermissionsOnboardingScreenState
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
               ),
-              child: Text(
+              child: const Text(
                 "تفعيل",
-                style: GoogleFonts.cairo(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,

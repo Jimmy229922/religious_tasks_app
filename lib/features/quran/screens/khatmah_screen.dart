@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
 
@@ -150,9 +149,9 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
       resizeToAvoidBottomInset:
           false, // Prevents the background from shrinking/becoming blank
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           "متابع الختمة",
-          style: GoogleFonts.arefRuqaa(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'ArefRuqaa'),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -188,7 +187,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                     const SizedBox(height: 30),
                     Text(
                       "أين وصلت في قراءتك؟",
-                      style: GoogleFonts.cairo(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: isDark ? Colors.white : Colors.black87,
@@ -217,7 +216,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                               .map((s) => DropdownMenuItem(
                                     value: s,
                                     child: Text(s,
-                                        style: GoogleFonts.cairo(
+                                        style: TextStyle(
                                             color: isDark
                                                 ? Colors.white
                                                 : Colors.black87)),
@@ -238,12 +237,13 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                       controller: _ayahController,
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.ibmPlexMono(
+                      style: TextStyle(
                           fontSize: 24,
-                          color: isDark ? Colors.white : Colors.black87),
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontFamily: 'IBMPlexMono'),
                       decoration: InputDecoration(
                         labelText: "رقم الآية",
-                        labelStyle: GoogleFonts.cairo(color: Colors.teal),
+                        labelStyle: const TextStyle(color: Colors.teal),
                         filled: true,
                         fillColor: isDark ? Colors.white10 : Colors.white,
                         border: OutlineInputBorder(
@@ -271,7 +271,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                         children: [
                           Text(
                             "آخر حفظ: سورة ${vm.lastSurah} - آية ${vm.lastAyah}",
-                            style: GoogleFonts.cairo(
+                            style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: isDark ? Colors.white : Colors.black87),

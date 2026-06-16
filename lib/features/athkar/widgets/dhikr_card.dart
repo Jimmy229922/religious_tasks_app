@@ -91,15 +91,6 @@ class DhikrCard extends StatelessWidget {
             color: isDone ? accent : border,
             width: isDone ? 2 : 1,
           ),
-          boxShadow: trueBlackMode || isDone
-              ? []
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
         ),
         child: Padding(
           padding: EdgeInsets.all(isFocus ? 20 : 16),

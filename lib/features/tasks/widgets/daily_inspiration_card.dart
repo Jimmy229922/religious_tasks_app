@@ -34,14 +34,6 @@ class DailyInspirationCard extends StatelessWidget {
               ? Colors.white12
               : (isQuran ? const Color(0xFF80CBC4) : Colors.teal.shade100),
         ),
-        boxShadow: isQuran && !isDark
-            ? [
-                BoxShadow(
-                    color: Colors.teal.withValues(alpha: 0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2))
-              ]
-            : [],
       ),
       child: Column(
         children: [

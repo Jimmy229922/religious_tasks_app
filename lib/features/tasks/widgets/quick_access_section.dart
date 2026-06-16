@@ -1,6 +1,5 @@
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
 import 'package:religious_tasks_app/core/widgets/calendar_explorer_dialog.dart';
 import 'package:religious_tasks_app/features/athkar/screens/halqat_dhikr_screen.dart';
@@ -111,14 +110,6 @@ class QuickAccessSection extends StatelessWidget {
               color: isDark
                   ? baseColor.withValues(alpha: 0.4)
                   : baseColor.withValues(alpha: 0.3)),
-          boxShadow: isDark
-              ? []
-              : [
-                  BoxShadow(
-                      color: baseColor.withValues(alpha: 0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2))
-                ],
         ),
         child: Column(
           children: [
@@ -138,7 +129,7 @@ class QuickAccessSection extends StatelessWidget {
             Text(
               label,
               textAlign: TextAlign.center,
-              style: GoogleFonts.cairo(
+              style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white70 : Colors.black87),

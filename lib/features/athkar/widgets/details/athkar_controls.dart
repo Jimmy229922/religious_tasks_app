@@ -49,15 +49,6 @@ class AthkarControls extends StatelessWidget {
         color: surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: border),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

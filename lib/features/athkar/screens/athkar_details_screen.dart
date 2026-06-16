@@ -43,6 +43,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   bool _focusMode = false;
   bool _isNightMode = false;
   bool _themeInitialized = false;
+  ThemeData? _cachedTheme;
   int _focusIndex = 0;
   double _fontScale = 1.0;
   late final String _progressKey;
@@ -75,8 +76,20 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
     super.didChangeDependencies();
     if (!_themeInitialized) {
       _isNightMode = Theme.of(context).brightness == Brightness.dark;
+      _updateCachedTheme();
       _themeInitialized = true;
     }
+  }
+
+  void _updateCachedTheme() {
+    _cachedTheme = _isNightMode
+        ? ThemeData.dark().copyWith(
+            scaffoldBackgroundColor: Colors.black,
+            appBarTheme: const AppBarTheme(backgroundColor: Colors.black),
+          )
+        : ThemeData.light().copyWith(
+            scaffoldBackgroundColor: const Color(0xFFFAFAFA),
+          );
   }
 
   @override
@@ -327,6 +340,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   void _toggleTheme() {
     setState(() {
       _isNightMode = !_isNightMode;
+      _updateCachedTheme();
     });
   }
 
@@ -579,17 +593,8 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = _isNightMode
-        ? ThemeData.dark().copyWith(
-            scaffoldBackgroundColor: Colors.black,
-            appBarTheme: const AppBarTheme(backgroundColor: Colors.black),
-          )
-        : ThemeData.light().copyWith(
-            scaffoldBackgroundColor: const Color(0xFFFAFAFA),
-          );
-
     return Theme(
-      data: theme,
+      data: _cachedTheme ?? ThemeData(),
       child: Builder(builder: (context) {
         final isDark = _isNightMode;
 

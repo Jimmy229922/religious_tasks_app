@@ -33,13 +33,6 @@ class ProfessionalClockDialog extends StatelessWidget {
                       ? Colors.tealAccent.withValues(alpha: 0.3)
                       : Colors.teal.shade200,
                   width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                )
-              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,

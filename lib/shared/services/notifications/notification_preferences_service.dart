@@ -27,6 +27,7 @@ class NotificationPreferencesService {
     final prefs = await SharedPreferences.getInstance();
     final defaults = NotificationPreferences.defaults();
     final adhanEnabled = <String, bool>{};
+    final prayerOffsets = <String, int>{};
     final storedInterval = prefs.getInt(hourlyDhikrIntervalKey);
     final soundTypeIndex = prefs.getInt(adhanSoundTypeKey) ?? 
         AdhanSoundType.full.index;
@@ -35,10 +36,13 @@ class NotificationPreferencesService {
     for (final prayerKey in prayerKeys) {
       adhanEnabled[prayerKey] =
           prefs.getBool('adhan_enabled_$prayerKey') ?? true;
+      prayerOffsets[prayerKey] =
+          prefs.getInt('prayer_offset_$prayerKey') ?? 0;
     }
 
     return defaults.copyWith(
       adhanEnabled: adhanEnabled,
+      prayerOffsets: prayerOffsets,
       adhanSoundType: adhanSoundType,
       morningAthkarReminderEnabled:
           prefs.getBool(morningAthkarReminderEnabledKey) ??
@@ -60,6 +64,11 @@ class NotificationPreferencesService {
   Future<void> setAdhanEnabled(String prayerKey, bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('adhan_enabled_$prayerKey', value);
+  }
+
+  Future<void> setPrayerOffset(String prayerKey, int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('prayer_offset_$prayerKey', value);
   }
 
   Future<void> setAdhanSoundType(AdhanSoundType type) async {

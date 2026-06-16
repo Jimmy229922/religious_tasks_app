@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../../tasbeeh/providers/tasbeeh_view_model.dart';
@@ -26,7 +25,8 @@ class StatisticsScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: isDark ? Colors.black : const Color(0xFFF8F9FA),
         appBar: AppBar(
-          title: Text("إحصائيات الإيمان", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          title: const Text("إحصائيات الإيمان",
+              style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: true,
           elevation: 0,
           backgroundColor: Colors.transparent,
@@ -51,15 +51,12 @@ class StatisticsScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("نشاطك في الأذكار (أيام متتالية)",
-              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text("نشاطك في الأذكار (أيام متتالية)",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 30),
           SizedBox(
             height: 200,
@@ -137,12 +134,18 @@ class StatisticsScreen extends StatelessWidget {
         children: [
           const Icon(Icons.auto_awesome_rounded, color: Colors.amber, size: 40),
           const SizedBox(height: 12),
-          Text("إجمالي التسبيحات", style: GoogleFonts.cairo(color: Colors.white70, fontSize: 16)),
+          const Text("إجمالي التسبيحات",
+              style: TextStyle(color: Colors.white70, fontSize: 16)),
           Text("$total",
-              style: GoogleFonts.ibmPlexMono(color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold)),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 40,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'IBMPlexMono')),
           const SizedBox(height: 8),
-          Text("ما شاء الله، استمر في ذكر الله",
-              style: GoogleFonts.cairo(color: Colors.white60, fontSize: 12, fontStyle: FontStyle.italic)),
+          const Text("ما شاء الله، استمر في ذكر الله",
+              style: TextStyle(
+                  color: Colors.white60, fontSize: 12, fontStyle: FontStyle.italic)),
         ],
       ),
     );
@@ -152,10 +155,10 @@ class StatisticsScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(right: 8.0, bottom: 12),
+        const Padding(
+          padding: EdgeInsets.only(right: 8.0, bottom: 12),
           child: Text("أوسمة الإنجاز",
-              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18)),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         ),
         GridView.count(
           shrinkWrap: true,
@@ -236,16 +239,20 @@ class StatisticsScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Text(title,
               textAlign: TextAlign.center,
-              style: GoogleFonts.cairo(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: isUnlocked ? (isDark ? Colors.white : Colors.black87) : Colors.grey,
+                color: isUnlocked
+                    ? (isDark ? Colors.white : Colors.black87)
+                    : Colors.grey,
               )),
           Text(subtitle,
               textAlign: TextAlign.center,
-              style: GoogleFonts.cairo(
+              style: TextStyle(
                 fontSize: 9,
-                color: isUnlocked ? (isDark ? Colors.white70 : Colors.black54) : Colors.grey,
+                color: isUnlocked
+                    ? (isDark ? Colors.white70 : Colors.black54)
+                    : Colors.grey,
               )),
         ],
       ),

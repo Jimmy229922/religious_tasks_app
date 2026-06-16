@@ -38,13 +38,6 @@ class AthkarHeader extends StatelessWidget {
           colors: [accentStart, accentEnd],
         ),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.18),
-            blurRadius: 16,
-            offset: const Offset(0, 10),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

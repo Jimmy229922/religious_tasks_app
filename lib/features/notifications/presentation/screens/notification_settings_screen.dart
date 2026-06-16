@@ -1,7 +1,6 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:religious_tasks_app/core/constants/strings.dart';
@@ -513,7 +512,7 @@ class _NotificationSettingsScreenState
       padding: const EdgeInsets.only(bottom: 8, right: 4),
       child: Text(
         title,
-        style: GoogleFonts.cairo(
+        style: const TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
           color: Colors.teal,

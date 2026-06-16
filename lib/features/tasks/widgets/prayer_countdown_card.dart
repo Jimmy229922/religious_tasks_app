@@ -118,13 +118,6 @@ class _PrayerCountdownCardState extends State<PrayerCountdownCard> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: gradientColors.last.withValues(alpha: 0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -134,9 +127,9 @@ class _PrayerCountdownCardState extends State<PrayerCountdownCard> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     "الصلاة القادمة",
-                    style: GoogleFonts.cairo(
+                    style: TextStyle(
                       color: Colors.white70,
                       fontSize: 14,
                     ),

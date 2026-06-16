@@ -13,6 +13,7 @@ import 'package:religious_tasks_app/core/constants/strings.dart';
 import '../models/task_item.dart';
 import 'package:religious_tasks_app/core/services/location_service.dart';
 import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
+import 'package:religious_tasks_app/shared/services/notifications/notification_preferences_service.dart';
 import 'package:religious_tasks_app/core/services/storage_service.dart';
 
 class TasksViewModel extends ChangeNotifier {
@@ -462,6 +463,22 @@ class TasksViewModel extends ChangeNotifier {
     final coordinates = Coordinates(position.latitude, position.longitude);
     final params = CalculationMethod.egyptian.getParameters();
     params.madhab = Madhab.shafi;
+
+    // Load manual offsets from settings
+    try {
+      final notificationPrefs =
+          await NotificationPreferencesService().load();
+      params.adjustments.fajr = notificationPrefs.getPrayerOffset('fajr');
+      params.adjustments.sunrise =
+          notificationPrefs.getPrayerOffset('sunrise');
+      params.adjustments.dhuhr = notificationPrefs.getPrayerOffset('dhuhr');
+      params.adjustments.asr = notificationPrefs.getPrayerOffset('asr');
+      params.adjustments.maghrib =
+          notificationPrefs.getPrayerOffset('maghrib');
+      params.adjustments.isha = notificationPrefs.getPrayerOffset('isha');
+    } catch (e) {
+      debugPrint("Failed to load prayer offsets: $e");
+    }
 
     final todayTimes = PrayerTimes.today(coordinates, params);
     final tomorrow = DateTime.now().add(const Duration(days: 1));

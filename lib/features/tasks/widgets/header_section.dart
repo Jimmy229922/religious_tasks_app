@@ -33,15 +33,6 @@ class HeaderSection extends StatelessWidget {
           color: isDark ? Colors.white10 : Colors.white24,
           width: 1,
         ),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
-              ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -82,11 +73,10 @@ class HeaderSection extends StatelessWidget {
                                     fontWeight: FontWeight.bold,
                                     fontSize: 26, // Bigger font
                                     shadows: [
-                                      Shadow(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.5),
+                                      const Shadow(
+                                          color: Colors.black54,
                                           blurRadius: 4,
-                                          offset: const Offset(0, 2))
+                                          offset: Offset(0, 2))
                                     ]),
                               ),
                               Text(
@@ -141,7 +131,7 @@ class HeaderSection extends StatelessWidget {
                               if (vm.weatherInfo['advice'] != null)
                                 Text(
                                   vm.weatherInfo['advice']!,
-                                  style: GoogleFonts.cairo(
+                                  style: const TextStyle(
                                     color: Colors.white70,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
@@ -165,7 +155,7 @@ class HeaderSection extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(gregorianStr,
-                                  style: GoogleFonts.cairo(
+                                  style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold)),
@@ -194,7 +184,7 @@ class HeaderSection extends StatelessWidget {
               Flexible(
                 child: Text(vm.locationName,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.cairo(
+                    style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 13)),
