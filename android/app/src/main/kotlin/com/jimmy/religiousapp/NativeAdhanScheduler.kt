@@ -13,10 +13,11 @@ object NativeAdhanScheduler {
         prayerKey: String,
         prayerName: String,
         timeMillis: Long,
-        soundType: Int
+        soundType: Int,
+        moazzenId: String
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val pendingIntent = pendingIntent(context, requestCode, prayerKey, prayerName, soundType)
+        val pendingIntent = pendingIntent(context, requestCode, prayerKey, prayerName, soundType, moazzenId)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timeMillis, pendingIntent)
@@ -32,7 +33,7 @@ object NativeAdhanScheduler {
 
     fun cancel(context: Context, requestCode: Int) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        alarmManager.cancel(pendingIntent(context, requestCode, "", "", 0))
+        alarmManager.cancel(pendingIntent(context, requestCode, "", "", 0, "default"))
     }
 
     private fun pendingIntent(
@@ -40,12 +41,14 @@ object NativeAdhanScheduler {
         requestCode: Int,
         prayerKey: String,
         prayerName: String,
-        soundType: Int
+        soundType: Int,
+        moazzenId: String
     ): PendingIntent {
         val intent = Intent(context, AdhanAlarmReceiver::class.java).apply {
             putExtra(AdhanPlaybackService.EXTRA_PRAYER_KEY, prayerKey)
             putExtra(AdhanPlaybackService.EXTRA_PRAYER_NAME, prayerName)
             putExtra(AdhanPlaybackService.EXTRA_SOUND_TYPE, soundType)
+            putExtra(AdhanPlaybackService.EXTRA_MOAZZEN_ID, moazzenId)
         }
 
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or

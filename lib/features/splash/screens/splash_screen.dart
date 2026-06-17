@@ -62,44 +62,50 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkOnboardingAndNavigate() async {
-    // 1. Start initialization tasks
-    final initFuture = AppNotificationService().init();
-    
-    // 2. Load preferences
-    final prefsFuture = SharedPreferences.getInstance();
+    try {
+      // 1. Start initialization tasks
+      final initFuture = AppNotificationService().init().timeout(const Duration(seconds: 10));
+      
+      // 2. Load preferences
+      final prefsFuture = SharedPreferences.getInstance();
 
-    // 3. Keep the mosque screen visible for at least 3 seconds
-    await Future.wait([
-      initFuture,
-      prefsFuture,
-      Future.delayed(const Duration(seconds: 3)),
-    ]);
+      // 3. Wait for necessary tasks, but don't block forever if something fails
+      await Future.wait([
+        initFuture.catchError((e) => debugPrint("Notification init timed out or failed: $e")),
+        prefsFuture,
+        Future.delayed(const Duration(seconds: 3)),
+      ]);
 
-    if (!mounted) return;
-    
-    final prefs = await prefsFuture;
-    final bool onboardingCompleted =
-        prefs.getBool('onboarding_completed') ?? false;
+      if (!mounted) return;
+      
+      final prefs = await prefsFuture;
+      final bool onboardingCompleted =
+          prefs.getBool('onboarding_completed') ?? false;
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (onboardingCompleted) {
-      _navigateToHome();
-    } else {
-      // Check if all permissions are already granted
-      bool allGranted = await _areAllPermissionsGranted();
-      if (allGranted) {
-        // Mark as completed silently and go home
-        await prefs.setBool('onboarding_completed', true);
+      if (onboardingCompleted) {
         _navigateToHome();
       } else {
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-              builder: (context) => const PermissionsOnboardingScreen()),
-        );
+        // Check if all permissions are already granted
+        bool allGranted = await _areAllPermissionsGranted().catchError((e) => false);
+        if (allGranted) {
+          // Mark as completed silently and go home
+          await prefs.setBool('onboarding_completed', true);
+          _navigateToHome();
+        } else {
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const PermissionsOnboardingScreen()),
+          );
+        }
       }
+    } catch (e) {
+      debugPrint("Fatal error in Splash Screen: $e");
+      // If anything fails, try to navigate home anyway to not leave the user stuck
+      _navigateToHome();
     }
   }
 

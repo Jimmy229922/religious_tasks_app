@@ -22,6 +22,7 @@ class NotificationPreferencesService {
   static const String eveningAthkarReminderEnabledKey =
       'evening_athkar_reminder_enabled_v1';
   static const String floatingDhikrEnabledKey = 'floating_dhikr_enabled_v1';
+  static const String selectedMoazzenIdKey = 'selected_moazzen_id_v1';
 
   Future<NotificationPreferences> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -58,6 +59,8 @@ class NotificationPreferencesService {
               : defaults.hourlyDhikrIntervalMinutes,
       floatingDhikrEnabled:
           prefs.getBool(floatingDhikrEnabledKey) ?? defaults.floatingDhikrEnabled,
+      selectedMoazzenId:
+          prefs.getString(selectedMoazzenIdKey) ?? defaults.selectedMoazzenId,
     );
   }
 
@@ -99,5 +102,10 @@ class NotificationPreferencesService {
   Future<void> setFloatingDhikrEnabled(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(floatingDhikrEnabledKey, value);
+  }
+
+  Future<void> setSelectedMoazzenId(String moazzenId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(selectedMoazzenIdKey, moazzenId);
   }
 }

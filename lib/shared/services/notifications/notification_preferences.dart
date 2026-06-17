@@ -13,6 +13,7 @@ class NotificationPreferences {
   final bool hourlyDhikrEnabled;
   final int hourlyDhikrIntervalMinutes;
   final bool floatingDhikrEnabled;
+  final String selectedMoazzenId;
 
   const NotificationPreferences({
     required this.adhanEnabled,
@@ -23,6 +24,7 @@ class NotificationPreferences {
     required this.hourlyDhikrEnabled,
     required this.hourlyDhikrIntervalMinutes,
     required this.floatingDhikrEnabled,
+    required this.selectedMoazzenId,
   });
 
   factory NotificationPreferences.defaults() {
@@ -49,6 +51,7 @@ class NotificationPreferences {
       hourlyDhikrEnabled: true,
       hourlyDhikrIntervalMinutes: 10,
       floatingDhikrEnabled: false,
+      selectedMoazzenId: 'default',
     );
   }
 
@@ -61,6 +64,7 @@ class NotificationPreferences {
     bool? hourlyDhikrEnabled,
     int? hourlyDhikrIntervalMinutes,
     bool? floatingDhikrEnabled,
+    String? selectedMoazzenId,
   }) {
     return NotificationPreferences(
       adhanEnabled: adhanEnabled ?? this.adhanEnabled,
@@ -74,6 +78,7 @@ class NotificationPreferences {
       hourlyDhikrIntervalMinutes:
           hourlyDhikrIntervalMinutes ?? this.hourlyDhikrIntervalMinutes,
       floatingDhikrEnabled: floatingDhikrEnabled ?? this.floatingDhikrEnabled,
+      selectedMoazzenId: selectedMoazzenId ?? this.selectedMoazzenId,
     );
   }
 

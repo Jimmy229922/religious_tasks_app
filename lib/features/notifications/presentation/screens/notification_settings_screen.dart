@@ -26,6 +26,12 @@ class _NotificationSettingsScreenState
       NotificationPreferencesService();
   final AppNotificationService _notificationService = AppNotificationService();
 
+  final List<Map<String, String>> _availableMoazzens = [
+    {'id': 'default', 'name': 'الافتراضي'},
+    {'id': 'afasy', 'name': 'الشيخ مشاري العفاسي'},
+    {'id': 'basit', 'name': 'الشيخ عبد الباسط عبد الصمد'},
+  ];
+
   NotificationPreferences _preferences = NotificationPreferences.defaults();
   List<String> _customDhikrs = [];
   final TextEditingController _dhikrController = TextEditingController();
@@ -148,6 +154,19 @@ class _NotificationSettingsScreenState
     await _preferencesService.setAdhanSoundType(type);
     await _reschedulePrayerNotifications(
       successMessage: 'تم تحديث نوع صوت الأذان',
+    );
+  }
+
+  Future<void> _updateSelectedMoazzen(String? moazzenId) async {
+    if (moazzenId == null) return;
+
+    setState(() {
+      _preferences = _preferences.copyWith(selectedMoazzenId: moazzenId);
+    });
+
+    await _preferencesService.setSelectedMoazzenId(moazzenId);
+    await _reschedulePrayerNotifications(
+      successMessage: 'تم تغيير صوت المؤذن بنجاح',
     );
   }
 
@@ -435,6 +454,31 @@ class _NotificationSettingsScreenState
                             subtitle: 'إظهار إشعار بدون صوت عند وقت الأذان',
                             value: AdhanSoundType.none,
                           ),
+                          if (_preferences.adhanSoundType == AdhanSoundType.full) ...[
+                            const Divider(),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8.0),
+                              child: Text(
+                                'اختر صوت المؤذن:',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            DropdownButtonFormField<String>(
+                              key: ValueKey(_preferences.selectedMoazzenId),
+                              initialValue: _preferences.selectedMoazzenId,
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                              items: _availableMoazzens.map((moazzen) {
+                                return DropdownMenuItem<String>(
+                                  value: moazzen['id'],
+                                  child: Text(moazzen['name']!),
+                                );
+                              }).toList(),
+                              onChanged: _isApplying ? null : _updateSelectedMoazzen,
+                            ),
+                          ],
                         ],
                       ),
                     ),

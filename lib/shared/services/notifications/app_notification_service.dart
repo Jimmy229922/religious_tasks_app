@@ -37,10 +37,10 @@ class AppNotificationService {
   static const String prayerChannelId = 'prayer_reminders';
   static const String prayerReminderSound = 'prayer_reminder';
   static const String adhanChannelId = 'adhan_notifications';
-  static const String dhikrChannelId = 'athkar_reminders';
+  static const String dhikrChannelId = 'athkar_reminders_v3';
   static const String dhikrSound = 'dhikr_chime';
   static const String notificationChannelVersionKey =
-      'notification_channels_v11';
+      'notification_channels_v12';
 
   static const int _dhikrNotificationStartId = 4000;
   static const int _dhikrScheduleWindowMinutes = 48 * 60;
@@ -107,18 +107,7 @@ class AppNotificationService {
     await _plugin.cancel(_morningAthkarNotificationId);
     await _plugin.cancel(_eveningAthkarNotificationId);
 
-    const details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        dhikrChannelId,
-        AppStrings.notificationDhikrChannelName,
-        channelDescription: AppStrings.notificationDhikrChannelDesc,
-        importance: Importance.max,
-        priority: Priority.max,
-        sound: RawResourceAndroidNotificationSound(dhikrSound),
-        playSound: true,
-        visibility: NotificationVisibility.public,
-      ),
-    );
+    final details = _buildDhikrNotificationDetails();
 
     if (preferences.morningAthkarReminderEnabled) {
       var morningDate =
@@ -224,7 +213,8 @@ class AppNotificationService {
           key,
           name,
           adhanTime.millisecondsSinceEpoch,
-          preferences.adhanSoundType.index, // Pass sound type index to native
+          preferences.adhanSoundType.index,
+          preferences.selectedMoazzenId,
         );
       }
     }
@@ -247,6 +237,7 @@ class AppNotificationService {
     if (!preferences.hourlyDhikrEnabled) {
       await AndroidAlarmManager.cancel(_dhikrAlarmId);
       await AndroidAlarmManager.cancel(DhikrBackgroundRefresher.refreshAlarmId);
+      await closeDhikrOverlay();
       await _cancelAllDhikrNotifications();
       return;
     }
@@ -269,66 +260,59 @@ class AppNotificationService {
       );
     }
 
-    if (preferences.floatingDhikrEnabled) {
-      await _scheduleFloatingDhikrAlarm(preferences.hourlyDhikrIntervalMinutes);
-    } else {
-      await AndroidAlarmManager.cancel(_dhikrAlarmId);
-      final now = tz.TZDateTime.now(tz.local);
-      final intervalMinutes = preferences.hourlyDhikrIntervalMinutes;
+    await AndroidAlarmManager.cancel(_dhikrAlarmId);
+    await closeDhikrOverlay();
 
-      final cycleStartMillis = sharedPrefs.getInt(dhikrCycleStartTimeKey) ?? now.millisecondsSinceEpoch;
-      final cycleStart = tz.TZDateTime.fromMillisecondsSinceEpoch(tz.local, cycleStartMillis);
-      final intervalSeconds = intervalMinutes * 60;
-      final secondsSinceStart = now.difference(cycleStart).inSeconds;
-      final elapsedCycles = secondsSinceStart < 0 ? 0 : (secondsSinceStart ~/ intervalSeconds);
-      final lastGridPoint = cycleStart.add(Duration(seconds: elapsedCycles * intervalSeconds));
+    // Always schedule standard notifications if enabled
+    final now = tz.TZDateTime.now(tz.local);
+    final intervalMinutes = preferences.hourlyDhikrIntervalMinutes;
 
-      final customDhikrsJson = sharedPrefs.getString(customDhikrKey);
-      final List<String> userDhikrs = customDhikrsJson != null ? List<String>.from(jsonDecode(customDhikrsJson)) : [];
-      final allPhrases = [..._dhikrPhrases, ...userDhikrs];
+    final cycleStartMillis =
+        sharedPrefs.getInt(dhikrCycleStartTimeKey) ?? now.millisecondsSinceEpoch;
+    final cycleStart =
+        tz.TZDateTime.fromMillisecondsSinceEpoch(tz.local, cycleStartMillis);
+    final intervalSeconds = intervalMinutes * 60;
+    final secondsSinceStart = now.difference(cycleStart).inSeconds;
+    final elapsedCycles =
+        secondsSinceStart < 0 ? 0 : (secondsSinceStart ~/ intervalSeconds);
+    final lastGridPoint =
+        cycleStart.add(Duration(seconds: elapsedCycles * intervalSeconds));
 
-      int reqCount = (_dhikrScheduleWindowMinutes / intervalMinutes).ceil();
-      final scheduleCount = reqCount > 64 ? 64 : reqCount;
+    final customDhikrsJson = sharedPrefs.getString(customDhikrKey);
+    final List<String> userDhikrs = customDhikrsJson != null
+        ? List<String>.from(jsonDecode(customDhikrsJson))
+        : [];
+    final allPhrases = [..._dhikrPhrases, ...userDhikrs];
 
-      for (var i = 1; i <= scheduleCount; i++) {
-        final scheduledTime = lastGridPoint.add(Duration(minutes: intervalMinutes * i));
-        if (scheduledTime.isBefore(now)) continue;
+    int reqCount = (_dhikrScheduleWindowMinutes / intervalMinutes).ceil();
+    final scheduleCount = reqCount > 64 ? 64 : reqCount;
 
-        String phrase = scheduledTime.weekday == DateTime.friday ? 'اللهم صل وسلم على نبينا محمد' : allPhrases[(i + scheduledTime.day) % allPhrases.length];
-        final title = _dhikrTitles[(i + scheduledTime.hour) % _dhikrTitles.length];
+    for (var i = 1; i <= scheduleCount; i++) {
+      final scheduledTime =
+          lastGridPoint.add(Duration(minutes: intervalMinutes * i));
+      if (scheduledTime.isBefore(now.add(const Duration(seconds: 5)))) continue;
 
-        await _safeZonedSchedule(
-          _dhikrNotificationStartId + i - 1,
-          title,
-          phrase,
-          scheduledTime,
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              dhikrChannelId,
-              AppStrings.notificationDhikrChannelName,
-              channelDescription: AppStrings.notificationDhikrChannelDesc,
-              importance: Importance.max,
-              priority: Priority.max,
-              sound: const RawResourceAndroidNotificationSound(dhikrSound),
-              playSound: true,
-              styleInformation: BigTextStyleInformation(phrase),
-              visibility: NotificationVisibility.public,
-            ),
-          ),
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        );
-      }
+      String phrase = scheduledTime.weekday == DateTime.friday
+          ? 'اللهم صل وسلم على نبينا محمد'
+          : allPhrases[(i + scheduledTime.day) % allPhrases.length];
+      final title = _dhikrTitles[(i + scheduledTime.hour) % _dhikrTitles.length];
+
+      await _safeZonedSchedule(
+        _dhikrNotificationStartId + i - 1,
+        title,
+        phrase,
+        scheduledTime,
+        _buildDhikrNotificationDetails(phrase: phrase),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
     }
   }
 
   Future<void> _cancelAllDhikrNotifications() async {
     try {
-      final pendingNotifications = await _plugin.pendingNotificationRequests();
-      for (final request in pendingNotifications) {
-        final id = request.id;
-        if (id >= _dhikrNotificationStartId && id < _dhikrNotificationStartId + 1000) {
-          await _plugin.cancel(id);
-        }
+      // Loop through potential IDs instead of querying which can be flaky
+      for (int i = 0; i < 100; i++) {
+        await _plugin.cancel(_dhikrNotificationStartId + i);
       }
     } catch (e) {
       debugPrint('Error canceling dhikr notifications: $e');
@@ -368,18 +352,6 @@ class AppNotificationService {
     }
   }
 
-  Future<void> _scheduleFloatingDhikrAlarm(int intervalMinutes) async {
-    await AndroidAlarmManager.cancel(_dhikrAlarmId);
-    await AndroidAlarmManager.periodic(
-      Duration(minutes: intervalMinutes),
-      _dhikrAlarmId,
-      dhikrAlarmCallback,
-      exact: true,
-      wakeup: true,
-      rescheduleOnReboot: true,
-    );
-  }
-
   static Future<void> _showFloatingDhikrText(String text) async {
     if (!(await overlay.FlutterOverlayWindow.isPermissionGranted())) return;
 
@@ -408,35 +380,41 @@ class AppNotificationService {
   Future<void> testAdhanNotification(String prayerKey, String prayerName) async {
     await _ensureInitialized();
     final preferences = await _preferencesService.load();
-    await _playNativeAdhanNow(prayerKey, prayerName, preferences.adhanSoundType.index);
+    await _playNativeAdhanNow(prayerKey, prayerName, preferences.adhanSoundType.index, preferences.selectedMoazzenId);
   }
 
   Future<void> testDhikrNotification() async {
-    await _ensureInitialized();
-    final preferences = await _preferencesService.load();
-    final phrase = _dhikrPhrases[DateTime.now().minute % _dhikrPhrases.length];
-    
-    await _plugin.show(
-      889,
-      _dhikrTitles[DateTime.now().hour % _dhikrTitles.length],
-      phrase,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          dhikrChannelId,
-          AppStrings.notificationDhikrChannelName,
-          channelDescription: AppStrings.notificationDhikrChannelDesc,
-          importance: Importance.max,
-          priority: Priority.max,
-          sound: const RawResourceAndroidNotificationSound(dhikrSound),
-          playSound: true,
-          styleInformation: BigTextStyleInformation(phrase),
-          visibility: NotificationVisibility.public,
-        ),
-      ),
-    );
+    try {
+      await _ensureInitialized();
+      final phrase = _dhikrPhrases[DateTime.now().minute % _dhikrPhrases.length];
 
-    if (preferences.floatingDhikrEnabled) {
-      await _showFloatingDhikrText(phrase);
+      try {
+        await _plugin.show(
+          889,
+          _dhikrTitles[DateTime.now().hour % _dhikrTitles.length],
+          phrase,
+          _buildDhikrNotificationDetails(
+            phrase: phrase,
+            fullScreenIntent: false,
+          ),
+        );
+      } catch (e) {
+        if (!_isInvalidSoundError(e)) rethrow;
+        // Fallback without custom sound if the sound resource is problematic
+        await _plugin.show(
+          889,
+          _dhikrTitles[DateTime.now().hour % _dhikrTitles.length],
+          phrase,
+          _buildDhikrNotificationDetails(
+            phrase: phrase,
+            useCustomSound: false,
+            fullScreenIntent: false,
+          ),
+        );
+      }
+    } catch (e, stack) {
+      debugPrint('Error in testDhikrNotification: $e\n$stack');
+      rethrow;
     }
   }
 
@@ -471,12 +449,49 @@ class AppNotificationService {
   }
 
   Future<void> _createChannels(AndroidFlutterLocalNotificationsPlugin? androidPlugin) async {
-    await androidPlugin?.createNotificationChannel(
-      const AndroidNotificationChannel(prayerChannelId, AppStrings.notificationPrayerChannelName, importance: Importance.max, sound: RawResourceAndroidNotificationSound(prayerReminderSound), playSound: true),
-    );
-    await androidPlugin?.createNotificationChannel(
-      const AndroidNotificationChannel(dhikrChannelId, AppStrings.notificationDhikrChannelName, importance: Importance.max, sound: RawResourceAndroidNotificationSound(dhikrSound), playSound: true),
-    );
+    try {
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          prayerChannelId,
+          AppStrings.notificationPrayerChannelName,
+          importance: Importance.max,
+          sound: RawResourceAndroidNotificationSound(prayerReminderSound),
+          playSound: true,
+        ),
+      );
+    } catch (e) {
+      if (!_isInvalidSoundError(e)) rethrow;
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          prayerChannelId,
+          AppStrings.notificationPrayerChannelName,
+          importance: Importance.max,
+          playSound: true,
+        ),
+      );
+    }
+
+    try {
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          dhikrChannelId,
+          AppStrings.notificationDhikrChannelName,
+          importance: Importance.max,
+          sound: RawResourceAndroidNotificationSound(dhikrSound),
+          playSound: true,
+        ),
+      );
+    } catch (e) {
+      if (!_isInvalidSoundError(e)) rethrow;
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          dhikrChannelId,
+          AppStrings.notificationDhikrChannelName,
+          importance: Importance.max,
+          playSound: true,
+        ),
+      );
+    }
   }
 
   Future<void> _configureLocalTimeZone() async {
@@ -499,13 +514,51 @@ class AppNotificationService {
     try {
       await _plugin.zonedSchedule(id, title, body, scheduledDate, details, androidScheduleMode: androidScheduleMode, matchDateTimeComponents: matchDateTimeComponents);
     } catch (e) {
+      if (_isInvalidSoundError(e)) {
+        final fallbackDetails = body == null
+            ? _buildDhikrNotificationDetails(useCustomSound: false)
+            : _buildDhikrNotificationDetails(
+                phrase: body,
+                useCustomSound: false,
+              );
+        await _plugin.zonedSchedule(id, title, body, scheduledDate, fallbackDetails, androidScheduleMode: androidScheduleMode, matchDateTimeComponents: matchDateTimeComponents);
+        return;
+      }
       if (androidScheduleMode == AndroidScheduleMode.exactAllowWhileIdle) {
         await _plugin.zonedSchedule(id, title, body, scheduledDate, details, androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle, matchDateTimeComponents: matchDateTimeComponents);
       }
     }
   }
 
-  Future<void> _scheduleNativeAdhan(int requestCode, String prayerKey, String prayerName, int timeMillis, int soundType) async {
+  NotificationDetails _buildDhikrNotificationDetails({
+    String? phrase,
+    bool useCustomSound = true,
+    bool? fullScreenIntent,
+  }) {
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        dhikrChannelId,
+        AppStrings.notificationDhikrChannelName,
+        channelDescription: AppStrings.notificationDhikrChannelDesc,
+        importance: Importance.max,
+        priority: Priority.max,
+        sound: useCustomSound
+            ? const RawResourceAndroidNotificationSound(dhikrSound)
+            : null,
+        playSound: true,
+        styleInformation:
+            phrase != null ? BigTextStyleInformation(phrase) : null,
+        visibility: NotificationVisibility.public,
+        fullScreenIntent: fullScreenIntent ?? false,
+      ),
+    );
+  }
+
+  bool _isInvalidSoundError(Object error) {
+    return error is PlatformException && error.code == 'invalid_sound';
+  }
+
+  Future<void> _scheduleNativeAdhan(int requestCode, String prayerKey, String prayerName, int timeMillis, int soundType, String moazzenId) async {
     // Pause Radio if it's playing before Adhan
     if (RadioService().player.playing) {
       await RadioService().pause();
@@ -514,17 +567,29 @@ class AppNotificationService {
         RadioService().resume();
       });
     }
-    await _nativeAdhanChannel.invokeMethod<void>('schedule', {'requestCode': requestCode, 'prayerKey': prayerKey, 'prayerName': prayerName, 'timeMillis': timeMillis, 'soundType': soundType});
+    await _nativeAdhanChannel.invokeMethod<void>('schedule', {
+      'requestCode': requestCode,
+      'prayerKey': prayerKey,
+      'prayerName': prayerName,
+      'timeMillis': timeMillis,
+      'soundType': soundType,
+      'moazzenId': moazzenId,
+    });
   }
 
   Future<void> _cancelNativeAdhan(int requestCode) async {
     await _nativeAdhanChannel.invokeMethod<void>('cancel', {'requestCode': requestCode});
   }
 
-  Future<void> _playNativeAdhanNow(String prayerKey, String prayerName, int soundType) async {
+  Future<void> _playNativeAdhanNow(String prayerKey, String prayerName, int soundType, String moazzenId) async {
     if (RadioService().player.playing) {
       await RadioService().pause();
     }
-    await _nativeAdhanChannel.invokeMethod<void>('playNow', {'prayerKey': prayerKey, 'prayerName': prayerName, 'soundType': soundType});
+    await _nativeAdhanChannel.invokeMethod<void>('playNow', {
+      'prayerKey': prayerKey,
+      'prayerName': prayerName,
+      'soundType': soundType,
+      'moazzenId': moazzenId,
+    });
   }
 }

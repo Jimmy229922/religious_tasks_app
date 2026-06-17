@@ -10,6 +10,7 @@ import android.media.MediaPlayer
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import android.util.Log
 
 class AdhanPlaybackService : Service() {
     private var mediaPlayer: MediaPlayer? = null
@@ -28,11 +29,12 @@ class AdhanPlaybackService : Service() {
         val prayerKey = intent?.getStringExtra(EXTRA_PRAYER_KEY) ?: "fajr"
         val prayerName = intent?.getStringExtra(EXTRA_PRAYER_NAME) ?: "الصلاة"
         val soundType = intent?.getIntExtra(EXTRA_SOUND_TYPE, 0) ?: 0 // 0: none, 1: short, 2: full
+        val moazzenId = intent?.getStringExtra(EXTRA_MOAZZEN_ID) ?: "default"
 
         startForeground(NOTIFICATION_ID, buildNotification(prayerName))
         
         if (soundType != 0) { // 0 is 'none' / silent
-            playAdhan(prayerKey, soundType)
+            playAdhan(prayerKey, soundType, moazzenId)
         }
 
         return START_NOT_STICKY
@@ -46,22 +48,18 @@ class AdhanPlaybackService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun playAdhan(prayerKey: String, soundType: Int) {
+    private fun playAdhan(prayerKey: String, soundType: Int, moazzenId: String) {
         mediaPlayer?.release()
 
-        val soundResId = if (soundType == 1) { // Short sound
-            if (prayerKey == "sunrise") R.raw.prayer_reminder else R.raw.prayer_reminder 
-            // يمكنك تخصيص صوت قصير هنا، حالياً نستخدم prayer_reminder
+        val soundResId = if (soundType == 1) {
             R.raw.prayer_reminder
-        } else { // Full Adhan
-            when (prayerKey) {
-                "fajr" -> R.raw.adhan_fajr
-                "dhuhr" -> R.raw.adhan_dhuhr
-                "asr" -> R.raw.adhan_asr
-                "maghrib" -> R.raw.adhan_maghrib
-                "isha" -> R.raw.adhan_isha
-                else -> R.raw.prayer_reminder
-            }
+        } else {
+            getAdhanResource(prayerKey, moazzenId)
+        }
+
+        if (soundResId == 0) {
+            stopSelf()
+            return
         }
 
         try {
@@ -88,7 +86,16 @@ class AdhanPlaybackService : Service() {
                 start()
             }
         } catch (e: Exception) {
+            Log.e("AdhanService", "Error playing adhan")
             stopSelf()
+        }
+    }
+
+    private fun getAdhanResource(prayerKey: String, moazzenId: String): Int {
+        return when (moazzenId) {
+            "afasy" -> R.raw.afasy_all_prayers
+            "basit" -> R.raw.basit_all_prayers
+            else -> R.raw.default_all_prayers
         }
     }
 
@@ -113,7 +120,7 @@ class AdhanPlaybackService : Service() {
             .setOngoing(false) 
             .setDeleteIntent(stopPendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "إيقاف الصوت", stopPendingIntent)
-            .setSilent(true) // We handle sound via MediaPlayer for better control
+            .setSilent(true)
             .build()
     }
 
@@ -131,8 +138,9 @@ class AdhanPlaybackService : Service() {
         const val EXTRA_PRAYER_KEY = "prayer_key"
         const val EXTRA_PRAYER_NAME = "prayer_name"
         const val EXTRA_SOUND_TYPE = "sound_type"
+        const val EXTRA_MOAZZEN_ID = "moazzen_id"
         const val ACTION_STOP_ADHAN = "com.jimmy.religiousapp.STOP_ADHAN"
-        private const val CHANNEL_ID = "native_adhan_playback_v2"
+        private const val CHANNEL_ID = "native_adhan_playback_v3"
         private const val NOTIFICATION_ID = 9001
     }
 }

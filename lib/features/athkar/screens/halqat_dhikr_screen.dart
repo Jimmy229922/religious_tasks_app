@@ -15,7 +15,7 @@ class _DhikrSessionItem {
   int current;
 
   _DhikrSessionItem({required this.text})
-      : target = 3,
+      : target = 10,
         current = 0;
   bool get isDone => current >= target;
 }
@@ -32,6 +32,16 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
     "سبحان الله والحمد لله ولا إله إلا الله والله أكبر",
     "رضيت بالله رباً وبالإسلام ديناً وبمحمد ﷺ نبياً",
     "اللهم إنك عفو تحب العفو فاعف عنا",
+    "اللهم صل على محمد وعلى آل محمد كما صليت على إبراهيم",
+    "سبحان الله وبحمده عدد خلقه ورضا نفسه وزنة عرشه",
+    "يا حي يا قيوم برحمتك أستغيث أصلح لي شأني كله",
+    "حسبي الله لا إله إلا هو عليه توكلت وهو رب العرش العظيم",
+    "اللهم إني أسألك علماً نافعاً ورزقاً طيباً وعملاً متقبلاً",
+    "لا إله إلا الله وحده لا شريك له، له الملك وله الحمد وهو على كل شيء قدير",
+    "اللهم أنت ربي لا إله إلا أنت خلقتني وأنا عبدك",
+    "أستغفر الله العظيم الذي لا إله إلا هو الحي القيوم وأتوب إليه",
+    "يا مقلب القلوب ثبت قلبي على دينك",
+    "اللهم اجعل في قلبي نوراً وفي بصري نوراً وفي سمعي نوراً",
   ];
 
   late List<_DhikrSessionItem> _sessionAthkar;
@@ -45,7 +55,7 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
   void _startNewSession() {
     final random = Random();
     final shuffled = List<String>.from(_masterAthkar)..shuffle(random);
-    final selected = shuffled.take(3).toList();
+    final selected = shuffled.take(10).toList();
     _sessionAthkar =
         selected.map((text) => _DhikrSessionItem(text: text)).toList();
   }
@@ -128,7 +138,7 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
             children: [
               const SizedBox(height: 20),
               Text(
-                "ردد كل ذكر ${3} مرات",
+                "ردد كل ذكر ${10} مرات",
                 style: TextStyle(
                     fontSize: 18,
                     color: isDark ? Colors.white70 : Colors.teal[800]),
