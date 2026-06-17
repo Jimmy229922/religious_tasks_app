@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -27,13 +29,13 @@ class RadioService {
     RadioStation(
       id: 'cairo_quran',
       title: 'إذاعة القرآن الكريم من القاهرة',
-      url: 'https://n0a.radiojar.com/8s9u5p3ncd0uv',
+      url: 'https://stream.radiojar.com/8s5u5tpdtwzuv',
       artUri: 'https://i.ibb.co/X7R0qjC/quran-radio.png',
     ),
     RadioStation(
       id: 'saudi_quran',
       title: 'إذاعة القرآن الكريم من السعودية',
-      url: 'https://stream.radiojar.com/4wqne2v2p78uv',
+      url: 'https://stream.radiojar.com/0tpy1h0kxtzuv',
     ),
     RadioStation(
       id: 'quran_live',
@@ -101,8 +103,14 @@ class RadioService {
       );
       
       await _player.stop(); // التأكد من إيقاف أي بث سابق تماماً
-      await _player.setAudioSource(source, preload: true);
-      await _player.play();
+      await _player.setAudioSource(source, preload: true).timeout(const Duration(seconds: 7));
+      _player.play(); // عدم الانتظار (await) هنا لأن البث المباشر لا ينتهي
+    } on TimeoutException catch (e) {
+      debugPrint("Radio stream timeout: $e");
+      rethrow;
+    } on PlayerException catch (e) {
+      debugPrint("Player error playing radio: ${e.message}");
+      rethrow;
     } catch (e) {
       debugPrint("Error playing radio: $e");
       rethrow;
