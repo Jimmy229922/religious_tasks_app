@@ -11,6 +11,7 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../core/constants/strings.dart';
+import '../audio/radio_service.dart';
 import 'notification_preferences.dart';
 import 'notification_preferences_service.dart';
 import 'dhikr_background_refresher.dart';
@@ -505,6 +506,14 @@ class AppNotificationService {
   }
 
   Future<void> _scheduleNativeAdhan(int requestCode, String prayerKey, String prayerName, int timeMillis, int soundType) async {
+    // Pause Radio if it's playing before Adhan
+    if (RadioService().player.playing) {
+      await RadioService().pause();
+      // Schedule a resume after typical adhan duration (approx 4 minutes)
+      Future.delayed(const Duration(minutes: 4), () {
+        RadioService().resume();
+      });
+    }
     await _nativeAdhanChannel.invokeMethod<void>('schedule', {'requestCode': requestCode, 'prayerKey': prayerKey, 'prayerName': prayerName, 'timeMillis': timeMillis, 'soundType': soundType});
   }
 
@@ -513,6 +522,9 @@ class AppNotificationService {
   }
 
   Future<void> _playNativeAdhanNow(String prayerKey, String prayerName, int soundType) async {
+    if (RadioService().player.playing) {
+      await RadioService().pause();
+    }
     await _nativeAdhanChannel.invokeMethod<void>('playNow', {'prayerKey': prayerKey, 'prayerName': prayerName, 'soundType': soundType});
   }
 }

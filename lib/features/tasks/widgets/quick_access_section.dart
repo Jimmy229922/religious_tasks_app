@@ -7,6 +7,7 @@ import 'package:religious_tasks_app/features/athkar/screens/surah_kahf_screen.da
 import 'package:religious_tasks_app/features/qibla/screens/qibla_screen.dart';
 import 'package:religious_tasks_app/features/quran/screens/khatmah_screen.dart';
 import 'package:religious_tasks_app/features/tasbeeh/screens/custom_tasbeeh_screen.dart';
+import 'package:religious_tasks_app/features/radio/screens/radio_screen.dart';
 
 class QuickAccessSection extends StatelessWidget {
   final TasksViewModel vm;
@@ -55,6 +56,16 @@ class QuickAccessSection extends StatelessWidget {
             },
             isDark,
             const Color(0xFF00695C), // Dark Teal
+          ),
+          const SizedBox(width: 8),
+          _buildQuickAccessItem(
+            context,
+            "راديو القرآن",
+            Icons.radio,
+            () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const RadioScreen())),
+            isDark,
+            const Color(0xFFE53935), // Red
           ),
           const SizedBox(width: 8),
           _buildQuickAccessItem(

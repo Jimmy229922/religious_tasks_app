@@ -13,7 +13,9 @@ import 'core/theme/theme_provider.dart';
 import 'features/athkar/providers/athkar_view_model.dart';
 import 'features/tasbeeh/providers/tasbeeh_view_model.dart';
 import 'features/tasks/providers/tasks_view_model.dart';
+import 'features/radio/providers/radio_view_model.dart';
 import 'shared/widgets/dhikr_overlay.dart';
+import 'shared/services/audio/radio_service.dart';
 
 @pragma("vm:entry-point")
 void overlayMain() {
@@ -48,6 +50,8 @@ void main() async {
     debugPrint("Notification init failed: $e");
   });
 
+  await RadioService().init();
+
   runApp(
     MultiProvider(
       providers: [
@@ -55,6 +59,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AthkarViewModel()),
         ChangeNotifierProvider(create: (_) => TasksViewModel()),
         ChangeNotifierProvider(create: (_) => TasbeehViewModel()),
+        ChangeNotifierProvider(create: (_) => RadioViewModel()),
       ],
       child: const ReligiousApp(),
     ),
