@@ -1,21 +1,57 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:religious_tasks_app/core/services/storage_service.dart';
+import 'package:religious_tasks_app/core/services/global_challenge_service.dart';
 
 class TasbeehViewModel extends ChangeNotifier {
   static const String _prefsKey = 'custom_tasbeeh_athkar';
   static const String _totalCountKey = 'total_tasbeeh_count_v1';
   static const String customOption = '__custom__';
 
+  final GlobalChallengeService _globalService = GlobalChallengeService();
+  int _globalCount = 0;
+  final int _maxTarget = 1000000;
+  int _localSessionCount = 0; 
+  Timer? _syncTimer;
+  
+  final List<int> _milestones = [1000, 5000, 10000, 50000, 100000, 500000, 1000000];
+
+  int get globalCount => _globalCount;
+  int get maxTarget => _maxTarget;
+
+  int get currentMilestone {
+    for (int milestone in _milestones) {
+      if (_globalCount < milestone) return milestone;
+    }
+    return _maxTarget;
+  }
+
+  int get lastAchievedMilestone {
+    int last = 0;
+    for (int milestone in _milestones) {
+      if (_globalCount >= milestone) {
+        last = milestone;
+      } else {
+        break;
+      }
+    }
+    return last;
+  }
+
+  List<int> get achievedMilestones {
+    return _milestones.where((m) => _globalCount >= m).toList();
+  }
+
+  double get globalProgress {
+    if (_globalCount >= _maxTarget) return 1.0;
+    return (_globalCount / currentMilestone).clamp(0.0, 1.0);
+  }
+
+  bool get isChallengeCompleted => _globalCount >= _maxTarget;
+
   static const List<String> _defaultAthkar = [
-    'سبحان الله',
-    'الحمد لله',
-    'الله أكبر',
-    'لا إله إلا الله',
-    'أستغفر الله',
-    'سبحان الله وبحمده',
-    'سبحان الله العظيم',
-    'لا حول ولا قوة إلا بالله',
+    'اللهم صلِّ وسلم وبارك على نبينا محمد',
   ];
 
   int _counter = 0;
@@ -34,6 +70,15 @@ class TasbeehViewModel extends ChangeNotifier {
   TasbeehViewModel() {
     _loadCustomAthkar();
     _loadTotalCount();
+    _initGlobalSync();
+  }
+
+  void _initGlobalSync() {
+    _globalService.subscribeToChallenge();
+    _globalService.challengeStream.listen((data) {
+      _globalCount = data['count'] ?? 0;
+      notifyListeners();
+    });
   }
 
   Future<void> _loadTotalCount() async {
@@ -45,6 +90,8 @@ class TasbeehViewModel extends ChangeNotifier {
   @override
   void dispose() {
     customController.dispose();
+    _syncTimer?.cancel();
+    _syncToSupabase(); // Final sync on close
     super.dispose();
   }
 
@@ -60,11 +107,33 @@ class TasbeehViewModel extends ChangeNotifier {
   }
 
   void increment() {
+    if (isChallengeCompleted) return;
+
     _counter++;
     _totalCounter++;
+    _localSessionCount++;
     HapticFeedback.lightImpact();
     StorageService.instance.prefs.setInt(_totalCountKey, _totalCounter);
+    
+    // Batch sync to avoid hitting Supabase on EVERY click (throttling)
+    _startSyncTimer();
+    
     notifyListeners();
+  }
+
+  void _startSyncTimer() {
+    _syncTimer?.cancel();
+    _syncTimer = Timer(const Duration(seconds: 2), () {
+      _syncToSupabase();
+    });
+  }
+
+  Future<void> _syncToSupabase() async {
+    if (_localSessionCount > 0) {
+      final amountToSync = _localSessionCount;
+      _localSessionCount = 0; // Clear immediately to avoid double counting
+      await _globalService.incrementGlobalCounter(amountToSync);
+    }
   }
 
   void reset() {

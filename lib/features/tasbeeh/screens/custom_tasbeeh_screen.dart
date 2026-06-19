@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/tasbeeh_view_model.dart';
-import '../widgets/custom/tasbeeh_selector.dart';
 import '../widgets/custom/tasbeeh_counter.dart';
-import '../widgets/custom/tasbeeh_display.dart';
 
 class CustomTasbeehScreen extends StatelessWidget {
   const CustomTasbeehScreen({super.key});
@@ -31,13 +29,7 @@ class CustomTasbeehScreen extends StatelessWidget {
           backgroundColor: Colors.transparent,
           elevation: 0,
           foregroundColor: textPrimary,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'إعادة التصفير',
-              onPressed: vm.reset,
-            ),
-          ],
+          actions: const [],
         ),
         body: Container(
           decoration: BoxDecoration(gradient: background),
@@ -46,29 +38,24 @@ class CustomTasbeehScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
               child: Column(
                 children: [
-                  TasbeehSelector(
-                    items: vm.allAthkar,
-                    selectedItem: vm.selectedDhikr,
-                    isCustomInput: vm.isCustomInput,
-                    customController: vm.customController,
-                    onAddCustom: () {
-                      final message = vm.addCustomDhikr();
-                      if (message != null) {
-                        ScaffoldMessenger.of(context).clearSnackBars();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(message)),
-                        );
-                      }
-                    },
-                    onChanged: vm.selectDhikr,
-                    onCustomTextChanged: vm.updateCustomText,
-                  ),
+                  // TasbeehSelector is removed as per request to keep only one Dhikr
+                  const SizedBox(height: 10),
+                  _buildGlobalChallengeCard(vm, isDark),
                   const SizedBox(height: 30),
-                  TasbeehDisplay(text: vm.selectedDhikr),
+                  const Text(
+                    'اللهم صلِّ وسلم وبارك على نبينا محمد',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.teal,
+                    ),
+                  ),
                   const Spacer(),
                   TasbeehCounter(
                     count: vm.counter,
                     onIncrement: vm.increment,
+                    isCompleted: vm.isChallengeCompleted,
                   ),
                   const Spacer(),
                 ],
@@ -76,6 +63,142 @@ class CustomTasbeehScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildGlobalChallengeCard(TasbeehViewModel vm, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white10 : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.groups_rounded, color: Colors.teal, size: 22),
+                  SizedBox(width: 8),
+                  Text(
+                    'تحدي المليون تسبيحة',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${(vm.globalProgress * 100).toStringAsFixed(1)}%',
+                  style: const TextStyle(
+                    color: Colors.teal,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: vm.globalProgress,
+              backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.teal),
+              minHeight: 10,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'وصلنا إلى: ${vm.globalCount}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              Text(
+                'الهدف القادم: ${vm.currentMilestone}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (vm.achievedMilestones.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                alignment: WrapAlignment.end,
+                children: vm.achievedMilestones.reversed.map((milestone) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.stars_rounded, color: Colors.amber, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          milestone >= 1000000
+                              ? '${(milestone / 1000000).toStringAsFixed(0)}M'
+                              : milestone >= 1000
+                                  ? '${(milestone / 1000).toStringAsFixed(0)}K'
+                                  : milestone.toString(),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.amber,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          if (vm.isChallengeCompleted)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'تم تحقيق الهدف المليون! جزاكم الله خيراً',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.green[700],
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

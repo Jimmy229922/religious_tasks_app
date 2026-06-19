@@ -5,6 +5,7 @@ import 'package:hijri/hijri_calendar.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/religious_app.dart';
 import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
@@ -31,6 +32,20 @@ void overlayMain() {
 void main() async {
   debugPrint("🟢 Application Main Function Started");
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Supabase
+  try {
+    await Supabase.initialize(
+      url: 'https://qxllkedwilhpmrcrfeya.supabase.co',
+      publishableKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4bGxrZWR3aWxocG1yY3JmZXlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjIyMzgsImV4cCI6MjA5NzM5ODIzOH0.Fr5QKruw69aHjj4NMJc8uWa4naZgInVfo2yZQF7hld8',
+      realtimeClientOptions: const RealtimeClientOptions(
+        eventsPerSecond: 2,
+      ),
+    );
+  } catch (e) {
+    debugPrint("Supabase init failed: $e");
+  }
+
   await AndroidAlarmManager.initialize();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
