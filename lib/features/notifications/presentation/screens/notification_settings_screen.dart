@@ -30,6 +30,9 @@ class _NotificationSettingsScreenState
     {'id': 'default', 'name': 'الافتراضي'},
     {'id': 'afasy', 'name': 'الشيخ مشاري العفاسي'},
     {'id': 'basit', 'name': 'الشيخ عبد الباسط عبد الصمد'},
+    {'id': 'minshawi', 'name': 'الشيخ محمد صديق المنشاوي'},
+    {'id': 'muaiqly', 'name': 'الشيخ ماهر المعيقلي'},
+    {'id': 'dosari', 'name': 'الشيخ ياسر الدوسري'},
   ];
 
   NotificationPreferences _preferences = NotificationPreferences.defaults();

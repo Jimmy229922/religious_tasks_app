@@ -509,7 +509,46 @@ class TasksViewModel extends ChangeNotifier {
 
   Future<void> _calculatePrayers(Position position) async {
     final coordinates = Coordinates(position.latitude, position.longitude);
-    final params = CalculationMethod.egyptian.getParameters();
+
+    // 1. Detect Country and get calculation method
+    CalculationMethod method = CalculationMethod.egyptian; // Default
+    try {
+      final countryCode = await _locationService.getCountryCode(position);
+      if (countryCode != null) {
+        switch (countryCode.toUpperCase()) {
+          case 'SA':
+            method = CalculationMethod.umm_al_qura;
+            break;
+          case 'AE':
+          case 'QA':
+          case 'KW':
+          case 'OM':
+          case 'BH':
+            method = CalculationMethod.dubai; // Common for Gulf
+            break;
+          case 'MA':
+          case 'DZ':
+          case 'TN':
+            method = CalculationMethod.muslim_world_league; // Fallback from committee
+            break;
+          case 'JO':
+          case 'LB':
+          case 'SY':
+          case 'PS':
+            method = CalculationMethod.karachi; // Often used in Levant
+            break;
+          case 'EG':
+            method = CalculationMethod.egyptian;
+            break;
+          default:
+            method = CalculationMethod.muslim_world_league; // Global default
+        }
+      }
+    } catch (e) {
+      debugPrint("Failed to detect country method: $e");
+    }
+
+    final params = method.getParameters();
     params.madhab = Madhab.shafi;
 
     // Load manual offsets from settings

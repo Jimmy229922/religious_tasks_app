@@ -92,10 +92,14 @@ class AdhanPlaybackService : Service() {
     }
 
     private fun getAdhanResource(prayerKey: String, moazzenId: String): Int {
+        val isFajr = prayerKey.lowercase() == "fajr"
         return when (moazzenId) {
-            "afasy" -> R.raw.afasy_all_prayers
-            "basit" -> R.raw.basit_all_prayers
-            else -> R.raw.default_all_prayers
+            "afasy" -> if (isFajr) R.raw.afasy_fajr else R.raw.afasy_others
+            "basit" -> if (isFajr) R.raw.basit_fajr else R.raw.basit_others
+            "minshawi" -> if (isFajr) R.raw.minshawi_fajr else R.raw.minshawi_others
+            "muaiqly" -> if (isFajr) R.raw.muaiqly_fajr else R.raw.muaiqly_others
+            "dosari" -> if (isFajr) R.raw.dosari_fajr else R.raw.dosari_others
+            else -> if (isFajr) R.raw.default_fajr else R.raw.default_others
         }
     }
 
