@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:ota_update/ota_update.dart';
+import 'package:religious_tasks_app/shared/services/updates/app_update_service.dart';
 
 import 'package:religious_tasks_app/core/constants/strings.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
@@ -42,6 +45,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _isLoading = true;
   bool _isRefreshingLocation = false;
+  String _appVersion = "";
+  bool _isCheckingUpdate = false;
+  double _downloadProgress = 0;
+  bool _isDownloading = false;
 
   @override
   void initState() {
@@ -51,10 +58,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadSettings() async {
     final prefs = await _prefsService.load();
+    final packageInfo = await PackageInfo.fromPlatform();
     setState(() {
       adhanSettings = Map.from(prefs.adhanEnabled);
       prayerOffsets = Map.from(prefs.prayerOffsets);
       _soundType = prefs.adhanSoundType;
+      _appVersion = packageInfo.version;
       _isLoading = false;
     });
   }
@@ -103,7 +112,99 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _reschedulePrayers();
   }
 
-  // Offset method removed
+  void _checkUpdate() async {
+    setState(() {
+      _isCheckingUpdate = true;
+    });
+
+    final updateInfo = await AppUpdateService.checkForUpdate();
+
+    setState(() {
+      _isCheckingUpdate = false;
+    });
+
+    if (updateInfo != null) {
+      if (!mounted) return;
+      _showUpdateDialog(updateInfo);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("أنت تستخدم أحدث إصدار بالفعل")),
+        );
+      }
+    }
+  }
+
+  void _showUpdateDialog(Map<String, dynamic> updateInfo) {
+    showDialog(
+      context: context,
+      barrierDismissible: !_isDownloading,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text("تحديث جديد متاح"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("إصدار: ${updateInfo['version']}+${updateInfo['buildNumber']}"),
+                const SizedBox(height: 10),
+                const Text("ما الجديد:"),
+                Text(updateInfo['releaseNotes'] ?? "تحسينات عامة"),
+                if (_isDownloading) ...[
+                  const SizedBox(height: 20),
+                  LinearProgressIndicator(value: _downloadProgress / 100),
+                  const SizedBox(height: 8),
+                  Center(child: Text("جاري التحميل: ${_downloadProgress.toInt()}%")),
+                ],
+              ],
+            ),
+            actions: [
+              if (!_isDownloading)
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("لاحقاً"),
+                ),
+              if (!_isDownloading)
+                ElevatedButton(
+                  onPressed: () async {
+                    setDialogState(() {
+                      _isDownloading = true;
+                    });
+                    
+                    AppUpdateService.downloadAndInstall(updateInfo['downloadUrl']).listen(
+                      (event) {
+                        setDialogState(() {
+                          _downloadProgress = double.tryParse(event.value ?? "0") ?? 0;
+                        });
+                        if (event.status == OtaStatus.INSTALLING) {
+                          if (context.mounted) Navigator.pop(context);
+                          setState(() {
+                            _isDownloading = false;
+                            _downloadProgress = 0;
+                          });
+                        }
+                      },
+                      onError: (e) {
+                        setDialogState(() {
+                          _isDownloading = false;
+                        });
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("حدث خطأ أثناء التحديث: $e")),
+                          );
+                        }
+                      },
+                    );
+                  },
+                  child: const Text("تحديث الآن"),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -387,6 +488,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onTap: () {
                             // Link to store
                           },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Section: About
+                  _buildSectionHeader("عن التطبيق"),
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.info_outline, color: Colors.blueGrey),
+                          title: const Text("إصدار تطبيق رفيق المسلم"),
+                          trailing: Text(_appVersion, 
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: _isCheckingUpdate 
+                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.system_update_rounded, color: Colors.blue),
+                          title: const Text("التحقق من التحديثات"),
+                          subtitle: const Text("تحميل وتثبيت أحدث نسخة تلقائياً"),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: _isCheckingUpdate ? null : _checkUpdate,
                         ),
                       ],
                     ),
