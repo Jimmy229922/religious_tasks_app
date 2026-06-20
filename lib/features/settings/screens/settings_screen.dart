@@ -181,17 +181,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             _downloadProgress = double.tryParse(event.value ?? "0") ?? 0;
                           });
                           if (event.status == OtaStatus.INSTALLING) {
-                            if (context.mounted) Navigator.pop(context);
-                            setState(() {
-                              _isDownloading = false;
-                              _downloadProgress = 0;
+                            debugPrint("OTA: Starting installation...");
+                            // Don't close immediately, give the system time to trigger the UI
+                            Future.delayed(const Duration(seconds: 2), () {
+                              if (context.mounted) Navigator.pop(context);
+                              setState(() {
+                                _isDownloading = false;
+                                _downloadProgress = 0;
+                              });
                             });
                           }
                           
-                          if (event.status == OtaStatus.PERMISSION_NOT_GRANTED_ERROR) {
+                          if (event.status.toString().contains('ERROR')) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("يرجى تفعيل إذن تثبيت التطبيقات من الإعدادات")),
+                                SnackBar(content: Text("حدث خطأ: ${event.status}. يرجى التثبيت يدويًا من التنزيلات")),
                               );
                             }
                           }

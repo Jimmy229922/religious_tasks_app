@@ -77,7 +77,7 @@ class AppUpdateService {
   static Stream<OtaEvent> downloadAndInstall(String url) {
     return OtaUpdate().execute(
       url,
-      destinationFilename: 'religious_app_update.apk',
+      destinationFilename: 'update.apk', // Short and safe name
     );
   }
 }
