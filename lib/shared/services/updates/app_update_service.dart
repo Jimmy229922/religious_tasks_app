@@ -25,16 +25,19 @@ class AppUpdateService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final latestTag = data['tag_name'] as String; // e.g., v3.5.3+15
+        final latestTag = data['tag_name'] as String; 
         
-        // Basic parsing: split by '+' to get version and build number
+        debugPrint('Checking update: Current Build $currentBuildNumber, Current Version $currentVersion');
+        debugPrint('Checking update: Latest Tag from GitHub: $latestTag');
+        
         final parts = latestTag.replaceAll('v', '').split('+');
         final latestVersion = parts[0];
         final latestBuildNumber = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
 
-        // Compare build numbers or versions
+        debugPrint('Checking update: Parsed Latest Version: $latestVersion, Build: $latestBuildNumber');
+
         if (latestBuildNumber > currentBuildNumber || _isVersionGreater(latestVersion, currentVersion)) {
-          // Find the best APK asset (prefer v7a or universal)
+          debugPrint('Checking update: Update FOUND!');
           final assets = data['assets'] as List;
           var apkAsset = assets.firstWhere(
             (asset) => (asset['name'] as String).toLowerCase().contains('v7a'),
@@ -74,10 +77,10 @@ class AppUpdateService {
     return latestParts.length > currentParts.length;
   }
 
-  static Stream<OtaEvent> downloadAndInstall(String url) {
+  static Stream<OtaEvent> downloadAndInstall(String url, String version) {
     return OtaUpdate().execute(
       url,
-      destinationFilename: 'update.apk', // Short and safe name
+      destinationFilename: 'update_$version.apk', // Unique name per version
     );
   }
 }

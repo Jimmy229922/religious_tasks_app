@@ -175,7 +175,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _isDownloading = true;
                       });
                       
-                      AppUpdateService.downloadAndInstall(updateInfo['downloadUrl']).listen(
+                      AppUpdateService.downloadAndInstall(
+                        updateInfo['downloadUrl'], 
+                        updateInfo['version'].toString().replaceAll('.', '_')
+                      ).listen(
                         (event) {
                           setDialogState(() {
                             _downloadProgress = double.tryParse(event.value ?? "0") ?? 0;
