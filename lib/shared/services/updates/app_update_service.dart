@@ -34,11 +34,17 @@ class AppUpdateService {
 
         // Compare build numbers or versions
         if (latestBuildNumber > currentBuildNumber || _isVersionGreater(latestVersion, currentVersion)) {
-          // Find the APK asset
+          // Find the best APK asset (prefer v7a or universal)
           final assets = data['assets'] as List;
-          final apkAsset = assets.firstWhere(
-            (asset) => (asset['name'] as String).endsWith('.apk'),
-            orElse: () => null,
+          var apkAsset = assets.firstWhere(
+            (asset) => (asset['name'] as String).toLowerCase().contains('v7a'),
+            orElse: () => assets.firstWhere(
+              (asset) => (asset['name'] as String).toLowerCase().contains('universal'),
+              orElse: () => assets.firstWhere(
+                (asset) => (asset['name'] as String).endsWith('.apk'),
+                orElse: () => null,
+              ),
+            ),
           );
 
           if (apkAsset != null) {

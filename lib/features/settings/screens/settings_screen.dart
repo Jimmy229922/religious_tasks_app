@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:ota_update/ota_update.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:religious_tasks_app/shared/services/updates/app_update_service.dart';
 
 import 'package:religious_tasks_app/core/constants/strings.dart';
@@ -168,34 +169,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (!_isDownloading)
                 ElevatedButton(
                   onPressed: () async {
-                    setDialogState(() {
-                      _isDownloading = true;
-                    });
-                    
-                    AppUpdateService.downloadAndInstall(updateInfo['downloadUrl']).listen(
-                      (event) {
-                        setDialogState(() {
-                          _downloadProgress = double.tryParse(event.value ?? "0") ?? 0;
-                        });
-                        if (event.status == OtaStatus.INSTALLING) {
-                          if (context.mounted) Navigator.pop(context);
-                          setState(() {
-                            _isDownloading = false;
-                            _downloadProgress = 0;
+                    // Check and request install permission (for Android 8+)
+                    if (await Permission.requestInstallPackages.request().isGranted) {
+                      setDialogState(() {
+                        _isDownloading = true;
+                      });
+                      
+                      AppUpdateService.downloadAndInstall(updateInfo['downloadUrl']).listen(
+                        (event) {
+                          setDialogState(() {
+                            _downloadProgress = double.tryParse(event.value ?? "0") ?? 0;
                           });
-                        }
-                      },
-                      onError: (e) {
-                        setDialogState(() {
-                          _isDownloading = false;
-                        });
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("حدث خطأ أثناء التحديث: $e")),
-                          );
-                        }
-                      },
-                    );
+                          if (event.status == OtaStatus.INSTALLING) {
+                            if (context.mounted) Navigator.pop(context);
+                            setState(() {
+                              _isDownloading = false;
+                              _downloadProgress = 0;
+                            });
+                          }
+                          
+                          if (event.status == OtaStatus.PERMISSION_NOT_GRANTED_ERROR) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("يرجى تفعيل إذن تثبيت التطبيقات من الإعدادات")),
+                              );
+                            }
+                          }
+                        },
+                        onError: (e) {
+                          setDialogState(() {
+                            _isDownloading = false;
+                          });
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("حدث خطأ أثناء التحديث: $e")),
+                            );
+                          }
+                        },
+                      );
+                    } else {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("يجب الموافقة على صلاحية التثبيت للمتابعة")),
+                        );
+                        openAppSettings(); // Open settings for the user
+                      }
+                    }
                   },
                   child: const Text("تحديث الآن"),
                 ),
@@ -482,7 +501,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ListTile(
                           leading: const Icon(Icons.star_rate_rounded,
                               color: Colors.amber),
-                          title: const Text("قيم التطبيق"),
+                          title: const Text("قيم تطبيق رفيق المسلم"),
                           trailing:
                               const Icon(Icons.arrow_forward_ios, size: 16),
                           onTap: () {
