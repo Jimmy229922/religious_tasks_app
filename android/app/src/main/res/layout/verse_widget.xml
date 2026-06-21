@@ -1,29 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:gravity="center"
-    android:orientation="vertical"
     android:padding="16dp">
 
-    <TextView
-        android:id="@+id/verse_text"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
         android:gravity="center"
-        android:text="فَاذْكُرُونِي أَذْكُرْكُمْ"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:textStyle="italic" />
+        android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/verse_source"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="سورة البقرة"
-        android:textColor="#B3FFFFFF"
-        android:textSize="12sp" />
+        <TextView
+            android:id="@+id/verse_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="فَاذْكُرُونِي أَذْكُرْكُمْ"
+            android:textColor="#FFFFFF"
+            android:textSize="17sp"
+            android:textStyle="italic" />
 
-</LinearLayout>
+        <FrameLayout
+            android:layout_width="40dp"
+            android:layout_height="1dp"
+            android:layout_marginTop="12dp"
+            android:background="#4DFFFFFF" />
+
+        <TextView
+            android:id="@+id/verse_source"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="سورة البقرة"
+            android:textColor="#B3FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</RelativeLayout>

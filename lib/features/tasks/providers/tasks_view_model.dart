@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:hijri/hijri_calendar.dart' as hijri;
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart' as intl;
 
@@ -28,6 +29,9 @@ class TasksViewModel extends ChangeNotifier {
   static const String _totalDhikrCountKey = 'total_dhikr_count_v1';
   static const String _quranSurahKey = 'quran_last_surah';
   static const String _quranAyahKey = 'quran_last_ayah';
+  static const String _latKey = 'last_latitude';
+  static const String _lngKey = 'last_longitude';
+  static const String _locNameKey = 'last_location_name';
   static const String _prayerWidgetName = 'PrayerWidgetProvider';
 
   List<TaskItem> _tasks = [];
@@ -103,6 +107,7 @@ class TasksViewModel extends ChangeNotifier {
   DateTime _now = DateTime.now();
   DateTime get now => _now;
   Timer? _clockTimer;
+  DateTime? _lastLocationRefresh;
 
   // --- Dynamic Content State (Refreshed by user) ---
   String _currentInspiration = "";
@@ -343,10 +348,16 @@ class TasksViewModel extends ChangeNotifier {
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       final newNow = DateTime.now();
       // Only notify listeners if the minute has changed (drastic optimization)
-      // This prevents the entire UI from rebuilding every second just for the countdown
       if (newNow.minute != _now.minute) {
         _now = newNow;
         _updatePrayerWidget();
+        
+        // Auto-refresh location every hour
+        if (_lastLocationRefresh == null || 
+            newNow.difference(_lastLocationRefresh!).inHours >= 1) {
+          refreshLocation();
+        }
+        
         notifyListeners();
       } else {
         _now = newNow;
@@ -482,22 +493,50 @@ class TasksViewModel extends ChangeNotifier {
   }
 
   Future<void> _initLocationAndPrayers() async {
+    // 1. Try to load cached location first for instant UI
+    final savedLat = _storage.getString(_latKey);
+    final savedLng = _storage.getString(_lngKey);
+    _locationName = _storage.getString(_locNameKey) ?? AppStrings.locating;
+
+    if (savedLat != null && savedLng != null) {
+      final pos = Position(
+        latitude: double.parse(savedLat),
+        longitude: double.parse(savedLng),
+        timestamp: DateTime.now(),
+        accuracy: 0,
+        altitude: 0,
+        heading: 0,
+        speed: 0,
+        speedAccuracy: 0,
+        altitudeAccuracy: 0,
+        headingAccuracy: 0,
+      );
+      await _calculatePrayers(pos);
+      debugPrint("📍 Using cached location for instant startup");
+    }
+
     _isLoadingLocation = true;
     notifyListeners();
 
-    // 1. Get location (optimized: tries cached first, then low accuracy fresh, then returns)
+    // 2. Fetch fresh location in background
     final result = await _locationService.getCurrentPosition();
 
     if (result.position != null) {
-      // 2. Calculate prayer times IMMEDIATELY (CPU conversion only, milliseconds)
+      _lastLocationRefresh = DateTime.now();
+      
+      // Save for next time
+      await _storage.setString(_latKey, result.position!.latitude.toString());
+      await _storage.setString(_lngKey, result.position!.longitude.toString());
+
       await _calculatePrayers(result.position!);
 
-      // 3. Start geocoding in background (doesn't block UI from showing prayers)
       _locationService.getLocationName(result.position!).then((name) {
         _locationName = name;
+        _storage.setString(_locNameKey, name);
         notifyListeners();
       });
-    } else {
+    } else if (savedLat == null) {
+      // Only show error if we don't even have a cached version
       _locationName = result.message.isNotEmpty
           ? result.message
           : AppStrings.unknownLocation;
@@ -608,12 +647,18 @@ class TasksViewModel extends ChangeNotifier {
           ? '$hours\u0633 $minutes\u062f'
           : '$minutes\u062f';
 
+      await HomeWidget.saveWidgetData<int>('next_prayer_timestamp', nextTime.millisecondsSinceEpoch);
       await HomeWidget.saveWidgetData<String>(
           'prayer_name', _getPrayerNameForWidget(nextPrayer));
       await HomeWidget.saveWidgetData<String>(
           'prayer_time', intl.DateFormat.jm('ar').format(nextTime));
       await HomeWidget.saveWidgetData<String>('remaining_time', remaining);
       
+      // Additional interactive data
+      final nowHijri = hijri.HijriCalendar.now();
+      await HomeWidget.saveWidgetData<String>('hijri_date', "${nowHijri.hDay} ${nowHijri.longMonthName} ${nowHijri.hYear}");
+      await HomeWidget.saveWidgetData<String>('location_name', _locationName);
+
       // Send all prayer times to widget
       final formatter = intl.DateFormat.jm('ar');
       await HomeWidget.saveWidgetData<String>('fajr_time', formatter.format(_prayerTimes!.fajr));

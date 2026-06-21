@@ -3,59 +3,73 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:padding="12dp">
+    android:padding="16dp">
 
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_centerVertical="true"
         android:orientation="vertical">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="ورد الذكر اليومي"
-            android:textColor="#B3FFFFFF"
-            android:textSize="12sp" />
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
-        <TextView
-            android:id="@+id/dhikr_progress_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="0 / 0"
-            android:textColor="#FFFFFF"
-            android:textSize="24sp"
-            android:textStyle="bold" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="الإنجاز اليومي"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/dhikr_progress_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="0 / 11"
+                    android:textColor="#FFFFFF"
+                    android:textSize="26sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/tasbeeh_button"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="@drawable/remaining_bg"
+                android:padding="10dp"
+                android:src="@android:drawable/ic_input_add"
+                android:tint="#FFFFFF" />
+        </RelativeLayout>
 
         <TextView
             android:id="@+id/dhikr_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="استعن بالله وابدأ"
-            android:textColor="#80FFFFFF"
-            android:textSize="11sp" />
+            android:layout_marginTop="8dp"
+            android:text="استعن بالله وابدأ يومك بالذكر"
+            android:textColor="#B3FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="italic" />
+
+        <ProgressBar
+            android:id="@+id/dhikr_progress_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="16dp"
+            android:progressDrawable="@android:drawable/progress_horizontal"
+            android:progress="0"
+            android:max="100" />
+
     </LinearLayout>
-
-    <ProgressBar
-        android:id="@+id/dhikr_progress_bar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="4dp"
-        android:layout_alignParentBottom="true"
-        android:layout_marginBottom="4dp"
-        android:progressDrawable="@android:drawable/progress_horizontal"
-        android:progress="0"
-        android:max="100" />
-
-    <ImageView
-        android:id="@+id/tasbeeh_button"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_alignParentEnd="true"
-        android:layout_centerVertical="true"
-        android:background="@drawable/remaining_bg"
-        android:padding="8dp"
-        android:src="@android:drawable/ic_menu_add"
-        android:contentDescription="تسبيح سريع" />
 
 </RelativeLayout>

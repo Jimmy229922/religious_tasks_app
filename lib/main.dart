@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 import 'app/religious_app.dart';
 import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
@@ -16,6 +17,7 @@ import 'features/tasbeeh/providers/tasbeeh_view_model.dart';
 import 'features/tasks/providers/tasks_view_model.dart';
 import 'features/radio/providers/radio_view_model.dart';
 import 'shared/widgets/dhikr_overlay.dart';
+import 'shared/widgets/radio_overlay.dart';
 import 'shared/services/audio/radio_service.dart';
 import 'shared/services/updates/update_view_model.dart';
 
@@ -23,9 +25,18 @@ import 'shared/services/updates/update_view_model.dart';
 void overlayMain() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
-    const MaterialApp(
+    MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: DhikrOverlay(),
+      home: StreamBuilder(
+        stream: FlutterOverlayWindow.overlayListener,
+        builder: (context, snapshot) {
+          final data = snapshot.data;
+          if (data == "RADIO_MODE") {
+            return const RadioOverlay();
+          }
+          return const DhikrOverlay();
+        },
+      ),
     ),
   );
 }

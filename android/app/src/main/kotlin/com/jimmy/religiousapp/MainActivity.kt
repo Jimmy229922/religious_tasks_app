@@ -60,6 +60,12 @@ class MainActivity : AudioServiceActivity() {
                         }
                         result.success(null)
                     }
+                    "bringToForeground" -> {
+                        val intent = Intent(this@MainActivity, MainActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NEW_TASK
+                        this@MainActivity.startActivity(intent)
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }

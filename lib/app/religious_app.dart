@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -7,9 +8,39 @@ import '../core/constants/app_constants.dart';
 import '../features/splash/screens/splash_screen.dart';
 import '../core/theme/theme_provider.dart';
 import '../shared/services/updates/update_view_model.dart';
+import '../features/radio/screens/radio_screen.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
-class ReligiousApp extends StatelessWidget {
+class ReligiousApp extends StatefulWidget {
   const ReligiousApp({super.key});
+
+  @override
+  State<ReligiousApp> createState() => _ReligiousAppState();
+}
+
+class _ReligiousAppState extends State<ReligiousApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToOverlay();
+  }
+
+  void _listenToOverlay() {
+    FlutterOverlayWindow.overlayListener.listen((event) async {
+      if (event == "OPEN_RADIO") {
+        try {
+          const platform = MethodChannel('religious_tasks_app/native_adhan');
+          await platform.invokeMethod('bringToForeground');
+        } catch (_) {}
+
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => const RadioScreen()),
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +50,7 @@ class ReligiousApp extends StatelessWidget {
     final seedColor = themeProvider.getDynamicSeedColor(hour);
 
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
       title: kAppName,
       locale: const Locale('ar'),

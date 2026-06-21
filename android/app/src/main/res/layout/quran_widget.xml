@@ -5,27 +5,17 @@
     android:background="@drawable/widget_background"
     android:padding="12dp">
 
-    <ImageView
-        android:id="@+id/quran_icon"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:layout_alignParentStart="true"
-        android:layout_centerVertical="true"
-        android:src="@android:drawable/ic_menu_book"
-        android:alpha="0.8" />
-
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_centerVertical="true"
-        android:layout_toEndOf="@id/quran_icon"
-        android:layout_marginStart="12dp"
+        android:layout_marginStart="8dp"
         android:orientation="vertical">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="آخر ما قرأت"
+            android:text="وردك القرآني"
             android:textColor="#B3FFFFFF"
             android:textSize="11sp" />
 
@@ -33,18 +23,18 @@
             android:id="@+id/last_surah_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="--"
+            android:layout_marginTop="2dp"
+            android:text="سورة البقرة"
             android:textColor="#FFFFFF"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/last_ayah_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="آية --"
+            android:text="آية 152"
             android:textColor="#80FFFFFF"
-            android:textSize="12sp" />
+            android:textSize="13sp" />
     </LinearLayout>
-
 </RelativeLayout>

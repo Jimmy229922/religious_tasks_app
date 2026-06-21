@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Color
+import android.os.SystemClock
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetProvider
 
@@ -17,11 +18,23 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
         appWidgetIds.forEach { widgetId ->
             val views = RemoteViews(context.packageName, R.layout.prayer_widget)
             
+            // Interactive Data
+            views.setTextViewText(R.id.location_name, widgetData.getString("location_name", "تحديد الموقع..."))
+            views.setTextViewText(R.id.hijri_date, widgetData.getString("hijri_date", "--"))
+            
             // Current / Next Prayer Data
             views.setTextViewText(R.id.prayer_name, widgetData.getString("prayer_name", "--"))
             views.setTextViewText(R.id.prayer_time, widgetData.getString("prayer_time", "00:00"))
-            views.setTextViewText(R.id.remaining_time, widgetData.getString("remaining_time", "--"))
             
+            // Live Countdown (Chronometer)
+            val nextTimestamp = widgetData.getLong("next_prayer_timestamp", 0)
+            if (nextTimestamp > 0) {
+                // Chronometer base is relative to SystemClock.elapsedRealtime()
+                val remainingMillis = nextTimestamp - System.currentTimeMillis()
+                views.setChronometerCountDown(R.id.remaining_time, true)
+                views.setChronometer(R.id.remaining_time, SystemClock.elapsedRealtime() + remainingMillis, null, true)
+            }
+
             // All Prayer Times
             val fajr = widgetData.getString("fajr_time", "--")
             val dhuhr = widgetData.getString("dhuhr_time", "--")
@@ -38,7 +51,7 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
 
             // Reset backgrounds
             val transparent = Color.TRANSPARENT
-            val highlight = Color.parseColor("#33FFFFFF") // Soft white highlight
+            val highlight = Color.parseColor("#4DFFFFFF")
             
             views.setInt(R.id.fajr_container, "setBackgroundColor", transparent)
             views.setInt(R.id.dhuhr_container, "setBackgroundColor", transparent)
@@ -46,7 +59,6 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
             views.setInt(R.id.maghrib_container, "setBackgroundColor", transparent)
             views.setInt(R.id.isha_container, "setBackgroundColor", transparent)
 
-            // Highlight next
             when (nextId?.lowercase()) {
                 "fajr" -> views.setInt(R.id.fajr_container, "setBackgroundColor", highlight)
                 "dhuhr" -> views.setInt(R.id.dhuhr_container, "setBackgroundColor", highlight)
