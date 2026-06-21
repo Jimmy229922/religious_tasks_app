@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class GuidedTasbeehScreen extends StatefulWidget {
   const GuidedTasbeehScreen({super.key});
@@ -57,6 +58,7 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
   void _handleTap() {
     if (_isCompleted) return;
 
+    HapticFeedback.lightImpact();
     _scaleController.forward().then((_) => _scaleController.reverse());
 
     setState(() {

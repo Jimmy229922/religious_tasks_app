@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class HalqatDhikrScreen extends StatefulWidget {
   const HalqatDhikrScreen({super.key});
@@ -61,11 +62,12 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
   }
 
   void _handleTap(int index) {
-    setState(() {
-      if (!_sessionAthkar[index].isDone) {
+    if (!_sessionAthkar[index].isDone) {
+      HapticFeedback.lightImpact();
+      setState(() {
         _sessionAthkar[index].current++;
-      }
-    });
+      });
+    }
 
     if (_sessionAthkar.every((d) => d.isDone)) {
       // Session Complete!
