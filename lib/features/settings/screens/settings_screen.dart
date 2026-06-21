@@ -50,6 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isCheckingUpdate = false;
   double _downloadProgress = 0;
   bool _isDownloading = false;
+  bool _isDownloadFinished = false;
 
   @override
   void initState() {
@@ -161,68 +162,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             actions: [
-              if (!_isDownloading)
+              if (!_isDownloading && !_isDownloadFinished)
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text("لاحقاً"),
                 ),
-              if (!_isDownloading)
+              if (_isDownloadFinished)
                 ElevatedButton(
-                  onPressed: () async {
-                    // Check and request install permission (for Android 8+)
-                    if (await Permission.requestInstallPackages.request().isGranted) {
-                      setDialogState(() {
-                        _isDownloading = true;
-                      });
-                      
-                      AppUpdateService.downloadAndInstall(
-                        updateInfo['downloadUrl'], 
-                        updateInfo['version'].toString().replaceAll('.', '_')
-                      ).listen(
-                        (event) {
-                          setDialogState(() {
-                            _downloadProgress = double.tryParse(event.value ?? "0") ?? 0;
-                          });
-                          if (event.status == OtaStatus.INSTALLING) {
-                            debugPrint("OTA: Starting installation...");
-                            // Don't close immediately, give the system time to trigger the UI
-                            Future.delayed(const Duration(seconds: 2), () {
-                              if (context.mounted) Navigator.pop(context);
-                              setState(() {
-                                _isDownloading = false;
-                                _downloadProgress = 0;
-                              });
-                            });
-                          }
-                          
-                          if (event.status.toString().contains('ERROR')) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text("حدث خطأ: ${event.status}. يرجى التثبيت يدويًا من التنزيلات")),
-                              );
-                            }
-                          }
-                        },
-                        onError: (e) {
-                          setDialogState(() {
-                            _isDownloading = false;
-                          });
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("حدث خطأ أثناء التحديث: $e")),
-                            );
-                          }
-                        },
-                      );
-                    } else {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("يجب الموافقة على صلاحية التثبيت للمتابعة")),
-                        );
-                        openAppSettings(); // Open settings for the user
-                      }
-                    }
+                  onPressed: () {
+                    // Re-trigger install if finished
+                    _checkAndInstall(updateInfo, setDialogState);
                   },
+                  child: const Text("تثبيت الآن (بدون تحميل)"),
+                )
+              else if (_isDownloading)
+                const SizedBox.shrink()
+              else
+                ElevatedButton(
+                  onPressed: () => _checkAndInstall(updateInfo, setDialogState),
                   child: const Text("تحديث الآن"),
                 ),
             ],
@@ -230,6 +187,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       ),
     );
+  }
+
+  void _checkAndInstall(Map<String, dynamic> updateInfo, StateSetter setDialogState) async {
+    if (await Permission.requestInstallPackages.request().isGranted) {
+      setDialogState(() {
+        _isDownloading = true;
+        _isDownloadFinished = false;
+      });
+
+      AppUpdateService.downloadAndInstall(
+        updateInfo['downloadUrl'],
+        updateInfo['version'].toString().replaceAll('.', '_'),
+      ).listen(
+        (event) {
+          setDialogState(() {
+            _downloadProgress = double.tryParse(event.value ?? "0") ?? 0;
+            if (_downloadProgress >= 100) {
+              _isDownloading = false;
+              _isDownloadFinished = true;
+            }
+          });
+
+          if (event.status == OtaStatus.INSTALLING) {
+            debugPrint("OTA: Starting installation...");
+            Future.delayed(const Duration(seconds: 2), () {
+              if (mounted) {
+                setState(() {
+                  _isDownloading = false;
+                });
+              }
+            });
+          }
+
+          if (event.status.toString().contains('ERROR')) {
+            setDialogState(() {
+              _isDownloading = false;
+              _isDownloadFinished = true; // Still marked as finished so they can retry
+            });
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("حدث خطأ: ${event.status}. يمكنك المحاولة مرة أخرى.")),
+              );
+            }
+          }
+        },
+        onError: (e) {
+          setDialogState(() {
+            _isDownloading = false;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("حدث خطأ أثناء التحديث: $e")),
+            );
+          }
+        },
+      );
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("يجب الموافقة على صلاحية التثبيت للمتابعة")),
+        );
+        openAppSettings();
+      }
+    }
   }
 
   @override
