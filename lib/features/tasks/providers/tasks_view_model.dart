@@ -613,9 +613,44 @@ class TasksViewModel extends ChangeNotifier {
       await HomeWidget.saveWidgetData<String>(
           'prayer_time', intl.DateFormat.jm('ar').format(nextTime));
       await HomeWidget.saveWidgetData<String>('remaining_time', remaining);
+      
+      // Send all prayer times to widget
+      final formatter = intl.DateFormat.jm('ar');
+      await HomeWidget.saveWidgetData<String>('fajr_time', formatter.format(_prayerTimes!.fajr));
+      await HomeWidget.saveWidgetData<String>('dhuhr_time', formatter.format(_prayerTimes!.dhuhr));
+      await HomeWidget.saveWidgetData<String>('asr_time', formatter.format(_prayerTimes!.asr));
+      await HomeWidget.saveWidgetData<String>('maghrib_time', formatter.format(_prayerTimes!.maghrib));
+      await HomeWidget.saveWidgetData<String>('isha_time', formatter.format(_prayerTimes!.isha));
+      await HomeWidget.saveWidgetData<String>('next_prayer_id', nextPrayer.name);
+
       await HomeWidget.updateWidget(androidName: _prayerWidgetName);
+      
+      // Update Other Widgets
+      await _updateOtherWidgets();
     } catch (e) {
       debugPrint("Prayer widget update failed: $e");
+    }
+  }
+
+  Future<void> _updateOtherWidgets() async {
+    try {
+      // 1. Dhikr Widget
+      await HomeWidget.saveWidgetData<int>('completed_tasks', completedCount);
+      await HomeWidget.saveWidgetData<int>('total_tasks', totalCount);
+      await HomeWidget.updateWidget(androidName: 'DhikrWidgetProvider');
+
+      // 2. Verse Widget
+      await HomeWidget.saveWidgetData<String>('verse_text', _currentInspiration);
+      await HomeWidget.saveWidgetData<String>('verse_source', _currentInspirationSource.isEmpty ? "حكمة اليوم" : _currentInspirationSource);
+      await HomeWidget.updateWidget(androidName: 'VerseWidgetProvider');
+
+      // 3. Quran Widget
+      await HomeWidget.saveWidgetData<String>('last_surah', _lastSurah);
+      await HomeWidget.saveWidgetData<String>('last_ayah', _lastAyah.toString());
+      await HomeWidget.updateWidget(androidName: 'QuranWidgetProvider');
+      
+    } catch (e) {
+      debugPrint("Other widgets update failed: $e");
     }
   }
 
@@ -686,6 +721,7 @@ class TasksViewModel extends ChangeNotifier {
       }
     }
     _saveTasks();
+    _updateOtherWidgets();
     notifyListeners();
   }
 
@@ -700,6 +736,7 @@ class TasksViewModel extends ChangeNotifier {
         if (_tasks[index].name == kAthkarSleep) _updateStreak('sleep');
       }
       _saveTasks();
+      _updateOtherWidgets();
       notifyListeners();
     }
   }
@@ -756,6 +793,7 @@ class TasksViewModel extends ChangeNotifier {
     _lastAyah = ayah;
     await _storage.setString(_quranSurahKey, surah);
     await _storage.setString(_quranAyahKey, ayah.toString());
+    _updateOtherWidgets();
     notifyListeners();
   }
 

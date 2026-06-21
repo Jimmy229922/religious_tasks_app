@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../core/constants/app_constants.dart';
 import '../features/splash/screens/splash_screen.dart';
 import '../core/theme/theme_provider.dart';
+import '../shared/services/updates/update_view_model.dart';
 
 class ReligiousApp extends StatelessWidget {
   const ReligiousApp({super.key});
@@ -55,6 +56,78 @@ class ReligiousApp extends StatelessWidget {
       ),
       themeMode: themeProvider.themeMode,
       home: SplashScreen(themeProvider: themeProvider),
+      builder: (context, child) {
+        return Stack(
+          children: [
+            child!,
+            const GlobalUpdateIndicator(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class GlobalUpdateIndicator extends StatelessWidget {
+  const GlobalUpdateIndicator({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<UpdateViewModel>(
+      builder: (context, updateVM, _) {
+        if (!updateVM.isDownloading && !updateVM.isDownloadFinished) {
+          return const SizedBox.shrink();
+        }
+
+        return Positioned(
+          bottom: 100,
+          left: 20,
+          child: Material(
+            color: Colors.transparent,
+            child: GestureDetector(
+              onTap: () {
+                if (updateVM.isDownloadFinished) {
+                  updateVM.startUpdate(); // This will trigger install if already downloaded
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("جاري التحميل: ${updateVM.downloadProgress.toInt()}%"),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  color: Colors.black87,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black26, blurRadius: 10, spreadRadius: 2)
+                  ],
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: updateVM.downloadProgress / 100,
+                      backgroundColor: Colors.white24,
+                      color: updateVM.isDownloadFinished ? Colors.green : Colors.tealAccent,
+                      strokeWidth: 4,
+                    ),
+                    Icon(
+                      updateVM.isDownloadFinished ? Icons.install_mobile : Icons.downloading,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

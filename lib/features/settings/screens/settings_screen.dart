@@ -3,9 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:ota_update/ota_update.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:religious_tasks_app/shared/services/updates/app_update_service.dart';
+import 'package:religious_tasks_app/shared/services/updates/update_view_model.dart';
 
 import 'package:religious_tasks_app/core/constants/strings.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
@@ -48,9 +47,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isRefreshingLocation = false;
   String _appVersion = "";
   bool _isCheckingUpdate = false;
-  double _downloadProgress = 0;
-  bool _isDownloading = false;
-  bool _isDownloadFinished = false;
 
   @override
   void initState() {
@@ -120,12 +116,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     final updateInfo = await AppUpdateService.checkForUpdate();
+    if (!mounted) return;
+    final updateVM = Provider.of<UpdateViewModel>(context, listen: false);
 
     setState(() {
       _isCheckingUpdate = false;
     });
 
     if (updateInfo != null) {
+      updateVM.setUpdateInfo(updateInfo);
       if (!mounted) return;
       _showUpdateDialog(updateInfo);
     } else {
@@ -140,9 +139,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showUpdateDialog(Map<String, dynamic> updateInfo) {
     showDialog(
       context: context,
-      barrierDismissible: !_isDownloading,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
+      barrierDismissible: true, // Allow closing even during download
+      builder: (context) => Consumer<UpdateViewModel>(
+        builder: (context, vm, _) {
           return AlertDialog(
             title: const Text("تحديث جديد متاح"),
             content: Column(
@@ -153,33 +152,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 10),
                 const Text("ما الجديد:"),
                 Text(updateInfo['releaseNotes'] ?? "تحسينات عامة"),
-                if (_isDownloading) ...[
+                if (vm.isDownloading) ...[
                   const SizedBox(height: 20),
-                  LinearProgressIndicator(value: _downloadProgress / 100),
+                  LinearProgressIndicator(value: vm.downloadProgress / 100),
                   const SizedBox(height: 8),
-                  Center(child: Text("جاري التحميل: ${_downloadProgress.toInt()}%")),
+                  Center(child: Text("جاري التحميل في الخلفية: ${vm.downloadProgress.toInt()}%")),
                 ],
               ],
             ),
             actions: [
-              if (!_isDownloading && !_isDownloadFinished)
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("لاحقاً"),
-                ),
-              if (_isDownloadFinished)
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("لاحقاً"),
+              ),
+              if (vm.isDownloadFinished)
                 ElevatedButton(
-                  onPressed: () {
-                    // Re-trigger install if finished
-                    _checkAndInstall(updateInfo, setDialogState);
-                  },
-                  child: const Text("تثبيت الآن (بدون تحميل)"),
+                  onPressed: () => vm.startUpdate(),
+                  child: const Text("تثبيت الآن"),
                 )
-              else if (_isDownloading)
-                const SizedBox.shrink()
-              else
+              else if (!vm.isDownloading)
                 ElevatedButton(
-                  onPressed: () => _checkAndInstall(updateInfo, setDialogState),
+                  onPressed: () => vm.startUpdate(),
                   child: const Text("تحديث الآن"),
                 ),
             ],
@@ -187,70 +180,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       ),
     );
-  }
-
-  void _checkAndInstall(Map<String, dynamic> updateInfo, StateSetter setDialogState) async {
-    if (await Permission.requestInstallPackages.request().isGranted) {
-      setDialogState(() {
-        _isDownloading = true;
-        _isDownloadFinished = false;
-      });
-
-      AppUpdateService.downloadAndInstall(
-        updateInfo['downloadUrl'],
-        updateInfo['version'].toString().replaceAll('.', '_'),
-      ).listen(
-        (event) {
-          setDialogState(() {
-            _downloadProgress = double.tryParse(event.value ?? "0") ?? 0;
-            if (_downloadProgress >= 100) {
-              _isDownloading = false;
-              _isDownloadFinished = true;
-            }
-          });
-
-          if (event.status == OtaStatus.INSTALLING) {
-            debugPrint("OTA: Starting installation...");
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted) {
-                setState(() {
-                  _isDownloading = false;
-                });
-              }
-            });
-          }
-
-          if (event.status.toString().contains('ERROR')) {
-            setDialogState(() {
-              _isDownloading = false;
-              _isDownloadFinished = true; // Still marked as finished so they can retry
-            });
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("حدث خطأ: ${event.status}. يمكنك المحاولة مرة أخرى.")),
-              );
-            }
-          }
-        },
-        onError: (e) {
-          setDialogState(() {
-            _isDownloading = false;
-          });
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("حدث خطأ أثناء التحديث: $e")),
-            );
-          }
-        },
-      );
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("يجب الموافقة على صلاحية التثبيت للمتابعة")),
-        );
-        openAppSettings();
-      }
-    }
   }
 
   @override

@@ -17,6 +17,7 @@ import 'features/tasks/providers/tasks_view_model.dart';
 import 'features/radio/providers/radio_view_model.dart';
 import 'shared/widgets/dhikr_overlay.dart';
 import 'shared/services/audio/radio_service.dart';
+import 'shared/services/updates/update_view_model.dart';
 
 @pragma("vm:entry-point")
 void overlayMain() {
@@ -75,6 +76,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => TasksViewModel()),
         ChangeNotifierProvider(create: (_) => TasbeehViewModel()),
         ChangeNotifierProvider(create: (_) => RadioViewModel()),
+        ChangeNotifierProvider(create: (_) => UpdateViewModel()),
       ],
       child: const ReligiousApp(),
     ),
