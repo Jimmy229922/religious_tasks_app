@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:religious_tasks_app/core/constants/strings.dart';
+import 'package:religious_tasks_app/core/widgets/full_adhan_overlay_dialog.dart';
 import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
 import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
 import 'package:religious_tasks_app/shared/services/notifications/notification_preferences.dart';
@@ -38,12 +39,13 @@ class _NotificationSettingsScreenState
   NotificationPreferences _preferences = NotificationPreferences.defaults();
   List<String> _customDhikrs = [];
   final TextEditingController _dhikrController = TextEditingController();
+  final ValueNotifier<Duration?> _remainingDhikrNotifier =
+      ValueNotifier<Duration?>(null);
   bool _isLoading = true;
   bool _isApplying = false;
   bool _isAllPermissionsGranted = true;
 
   Timer? _countdownTimer;
-  Duration? _remainingDhikrTime;
   DateTime? _dhikrStartTime;
 
   @override
@@ -75,6 +77,8 @@ class _NotificationSettingsScreenState
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _remainingDhikrNotifier.dispose();
+    _dhikrController.dispose();
     super.dispose();
   }
 
@@ -106,8 +110,8 @@ class _NotificationSettingsScreenState
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
       if (!_preferences.hourlyDhikrEnabled || _dhikrStartTime == null) {
-        if (_remainingDhikrTime != null) {
-          setState(() => _remainingDhikrTime = null);
+        if (_remainingDhikrNotifier.value != null) {
+          _remainingDhikrNotifier.value = null;
         }
         return;
       }
@@ -119,17 +123,14 @@ class _NotificationSettingsScreenState
       // Calculate elapsed seconds in current interval
       final elapsedInInterval = diffSeconds % intervalSeconds;
       
-      // If diffSeconds is negative (shouldn't happen with current logic but for safety)
       if (diffSeconds < 0) {
-        final remaining = intervalSeconds + diffSeconds; // diffSeconds is negative
-        setState(() => _remainingDhikrTime = Duration(seconds: remaining));
+        final remaining = intervalSeconds + diffSeconds;
+        _remainingDhikrNotifier.value = Duration(seconds: remaining);
         return;
       }
 
       final remainingSeconds = intervalSeconds - elapsedInInterval;
-      setState(() {
-        _remainingDhikrTime = Duration(seconds: remainingSeconds);
-      });
+      _remainingDhikrNotifier.value = Duration(seconds: remainingSeconds);
     });
   }
 
@@ -226,6 +227,47 @@ class _NotificationSettingsScreenState
       );
       await _loadPreferences();
       _showMessage('تم تحديث مدة التذكير المتكرر');
+    });
+  }
+
+  Future<void> _updateSalawatReminderEnabled(bool value) async {
+    setState(() {
+      _preferences = _preferences.copyWith(salawatReminderEnabled: value);
+    });
+
+    await _preferencesService.setSalawatReminderEnabled(value);
+    await _runApplyingTask(() async {
+      await _notificationService.scheduleSalawatNotifications(
+        settings: _preferences,
+        forceReschedule: true,
+      );
+      await _loadPreferences();
+      _showMessage('تم تحديث إعدادات الصلاة على النبي الدوري');
+    });
+  }
+
+  Future<void> _updateSalawatInterval(int minutes) async {
+    setState(() {
+      _preferences = _preferences.copyWith(
+        salawatIntervalMinutes: minutes,
+      );
+    });
+
+    await _preferencesService.setSalawatIntervalMinutes(minutes);
+    await _runApplyingTask(() async {
+      await _notificationService.scheduleSalawatNotifications(
+        settings: _preferences,
+        forceReschedule: true,
+      );
+      await _loadPreferences();
+      _showMessage('تم تحديث مدة التذكير بالصلاة على النبي');
+    });
+  }
+
+  Future<void> _testSalawatNotification() async {
+    await _runApplyingTask(() async {
+      await _notificationService.testSalawatNotification();
+      _showMessage('تم إرسال تجربة إشعار الصلاة على النبي بنجاح');
     });
   }
 
@@ -413,6 +455,7 @@ class _NotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         title: const Text('إعدادات الإشعارات'),
@@ -425,11 +468,11 @@ class _NotificationSettingsScreenState
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  _buildSectionHeader('صوت الأذان'),
+                  _buildSectionHeader(Icons.volume_up_rounded, 'صوت الأذان واختيار المؤذن'),
                   Card(
                     elevation: 2,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -469,6 +512,7 @@ class _NotificationSettingsScreenState
                             DropdownButtonFormField<String>(
                               key: ValueKey(_preferences.selectedMoazzenId),
                               initialValue: _preferences.selectedMoazzenId,
+                              isExpanded: true,
                               decoration: const InputDecoration(
                                 border: OutlineInputBorder(),
                                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -487,7 +531,7 @@ class _NotificationSettingsScreenState
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _buildSectionHeader('تنبيهات الأذان'),
+                  _buildSectionHeader(Icons.mosque_rounded, 'تنبيهات الأذان والصلوات الخمس'),
                   ...NotificationPreferencesService.prayerKeys.map(
                     (prayerKey) => _buildPrayerSwitchTile(
                       prayerKey: prayerKey,
@@ -495,7 +539,7 @@ class _NotificationSettingsScreenState
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _buildSectionHeader('تذكيرات الأذكار'),
+                  _buildSectionHeader(Icons.notifications_active_rounded, 'تذكيرات الأذكار اليومية والصلاة على النبي'),
                   _buildReminderTile(
                     title: 'أذكار الصباح',
                     subtitle: 'إشعار يومي ثابت في وقت الصباح',
@@ -509,9 +553,56 @@ class _NotificationSettingsScreenState
                     onChanged: _updateEveningReminder,
                   ),
                   _buildReminderTile(
+                    title: 'التذكير الدوري بالصلاة على النبي',
+                    subtitle:
+                        'تنبيه صوتي وإشعار دوري بالصلاة والسلام على النبي ﷺ',
+                    value: _preferences.salawatReminderEnabled,
+                    onChanged: _updateSalawatReminderEnabled,
+                  ),
+                  if (_preferences.salawatReminderEnabled)
+                    Card(
+                      elevation: 2,
+                      margin: const EdgeInsets.only(top: 8, bottom: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            DropdownButtonFormField<int>(
+                              key: ValueKey(_preferences.salawatIntervalMinutes),
+                              initialValue: _preferences.salawatIntervalMinutes,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'تكرار الصلاة على النبي (بالدقائق)',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.av_timer_rounded),
+                              ),
+                              items: NotificationPreferencesService.salawatIntervalOptions
+                                  .map(
+                                    (minutes) => DropdownMenuItem(
+                                      value: minutes,
+                                      child: Text(_intervalLabel(minutes)),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: _isApplying
+                                  ? null
+                                  : (value) {
+                                      if (value != null) {
+                                        _updateSalawatInterval(value);
+                                      }
+                                    },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  _buildReminderTile(
                     title: 'التذكير المتكرر بالذكر',
                     subtitle:
-                        'يمكنك الآن اختيار التذكير كل 10 دقائق أو بفواصل أطول',
+                        'تنبيه بالأذكار والأدعية بفواصل زمنية مخصصة',
                     value: _preferences.hourlyDhikrEnabled,
                     onChanged: _updateHourlyDhikrEnabled,
                   ),
@@ -535,6 +626,7 @@ class _NotificationSettingsScreenState
                             DropdownButtonFormField<int>(
                               key: ValueKey(_preferences.hourlyDhikrIntervalMinutes),
                               initialValue: _preferences.hourlyDhikrIntervalMinutes,
+                              isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'مدة التذكير المتكرر',
                                 border: OutlineInputBorder(),
@@ -556,47 +648,64 @@ class _NotificationSettingsScreenState
                                       }
                                     },
                             ),
-                            if (_remainingDhikrTime != null) ...[
-                              const SizedBox(height: 16),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: Colors.teal.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.teal.withValues(alpha: 0.2)),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'التذكير القادم خلال:',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.teal,
-                                      ),
+                            ValueListenableBuilder<Duration?>(
+                              valueListenable: _remainingDhikrNotifier,
+                              builder: (context, remainingTime, _) {
+                                if (remainingTime == null) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 16),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.teal.withValues(alpha: 0.05),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                          color: Colors.teal.withValues(alpha: 0.2)),
                                     ),
-                                    Text(
-                                      _formatDuration(_remainingDhikrTime!),
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.teal,
-                                        fontFamily: 'monospace',
-                                      ),
+                                    child: Row(
+                                      children: [
+                                        const Expanded(
+                                          child: Text(
+                                            'التذكير القادم خلال:',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.teal,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            child: Text(
+                                              _formatDuration(remainingTime),
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.teal,
+                                                fontFamily: 'monospace',
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                                  ),
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ),
                     ),
                   const SizedBox(height: 20),
-                  _buildSectionHeader('الأذكار المخصصة'),
+                  _buildSectionHeader(Icons.bookmark_add_rounded, 'الأذكار المخصصة'),
                   Card(
                     elevation: 2,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -645,26 +754,38 @@ class _NotificationSettingsScreenState
                   ),
                   if (!_isAllPermissionsGranted) ...[
                     const SizedBox(height: 20),
-                    _buildSectionHeader('نصيحة لضمان وصول الإشعارات'),
+                    _buildSectionHeader(Icons.verified_user_rounded, 'نصيحة لضمان وصول الإشعارات'),
                     Card(
-                      color: Colors.amber.shade50,
+                      color: isDark
+                          ? Colors.amber.withValues(alpha: 0.12)
+                          : Colors.amber.shade50,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.amber.shade200),
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color: isDark
+                              ? Colors.amber.withValues(alpha: 0.35)
+                              : Colors.amber.shade200,
+                        ),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
                           children: [
-                            const Row(
+                            Row(
                               children: [
-                                Icon(Icons.info_outline, color: Colors.amber),
-                                SizedBox(width: 8),
+                                const Icon(Icons.info_outline,
+                                    color: Colors.amber),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'لضمان استمرار الأذكار حتى عند غلق التطبيق، يرجى تفعيل "التشغيل التلقائي" وإلغاء "قيود البطارية" من إعدادات النظام.',
-                                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isDark
+                                          ? Colors.amber.shade100
+                                          : Colors.black87,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -673,7 +794,6 @@ class _NotificationSettingsScreenState
                             TextButton.icon(
                               onPressed: () async {
                                 await openAppSettings();
-                                // إعادة الفحص بعد العودة من الإعدادات
                                 Future.delayed(const Duration(seconds: 1), () => _checkAllPermissions());
                               },
                               icon: const Icon(Icons.settings_applications),
@@ -685,7 +805,7 @@ class _NotificationSettingsScreenState
                     ),
                   ],
                   const SizedBox(height: 20),
-                  _buildSectionHeader('أدوات سريعة'),
+                  _buildSectionHeader(Icons.build_circle_rounded, 'أدوات واختبارات سريعة'),
                   Card(
                     elevation: 2,
                     shape: RoundedRectangleBorder(
@@ -715,6 +835,31 @@ class _NotificationSettingsScreenState
                                 _isApplying ? null : _testDhikrNotification,
                             icon: const Icon(Icons.auto_awesome),
                             label: const Text('تجربة إشعار ذكر ودعاء'),
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed:
+                                _isApplying ? null : _testSalawatNotification,
+                            icon: const Icon(Icons.favorite_rounded, color: Colors.teal),
+                            label: const Text('تجربة إشعار الصلاة على النبي'),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (_) => const FullAdhanOverlayDialog(
+                                  prayerName: "العَصْر",
+                                  prayerKey: "asr",
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.mosque_rounded, color: Colors.amberAccent),
+                            label: const Text('تجربة شاشة الأذان الفاخرة الكاملة 🕌',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal,
+                            ),
                           ),
                           if (_isApplying) ...[
                             const SizedBox(height: 12),
@@ -812,16 +957,26 @@ class _NotificationSettingsScreenState
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(IconData icon, String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8, right: 4),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Colors.teal,
-        ),
+      padding: const EdgeInsets.only(bottom: 8, right: 4, top: 12),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.teal, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -27,6 +27,18 @@ void overlayMain() {
   runApp(
     MaterialApp(
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        final mediaQuery = MediaQuery.of(context);
+        return MediaQuery(
+          data: mediaQuery.copyWith(
+            textScaler: mediaQuery.textScaler.clamp(
+              minScaleFactor: 0.85,
+              maxScaleFactor: 1.25,
+            ),
+          ),
+          child: child!,
+        );
+      },
       home: StreamBuilder(
         stream: FlutterOverlayWindow.overlayListener,
         builder: (context, snapshot) {
@@ -48,8 +60,8 @@ void main() async {
   // Initialize Supabase
   try {
     await Supabase.initialize(
-      url: 'https://qxllkedwilhpmrcrfeya.supabase.co',
-      publishableKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4bGxrZWR3aWxocG1yY3JmZXlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjIyMzgsImV4cCI6MjA5NzM5ODIzOH0.Fr5QKruw69aHjj4NMJc8uWa4naZgInVfo2yZQF7hld8',
+      url: 'https://kqjqqaqucsbwvlaourqy.supabase.co',
+      publishableKey: 'sb_publishable_xALekfH8optKoUUZkokBFQ_s0rzdW11',
       realtimeClientOptions: const RealtimeClientOptions(
         eventsPerSecond: 2,
       ),

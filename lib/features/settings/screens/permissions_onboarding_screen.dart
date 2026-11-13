@@ -142,7 +142,7 @@ class _PermissionsOnboardingScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            "مينفعش نبدا من غير ما ناخد كل الصلاحيات عشان التطبيق يشتغل صح",
+            "يرجى السماح بكافة الصلاحيات المطلوبة لضمان عمل الأذان والتنبيهات بدقة عالية.",
             style: TextStyle(color: Colors.white),
           ),
           backgroundColor: Colors.red,
@@ -177,8 +177,11 @@ class _PermissionsOnboardingScreenState
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor:
+          isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF6F7FB),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -186,15 +189,19 @@ class _PermissionsOnboardingScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 20),
-              Icon(Icons.security, size: 80, color: Colors.teal.shade800),
+              Icon(
+                Icons.security,
+                size: 80,
+                color: isDark ? Colors.tealAccent.shade400 : Colors.teal.shade800,
+              ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 "إعداد التطبيق",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: isDark ? Colors.white : Colors.black87,
                 ),
               ),
               const SizedBox(height: 10),
@@ -203,7 +210,7 @@ class _PermissionsOnboardingScreenState
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey[600],
+                  color: isDark ? Colors.white70 : Colors.grey[600],
                 ),
               ),
               const SizedBox(height: 40),
@@ -215,14 +222,17 @@ class _PermissionsOnboardingScreenState
                       description: "لتلقي تنبيهات الأذان والأذكار في مواعيدها.",
                       icon: Icons.notifications_active,
                       status: _notificationStatus,
+                      isDark: isDark,
                       onTap: () => _requestPermission(Permission.notification),
                     ),
                     const SizedBox(height: 16),
                     _buildPermissionCard(
                       title: "الموقع الجغرافي",
-                      description: "لحساب مواقيت الصلاة والقبلة بدقة لمكانك الحالي.",
+                      description:
+                          "لحساب مواقيت الصلاة والقبلة بدقة لمكانك الحالي.",
                       icon: Icons.location_on,
                       status: _locationStatus,
+                      isDark: isDark,
                       onTap: () =>
                           _requestPermission(Permission.locationWhenInUse),
                     ),
@@ -230,30 +240,38 @@ class _PermissionsOnboardingScreenState
                       const SizedBox(height: 16),
                       _buildPermissionCard(
                         title: "المنبه الدقيق",
-                        description: "لضمان انطلاق صوت الأذان في الوقت المحدد تماماً.",
+                        description:
+                            "لضمان انطلاق صوت الأذان في الوقت المحدد تماماً.",
                         icon: Icons.alarm,
                         status: _exactAlarmStatus,
+                        isDark: isDark,
                         onTap: () =>
                             _requestPermission(Permission.scheduleExactAlarm),
                       ),
                       const SizedBox(height: 16),
                       _buildPermissionCard(
                         title: "إلغاء قيود البطارية",
-                        description: "لضمان استمرار عمل التنبيهات والأذكار دون توقف في الخلفية.",
+                        description:
+                            "لضمان استمرار عمل التنبيهات والأذكار دون توقف في الخلفية.",
                         icon: Icons.battery_charging_full,
                         status: _ignoreBatteryStatus,
-                        onTap: () =>
-                            _requestPermission(Permission.ignoreBatteryOptimizations),
+                        isDark: isDark,
+                        onTap: () => _requestPermission(
+                            Permission.ignoreBatteryOptimizations),
                       ),
                       const SizedBox(height: 16),
                       _buildPermissionCard(
                         title: "الظهور فوق التطبيقات",
-                        description: "لعرض الأذكار العائمة على الشاشة أثناء استخدامك للهاتف.",
+                        description:
+                            "لعرض الأذكار العائمة على الشاشة أثناء استخدامك للهاتف.",
                         icon: Icons.layers,
                         status: _overlayStatus,
+                        isDark: isDark,
                         onTap: () =>
                             _requestPermission(Permission.systemAlertWindow),
                       ),
+                      const SizedBox(height: 16),
+                      _buildGuideCard(isDark),
                     ],
                   ],
                 ),
@@ -283,11 +301,156 @@ class _PermissionsOnboardingScreenState
     );
   }
 
+  Widget _buildGuideCard(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.orange.withValues(alpha: 0.12)
+            : Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.orange.withValues(alpha: 0.35)
+              : Colors.orange.shade200,
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 300;
+          final button = TextButton(
+            onPressed: _showLockGuideDialog,
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.orange,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text(
+              "كيف؟",
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          );
+
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      color: isDark ? Colors.orange.shade300 : Colors.orange.shade800,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "تأمين التطبيق (Lock App)",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? Colors.orange.shade200
+                              : Colors.orange.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "اضغط هنا لتعرف كيف تمنع النظام من إغلاق الأذان تلقائياً.",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white70 : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: button,
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Icon(
+                Icons.lock_outline,
+                color: isDark ? Colors.orange.shade300 : Colors.orange.shade800,
+                size: 28,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "تأمين التطبيق (Lock App)",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark
+                            ? Colors.orange.shade200
+                            : Colors.orange.shade900,
+                      ),
+                    ),
+                    Text(
+                      "اضغط هنا لتعرف كيف تمنع النظام من إغلاق الأذان تلقائياً.",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              button,
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showLockGuideDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("كيفية قفل التطبيق في المهام"),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("1. افتح قائمة التطبيقات الأخيرة (المهام)."),
+              Text("2. اضغط مطولاً على أيقونة تطبيق 'رفيق المسلم'."),
+              Text("3. اضغط على علامة القفل (Lock) 🔒."),
+              SizedBox(height: 10),
+              Text(
+                "ملاحظة: هذا يضمن بقاء الأذان والأذكار قيد العمل حتى لو قمت بتنظيف الرامات.",
+                style: TextStyle(fontSize: 12, color: Colors.red),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text("فهمت")),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPermissionCard({
     required String title,
     required String description,
     required IconData icon,
     required PermissionStatus status,
+    required bool isDark,
     required VoidCallback onTap,
   }) {
     final bool isGranted = status.isGranted;
@@ -295,77 +458,160 @@ class _PermissionsOnboardingScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color:
-            isGranted ? const Color(0xFFE3F2FD) : Colors.grey[50], // Blue shade
+        color: isGranted
+            ? (isDark
+                ? Colors.teal.withValues(alpha: 0.15)
+                : const Color(0xFFE3F2FD))
+            : (isDark ? const Color(0xFF161616) : Colors.white),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isGranted ? const Color(0xFF1565C0) : Colors.grey[300]!,
+          color: isGranted
+              ? (isDark
+                  ? Colors.tealAccent.withValues(alpha: 0.5)
+                  : const Color(0xFF1565C0))
+              : (isDark ? Colors.white12 : Colors.grey[300]!),
           width: isGranted ? 1.5 : 1,
         ),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isGranted
-                  ? const Color(0xFFBBDEFB)
-                  : Colors.grey[200], // Blue shade
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: isGranted ? Colors.teal : Colors.grey[600],
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 300;
+          final actionWidget = !isGranted
+              ? TextButton(
+                  onPressed: onTap,
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text(
+                    "تفعيل",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                )
+              : Icon(
+                  Icons.check_circle,
+                  color: isDark ? Colors.tealAccent : Colors.teal,
+                  size: 28,
+                );
+
+          if (isNarrow) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isGranted ? Colors.teal[800] : Colors.black87,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isGranted
+                            ? (isDark
+                                ? Colors.teal.withValues(alpha: 0.25)
+                                : const Color(0xFFBBDEFB))
+                            : (isDark ? Colors.white10 : Colors.grey[200]),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        color: isGranted
+                            ? (isDark ? Colors.tealAccent : Colors.teal)
+                            : (isDark ? Colors.white70 : Colors.grey[600]),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isGranted
+                              ? (isDark
+                                  ? Colors.tealAccent.shade100
+                                  : Colors.teal[800])
+                              : (isDark ? Colors.white : Colors.black87),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Text(
                   description,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: isDark ? Colors.white60 : Colors.grey[600],
                   ),
                 ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: actionWidget,
+                ),
               ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (!isGranted)
-            TextButton(
-              onPressed: onTap,
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.teal,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text(
-                "تفعيل",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+            );
+          }
+
+          return Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isGranted
+                      ? (isDark
+                          ? Colors.teal.withValues(alpha: 0.25)
+                          : const Color(0xFFBBDEFB))
+                      : (isDark ? Colors.white10 : Colors.grey[200]),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: isGranted
+                      ? (isDark ? Colors.tealAccent : Colors.teal)
+                      : (isDark ? Colors.white70 : Colors.grey[600]),
+                  size: 24,
                 ),
               ),
-            )
-          else
-            const Icon(Icons.check_circle, color: Colors.teal, size: 28),
-        ],
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isGranted
+                            ? (isDark
+                                ? Colors.tealAccent.shade100
+                                : Colors.teal[800])
+                            : (isDark ? Colors.white : Colors.black87),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white60 : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              actionWidget,
+            ],
+          );
+        },
       ),
     );
   }

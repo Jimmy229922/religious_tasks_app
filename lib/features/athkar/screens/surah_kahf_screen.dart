@@ -63,6 +63,8 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
@@ -78,7 +80,8 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
         child: Scaffold(
           appBar: AppBar(
             title: const Text("القرآن الكريم"),
-            backgroundColor: const Color(0xFF1E5128),
+            backgroundColor:
+                isDark ? const Color(0xFF121A15) : const Color(0xFF1E5128),
             foregroundColor: Colors.white,
             actions: [
               IconButton(
@@ -97,11 +100,14 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
               // مؤشر التحميل يختفي بمجرد انتهاء التحميل
               if (_isLoading)
                 Container(
-                  color: Colors
-                      .white, // خلفية بيضاء تغطي المحتوى أثناء التحميل النظيف
-                  child: const Center(
-                      child:
-                          CircularProgressIndicator(color: Color(0xFF1E5128))),
+                  color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: isDark
+                          ? const Color(0xFF4ADE80)
+                          : const Color(0xFF1E5128),
+                    ),
+                  ),
                 ),
             ],
           ),

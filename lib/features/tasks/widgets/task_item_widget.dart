@@ -53,99 +53,135 @@ class TaskItemWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
                 color: accent.withValues(alpha: isDark ? 0.22 : 0.18)),
+            boxShadow: isDark
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 6,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: accent,
-                  borderRadius: BorderRadius.circular(999),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 6,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: isDark ? 0.2 : 0.12),
-                  shape: BoxShape.circle,
+                const SizedBox(width: 12),
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: isDark ? 0.2 : 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: accent, size: 22),
                 ),
-                child: Icon(icon, color: accent, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        task.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          decoration: task.isCompleted
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: task.isCompleted ? textMuted : textPrimary,
+                        ),
+                      ),
+                      if (subtitleWidget != null) ...[
+                        const SizedBox(height: 6),
+                        subtitleWidget,
+                      ],
+                    ],
+                  ),
+                ),
+                Column(
                   children: [
-                    Text(
-                      task.name,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        decoration: task.isCompleted
-                            ? TextDecoration.lineThrough
+                    GestureDetector(
+                      onTap: onTap,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: task.isCompleted ? accent : Colors.transparent,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: task.isCompleted
+                                ? accent
+                                : accent.withValues(alpha: 0.5),
+                            width: 2,
+                          ),
+                        ),
+                        child: task.isCompleted
+                            ? const Icon(Icons.check,
+                                color: Colors.white, size: 16)
                             : null,
-                        color: task.isCompleted ? textMuted : textPrimary,
                       ),
                     ),
-                    if (subtitleWidget != null) ...[
-                      const SizedBox(height: 6),
-                      subtitleWidget,
+                    if (isCounterTask) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: isDark ? 0.2 : 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          "${task.currentCount}/${task.targetCount}",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: accent,
+                              fontSize: 11),
+                        ),
+                      ),
+                    ] else if (isProphetPrayer) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color:
+                                  accent.withValues(alpha: isDark ? 0.2 : 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              "${task.currentCount}/200",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: accent,
+                                  fontSize: 11),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.arrow_forward_ios,
+                              size: 14, color: textMuted),
+                        ],
+                      ),
+                    ] else if (isAthkar) ...[
+                      const SizedBox(height: 8),
+                      Icon(Icons.arrow_forward_ios, size: 14, color: textMuted),
                     ],
                   ],
                 ),
-              ),
-              Column(
-                children: [
-                  GestureDetector(
-                    onTap: onTap,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: task.isCompleted ? accent : Colors.transparent,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: task.isCompleted
-                              ? accent
-                              : accent.withValues(alpha: 0.5),
-                          width: 2,
-                        ),
-                      ),
-                      child: task.isCompleted
-                          ? const Icon(Icons.check,
-                              color: Colors.white, size: 16)
-                          : null,
-                    ),
-                  ),
-                  if (isCounterTask) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: isDark ? 0.2 : 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        "${task.currentCount}/${task.targetCount}",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: accent,
-                            fontSize: 11),
-                      ),
-                    ),
-                  ] else if (isProphetPrayer || isAthkar) ...[
-                    const SizedBox(height: 8),
-                    Icon(Icons.arrow_forward_ios, size: 14, color: textMuted),
-                  ],
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -202,11 +238,12 @@ class TaskItemWidget extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 )),
             const SizedBox(height: 6),
-            Row(
-              mainAxisSize: MainAxisSize.min,
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              runSpacing: 2,
               children: [
                 Icon(Icons.access_time_filled, size: 14, color: countdownColor),
-                const SizedBox(width: 4),
                 Directionality(
                   textDirection: TextDirection.ltr,
                   child: Text("$hours:$minutes:$seconds",
@@ -216,7 +253,6 @@ class TaskItemWidget extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontFamily: 'Roboto')),
                 ),
-                const SizedBox(width: 4),
                 Text(AppStrings.remaining,
                     style: TextStyle(color: countdownColor, fontSize: 10)),
               ],
@@ -224,6 +260,23 @@ class TaskItemWidget extends StatelessWidget {
           ],
         );
       }
+    }
+
+    if (task.name.contains(kProphetPrayer)) {
+      final remaining = (200 - task.currentCount).clamp(0, 200);
+      final subtitleText = task.currentCount > 0
+          ? (remaining > 0
+              ? "${task.currentCount} من 200 (متبقي $remaining)"
+              : "مكتمل 🎉 (200 من 200)")
+          : AppStrings.count200;
+      return Text(
+        subtitleText,
+        style: TextStyle(
+          color: task.currentCount > 0 ? accent : textMuted,
+          fontWeight:
+              task.currentCount > 0 ? FontWeight.bold : FontWeight.normal,
+        ),
+      );
     }
 
     if (task.description.isNotEmpty) {

@@ -14,80 +14,85 @@ class ProfessionalClockDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
-      child: StreamBuilder(
-        stream: Stream.periodic(const Duration(seconds: 1)),
-        builder: (context, snapshot) {
-          final now = DateTime.now();
-          final hour = intl.DateFormat('hh', 'ar').format(now);
-          final minute = intl.DateFormat('mm', 'ar').format(now);
-          final second = intl.DateFormat('ss', 'ar').format(now);
-          final amPm = intl.DateFormat('a', 'ar').format(now);
+      child: SingleChildScrollView(
+        child: StreamBuilder(
+          stream: Stream.periodic(const Duration(seconds: 1)),
+          builder: (context, snapshot) {
+            final now = DateTime.now();
+            final hour = intl.DateFormat('hh', 'ar').format(now);
+            final minute = intl.DateFormat('mm', 'ar').format(now);
+            final second = intl.DateFormat('ss', 'ar').format(now);
+            final amPm = intl.DateFormat('a', 'ar').format(now);
 
-          return Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                  color: isDark
-                      ? Colors.tealAccent.withValues(alpha: 0.3)
-                      : Colors.teal.shade200,
-                  width: 2),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "الوقت الآن",
-                  style: GoogleFonts.cairo(
-                    color: isDark ? Colors.white70 : Colors.teal[800],
-                    fontSize: 16,
+            return Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                    color: isDark
+                        ? Colors.tealAccent.withValues(alpha: 0.3)
+                        : Colors.teal.shade200,
+                    width: 2),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "الوقت الآن",
+                    style: GoogleFonts.cairo(
+                      color: isDark ? Colors.white70 : Colors.teal[800],
+                      fontSize: 16,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                // Digital Clock Row
-                Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildDigitBox(hour, isDark),
-                      _buildColon(isDark),
-                      _buildDigitBox(minute, isDark),
-                      _buildColon(isDark),
-                      _buildDigitBox(second, isDark, isSeconds: true),
-                    ],
+                  const SizedBox(height: 20),
+                  // Digital Clock Row
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildDigitBox(hour, isDark),
+                          _buildColon(isDark),
+                          _buildDigitBox(minute, isDark),
+                          _buildColon(isDark),
+                          _buildDigitBox(second, isDark, isSeconds: true),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  amPm,
-                  style: GoogleFonts.ibmPlexMono(
-                    color: isDark ? Colors.tealAccent : Colors.teal[900],
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(height: 12),
+                  Text(
+                    amPm,
+                    style: GoogleFonts.ibmPlexMono(
+                      color: isDark ? Colors.tealAccent : Colors.teal[900],
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 32, vertical: 12),
-                  ),
-                  child: Text("إغلاق",
-                      style: GoogleFonts.cairo(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
-                )
-              ],
-            ),
-          );
-        },
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 12),
+                    ),
+                    child: Text("إغلاق",
+                        style: GoogleFonts.cairo(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
+                  )
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

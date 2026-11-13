@@ -76,18 +76,23 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
   }
 
   void _showCompletionDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF2C3E50),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title:
-            const Icon(Icons.check_circle, color: Colors.greenAccent, size: 50),
-        content: const Text(
+        title: Icon(Icons.check_circle,
+            color: isDark ? Colors.greenAccent : Colors.green, size: 50),
+        content: Text(
           "تقبل الله منك! أتممت حلقة الذكر.",
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white, fontSize: 18),
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            fontSize: 18,
+          ),
         ),
         actions: [
           TextButton(
@@ -95,7 +100,9 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
               Navigator.pop(ctx); // Close dialog
               Navigator.pop(context); // Close screen
             },
-            child: const Text("تم", style: TextStyle(color: Colors.white)),
+            child: Text("تم",
+                style: TextStyle(
+                    color: isDark ? Colors.white70 : Colors.grey[700])),
           ),
           TextButton(
             onPressed: () {
@@ -104,8 +111,10 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
                 _startNewSession(); // Restart
               });
             },
-            child: const Text("حلقة جديدة",
-                style: TextStyle(color: Colors.tealAccent)),
+            child: Text("حلقة جديدة",
+                style: TextStyle(
+                    color: isDark ? Colors.tealAccent : Colors.teal[700],
+                    fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -119,8 +128,12 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("حلقة الذكر",
-            style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'ArefRuqaa')),
+            style:
+                TextStyle(fontWeight: FontWeight.bold, fontFamily: 'ArefRuqaa')),
         backgroundColor: Colors.transparent,
+        foregroundColor: isDark ? Colors.white : const Color(0xFF004D40),
+        systemOverlayStyle:
+            isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         elevation: 0,
         centerTitle: true,
       ),

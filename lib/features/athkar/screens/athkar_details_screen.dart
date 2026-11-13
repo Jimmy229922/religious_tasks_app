@@ -2,12 +2,14 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../data/athkar_data.dart';
 import '../models/dhikr_item.dart';
 import 'package:religious_tasks_app/core/services/athkar_tracking_service.dart';
 import 'package:religious_tasks_app/core/services/storage_service.dart';
 import 'package:religious_tasks_app/core/services/audio_service.dart';
+import 'package:religious_tasks_app/features/athkar/models/athkar_time_helper.dart';
 import '../widgets/dhikr_card.dart';
 import '../widgets/details/athkar_header.dart';
 import '../widgets/details/athkar_controls.dart';
@@ -42,7 +44,8 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   bool _showCompleted = false;
   bool _focusMode = false;
   bool _isNightMode = false;
-  bool _themeInitialized = false;
+  bool _manualThemeOverride = false;
+  bool _hasCelebrated = false;
   ThemeData? _cachedTheme;
   int _focusIndex = 0;
   double _fontScale = 1.0;
@@ -74,22 +77,26 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_themeInitialized) {
-      _isNightMode = Theme.of(context).brightness == Brightness.dark;
+    final globalIsDark = Theme.of(context).brightness == Brightness.dark;
+    if (!_manualThemeOverride &&
+        (_cachedTheme == null || _isNightMode != globalIsDark)) {
+      _isNightMode = globalIsDark;
       _updateCachedTheme();
-      _themeInitialized = true;
     }
   }
 
   void _updateCachedTheme() {
-    _cachedTheme = _isNightMode
-        ? ThemeData.dark().copyWith(
-            scaffoldBackgroundColor: Colors.black,
-            appBarTheme: const AppBarTheme(backgroundColor: Colors.black),
-          )
-        : ThemeData.light().copyWith(
-            scaffoldBackgroundColor: const Color(0xFFFAFAFA),
-          );
+    final baseTheme = _isNightMode
+        ? ThemeData.dark(useMaterial3: true)
+        : ThemeData.light(useMaterial3: true);
+    _cachedTheme = baseTheme.copyWith(
+      textTheme: GoogleFonts.cairoTextTheme(baseTheme.textTheme),
+      scaffoldBackgroundColor:
+          _isNightMode ? Colors.black : const Color(0xFFFAFAFA),
+      appBarTheme: _isNightMode
+          ? const AppBarTheme(backgroundColor: Colors.black)
+          : null,
+    );
   }
 
   @override
@@ -108,6 +115,14 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
 
     await _audioService.stop();
     setState(() => _playingIndex = index);
+
+    if (_scrollController.hasClients && !_focusMode) {
+      _scrollController.animateTo(
+        (index * 220.0).clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    }
 
     await _audioService.speak(item.text, onCompletion: () {
       if (mounted) setState(() => _playingIndex = null);
@@ -254,6 +269,70 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
     );
   }
 
+  void _checkCelebration() {
+    if (_allDone && !_hasCelebrated) {
+      _hasCelebrated = true;
+      AthkarTrackingService.markCompleted(isMorning: widget.isMorning);
+
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.emoji_events_rounded,
+                  color: Colors.amber, size: 32),
+              const SizedBox(width: 8),
+              Text(
+                "هنيئاً لك الإتمام! 🎉",
+                style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "أتممت أذكار ${widget.title} بحمد الله وتوفيقه ✨",
+                textAlign: TextAlign.center,
+                style:
+                    GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "وسام حافظ الأذكار 🎖️\n«أَفَلا أُنَبِّئُكُمْ بِخَيْرِ أَعْمَالِكُمْ وَأَزْكَاهَا عِنْدَ مَلِيكِكُمْ... ذِكْرُ اللَّهِ»",
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.amiri(
+                      fontSize: 14, height: 1.6, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            Center(
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                child: const Text("الحمد لله 🤲",
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   void _increment(int index) {
     if (index < 0 || index >= _visibleAthkar.length) return;
     final item = _visibleAthkar[index];
@@ -261,7 +340,6 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
 
     HapticFeedback.lightImpact();
 
-    // Prevent double tapping causing double scheduling
     if (_removingItems.contains(item)) return;
 
     setState(() {
@@ -275,24 +353,21 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
         _scheduleRemovalSequence(item);
       }
     }
+
+    _checkCelebration();
   }
 
   void _scheduleRemovalSequence(DhikrItem item) async {
-    // For Focus Mode, we want seamless transition A -> B.
-    // relying on AnimatedSwitcher to handle the swap.
     if (_focusMode) {
-      // Short delay just to see the "final count" for a split second
       await Future.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
       setState(() {
         _visibleAthkar.remove(item);
-        // Ensure index is valid
         _focusIndex = _clampFocusIndex(_focusIndex, _visibleAthkar.length);
       });
       return;
     }
 
-    // List Mode: We use the "Removing" state to collapse the item gracefully.
     if (!mounted) return;
 
     setState(() {
@@ -339,6 +414,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
 
   void _toggleTheme() {
     setState(() {
+      _manualThemeOverride = true;
       _isNightMode = !_isNightMode;
       _updateCachedTheme();
     });
@@ -354,7 +430,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
       transitionBuilder: (child, animation) {
         return SizeTransition(
           sizeFactor: animation,
-          alignment: Alignment.topCenter,
+          alignment: AlignmentDirectional.topStart,
           child: FadeTransition(
             opacity: animation,
             child: SlideTransition(
@@ -412,7 +488,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
               opacity: animation,
               child: SizeTransition(
                 sizeFactor: animation,
-                alignment: Alignment.topCenter,
+                alignment: AlignmentDirectional.topStart,
                 child: ScaleTransition(
                   scale: Tween<double>(begin: 0.8, end: 1.0).animate(animation),
                   child: child,
@@ -458,6 +534,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
         controller: _scrollController,
         padding: const EdgeInsets.all(12),
         children: [
+          _buildTimeWindowBannerIfNeeded(),
           AthkarHeader(
             title: widget.title,
             isMorning: widget.isMorning,
@@ -489,6 +566,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
         controller: _scrollController,
         padding: const EdgeInsets.all(12),
         children: [
+          _buildTimeWindowBannerIfNeeded(),
           AthkarHeader(
             title: widget.title,
             isMorning: widget.isMorning,
@@ -562,6 +640,45 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
     );
   }
 
+  Widget _buildTimeWindowBannerIfNeeded() {
+    final now = DateTime.now();
+    final isActive = widget.isMorning
+        ? AthkarTimeHelper.isMorningWindow(now)
+        : AthkarTimeHelper.isEveningWindow(now);
+
+    if (isActive) return const SizedBox.shrink();
+
+    final text = widget.isMorning
+        ? 'تنويه: تصفح أذكار الصباح خارج وقتها المخصص (موعدها الفجر - الظهر)'
+        : 'تنويه: تصفح أذكار المساء خارج وقتها المخصص (موعدها العصر - الليل)';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: _isNightMode ? Colors.amber.shade200 : Colors.amber.shade900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _resetProgress() {
     showDialog(
       context: context,
@@ -577,6 +694,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
                 for (var item in _allAthkar) {
                   item.current = 0;
                 }
+                _hasCelebrated = false;
                 _removingItems.clear();
                 _visibleAthkar = _filterVisible(_allAthkar);
                 _focusIndex = 0;
@@ -600,26 +718,34 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
 
         final appBarColor = isDark
             ? Colors.black
-            : (widget.isMorning
-                ? const Color(0xFF2E7D32)
-                : const Color(0xFF3949AB));
+            : (widget.title == "أذكار النوم"
+                ? const Color(0xFF0F172A)
+                : (widget.isMorning
+                    ? const Color(0xFF2E7D32)
+                    : const Color(0xFF3949AB)));
 
         final background = isDark
             ? null
             : LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: widget.isMorning
+                colors: widget.title == "أذكار النوم"
                     ? const [
-                        Color(0xFFF9FCF6),
-                        Color(0xFFEAF4EC),
-                        Color(0xFFF3F6FF)
+                        Color(0xFF0F172A),
+                        Color(0xFF1E293B),
+                        Color(0xFF0F172A)
                       ]
-                    : const [
-                        Color(0xFFF4F6FF),
-                        Color(0xFFE9EDFF),
-                        Color(0xFFF9FAFF)
-                      ],
+                    : (widget.isMorning
+                        ? const [
+                            Color(0xFFFFFBEB),
+                            Color(0xFFFEF3C7),
+                            Color(0xFFFFFBEB)
+                          ]
+                        : const [
+                            Color(0xFFEEF2FF),
+                            Color(0xFFE0E7FF),
+                            Color(0xFFEEF2FF)
+                          ]),
               );
 
         return PopScope(

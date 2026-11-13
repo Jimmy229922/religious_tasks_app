@@ -14,6 +14,8 @@ class NotificationPreferences {
   final int hourlyDhikrIntervalMinutes;
   final bool floatingDhikrEnabled;
   final String selectedMoazzenId;
+  final bool salawatReminderEnabled;
+  final int salawatIntervalMinutes;
 
   const NotificationPreferences({
     required this.adhanEnabled,
@@ -25,6 +27,8 @@ class NotificationPreferences {
     required this.hourlyDhikrIntervalMinutes,
     required this.floatingDhikrEnabled,
     required this.selectedMoazzenId,
+    required this.salawatReminderEnabled,
+    required this.salawatIntervalMinutes,
   });
 
   factory NotificationPreferences.defaults() {
@@ -52,6 +56,8 @@ class NotificationPreferences {
       hourlyDhikrIntervalMinutes: 10,
       floatingDhikrEnabled: false,
       selectedMoazzenId: 'default',
+      salawatReminderEnabled: true,
+      salawatIntervalMinutes: 15,
     );
   }
 
@@ -65,6 +71,8 @@ class NotificationPreferences {
     int? hourlyDhikrIntervalMinutes,
     bool? floatingDhikrEnabled,
     String? selectedMoazzenId,
+    bool? salawatReminderEnabled,
+    int? salawatIntervalMinutes,
   }) {
     return NotificationPreferences(
       adhanEnabled: adhanEnabled ?? this.adhanEnabled,
@@ -79,6 +87,10 @@ class NotificationPreferences {
           hourlyDhikrIntervalMinutes ?? this.hourlyDhikrIntervalMinutes,
       floatingDhikrEnabled: floatingDhikrEnabled ?? this.floatingDhikrEnabled,
       selectedMoazzenId: selectedMoazzenId ?? this.selectedMoazzenId,
+      salawatReminderEnabled:
+          salawatReminderEnabled ?? this.salawatReminderEnabled,
+      salawatIntervalMinutes:
+          salawatIntervalMinutes ?? this.salawatIntervalMinutes,
     );
   }
 

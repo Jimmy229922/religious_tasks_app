@@ -106,11 +106,17 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
     stepsPassed += _currentCount;
     final overallProgress = totalSteps == 0 ? 0.0 : stepsPassed / totalSteps;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accentColor =
+        isDark ? const Color(0xFFE94560) : const Color(0xFF0F766E);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E), // Dark theme default
+      backgroundColor:
+          isDark ? const Color(0xFF1A1A2E) : const Color(0xFFF6F7FB),
       appBar: AppBar(
         title: const Text("حلقة ذكر"),
         backgroundColor: Colors.transparent,
+        foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
         elevation: 0,
         centerTitle: true,
       ),
@@ -119,16 +125,16 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
           // Top Progress Bar
           LinearProgressIndicator(
             value: overallProgress,
-            backgroundColor: Colors.white10,
-            color: const Color(0xFFE94560),
+            backgroundColor: isDark ? Colors.white10 : Colors.black12,
+            color: accentColor,
             minHeight: 6,
           ),
 
           Expanded(
             child: Center(
               child: _isCompleted
-                  ? _buildCompletionView()
-                  : _buildCounterView(text, target),
+                  ? _buildCompletionView(isDark)
+                  : _buildCounterView(text, target, isDark, accentColor),
             ),
           ),
         ],
@@ -136,7 +142,8 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
     );
   }
 
-  Widget _buildCounterView(String text, int target) {
+  Widget _buildCounterView(
+      String text, int target, bool isDark, Color accentColor) {
     return GestureDetector(
       onTap: _handleTap,
       behavior: HitTestBehavior.opaque, // Tap anywhere
@@ -145,7 +152,10 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
         children: [
           Text(
             "الذكر ${_currentIndex + 1} من ${_loopItems.length}",
-            style: const TextStyle(color: Colors.white54, fontSize: 16),
+            style: TextStyle(
+              color: isDark ? Colors.white54 : const Color(0xFF64748B),
+              fontSize: 16,
+            ),
           ),
           const SizedBox(height: 30),
           ScaleTransition(
@@ -154,11 +164,14 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
               padding: const EdgeInsets.all(40),
               decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF16213E).withValues(alpha: 0.5),
-                  border: Border.all(color: const Color(0xFFE94560), width: 2),
+                  color: isDark
+                      ? const Color(0xFF16213E).withValues(alpha: 0.5)
+                      : Colors.white,
+                  border: Border.all(color: accentColor, width: 2.5),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFE94560).withValues(alpha: 0.3),
+                      color:
+                          accentColor.withValues(alpha: isDark ? 0.3 : 0.15),
                       blurRadius: 20,
                       spreadRadius: 5,
                     )
@@ -168,8 +181,9 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
                   Text(
                     text,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: Colors.white,
+                    style: TextStyle(
+                        color:
+                            isDark ? Colors.white : const Color(0xFF0F172A),
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
                         height: 1.3),
@@ -177,8 +191,8 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
                   const SizedBox(height: 20),
                   Text(
                     "$_currentCount / $target",
-                    style: const TextStyle(
-                      color: Color(0xFFE94560),
+                    style: TextStyle(
+                      color: accentColor,
                       fontSize: 40,
                       fontWeight: FontWeight.bold,
                     ),
@@ -188,32 +202,38 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
             ),
           ),
           const SizedBox(height: 50),
-          const Text(
+          Text(
             "اضغط للشاشة للعد",
-            style: TextStyle(color: Colors.white30),
+            style: TextStyle(
+              color: isDark ? Colors.white30 : const Color(0xFF94A3B8),
+            ),
           )
         ],
       ),
     );
   }
 
-  Widget _buildCompletionView() {
+  Widget _buildCompletionView(bool isDark) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.check_circle_outline,
-            color: Colors.greenAccent, size: 80),
+        Icon(Icons.check_circle_outline,
+            color: isDark ? Colors.greenAccent : const Color(0xFF16A34A),
+            size: 80),
         const SizedBox(height: 20),
-        const Text(
+        Text(
           "اكتملت الحلقة المباركة",
           style: TextStyle(
-              color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+              fontSize: 24,
+              fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 30),
         ElevatedButton(
           onPressed: () => Navigator.pop(context),
           style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white10,
+              backgroundColor:
+                  isDark ? Colors.white10 : const Color(0xFF0F766E),
               padding:
                   const EdgeInsets.symmetric(horizontal: 30, vertical: 12)),
           child: const Text("عودة", style: TextStyle(color: Colors.white)),
@@ -221,8 +241,9 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
         const SizedBox(height: 10),
         TextButton(
           onPressed: _reset,
-          child: const Text("بدء مرة أخرى",
-              style: TextStyle(color: Colors.white70)),
+          child: Text("بدء مرة أخرى",
+              style: TextStyle(
+                  color: isDark ? Colors.white70 : const Color(0xFF0F766E))),
         )
       ],
     );

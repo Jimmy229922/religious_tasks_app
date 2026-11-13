@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/constants/app_constants.dart';
 import '../../tasks/screens/tasks_screen.dart';
@@ -22,9 +22,9 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   String _version = '';
-  String _dailyQuote = '';
+  late final String _dailyQuote;
 
-  final List<String> _quotes = [
+  static const List<String> _quotes = [
     'وَقُل رَّبِّ زِدْنِي عِلْمًا',
     'فَاذْكُرُونِي أَذْكُرْكُمْ',
     'أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ',
@@ -38,42 +38,35 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     debugPrint("🚀 Splash Screen Init Started");
-    
-    // Remove the native splash immediately to reveal our Flutter Mosque splash
-    // This prevents the "grey" native screen from staying too long
-    FlutterNativeSplash.remove();
+    _dailyQuote = _quotes[Random().nextInt(_quotes.length)];
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FlutterNativeSplash.remove();
+    });
 
     _loadVersion();
-    _picksRandomQuote();
     _checkOnboardingAndNavigate();
   }
 
-  void _picksRandomQuote() {
-    setState(() {
-      _dailyQuote = _quotes[Random().nextInt(_quotes.length)];
-    });
-  }
-
   Future<void> _loadVersion() async {
-    final packageInfo = await PackageInfo.fromPlatform();
-    setState(() {
-      _version = 'v${packageInfo.version}';
-    });
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _version = 'v${packageInfo.version}';
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkOnboardingAndNavigate() async {
     try {
-      // 1. Start initialization tasks
-      final initFuture = AppNotificationService().init().timeout(const Duration(seconds: 10));
-      
-      // 2. Load preferences
       final prefsFuture = SharedPreferences.getInstance();
+      final minDelayFuture = Future.delayed(const Duration(milliseconds: 1200));
 
-      // 3. Wait for necessary tasks, but don't block forever if something fails
       await Future.wait([
-        initFuture.catchError((e) => debugPrint("Notification init timed out or failed: $e")),
         prefsFuture,
-        Future.delayed(const Duration(seconds: 3)),
+        minDelayFuture,
       ]);
 
       if (!mounted) return;
@@ -87,24 +80,26 @@ class _SplashScreenState extends State<SplashScreen> {
       if (onboardingCompleted) {
         _navigateToHome();
       } else {
-        // Check if all permissions are already granted
         bool allGranted = await _areAllPermissionsGranted().catchError((e) => false);
         if (allGranted) {
-          // Mark as completed silently and go home
           await prefs.setBool('onboarding_completed', true);
           _navigateToHome();
         } else {
           if (!mounted) return;
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const PermissionsOnboardingScreen()),
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const PermissionsOnboardingScreen(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 350),
+            ),
           );
         }
       }
     } catch (e) {
       debugPrint("Fatal error in Splash Screen: $e");
-      // If anything fails, try to navigate home anyway to not leave the user stuck
       _navigateToHome();
     }
   }
@@ -129,82 +124,206 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _navigateToHome() {
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-          builder: (context) =>
-              TasksScreen(themeProvider: widget.themeProvider)),
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            TasksScreen(themeProvider: widget.themeProvider),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final gradientColors = isDark
+        ? const [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)]
+        : const [Color(0xFFF0FDFA), Color(0xFFE0F2F1), Color(0xFFCCFBF1)];
+    final titleColor = isDark ? Colors.white : const Color(0xFF0F3D3E);
+    final subtitleColor = isDark
+        ? Colors.white.withValues(alpha: 0.9)
+        : const Color(0xFF115E59);
+    final mutedColor = isDark
+        ? Colors.white.withValues(alpha: 0.75)
+        : const Color(0xFF334155);
+
     return Scaffold(
       body: SizedBox.expand(
         child: DecoratedBox(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF1565C0), Color(0xFF64B5F6)],
+              colors: gradientColors,
             ),
           ),
           child: SafeArea(
             child: Padding(
               padding:
-                  const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16),
+                  const EdgeInsets.symmetric(vertical: 24.0, horizontal: 20),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 10),
+                  
+                  // Center Logo & Title Block
                   Column(
                     children: [
-                      const Icon(Icons.mosque, size: 100, color: Colors.white),
-                      const SizedBox(height: 20),
-                      const Text(
-                        kAppName,
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        width: 152,
+                        height: 152,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
                           color: Colors.white,
+                          border: Border.all(
+                            color: const Color(0xFFD4AF37), // Metallic Gold
+                            width: 2.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black
+                                  .withValues(alpha: isDark ? 0.3 : 0.1),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                            BoxShadow(
+                              color: const Color(0xFFD4AF37)
+                                  .withValues(alpha: 0.3),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: ColoredBox(
+                            color: Colors.white,
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Image.asset(
+                                'assets/icon/app_icon.png',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      Text(
+                        kAppName,
+                        style: GoogleFonts.arefRuqaa(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: titleColor,
+                          shadows: isDark
+                              ? const [
+                                  Shadow(
+                                    color: Colors.black38,
+                                    offset: Offset(0, 3),
+                                    blurRadius: 8,
+                                  ),
+                                ]
+                              : null,
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      const Text(
+                      const SizedBox(height: 6),
+                      Text(
+                        'رفيقك اليومي في الطاعات والأذكار',
+                        style: TextStyle(
+                          color: subtitleColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Loading Indicator
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            isDark ? Colors.white : Colors.teal.shade700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
                         'جاري تحميل البيانات... يرجى الانتظار',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        style: TextStyle(
+                          color: mutedColor,
+                          fontSize: 13,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 24),
-                      Text(
-                        _dailyQuote,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontFamily:
-                              'Amiri', // Assuming you might have a font or default
-                          fontStyle: FontStyle.italic,
+                      
+                      // Daily Ayah / Quote Glass Card
+                      if (_dailyQuote.isNotEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 16),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.12)
+                                : Colors.white.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.2)
+                                  : Colors.teal.withValues(alpha: 0.25),
+                              width: 1,
+                            ),
+                            boxShadow: isDark
+                                ? null
+                                : [
+                                    BoxShadow(
+                                      color:
+                                          Colors.teal.withValues(alpha: 0.08),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                          ),
+                          child: Text(
+                            _dailyQuote,
+                            style: GoogleFonts.amiri(
+                              color: titleColor,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              height: 1.6,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                        textAlign: TextAlign.center,
-                      ),
                     ],
                   ),
+                  
+                  // Footer
                   Column(
                     children: [
                       Text(
                         _version,
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 14),
+                        style: TextStyle(
+                          color: mutedColor,
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        '© 2026 جميع الحقوق محفوظة - أحمد جمال',
-                        style: TextStyle(color: Colors.white60, fontSize: 12),
+                      Text(
+                        '© 2027 جميع الحقوق محفوظة - أحمد جمال',
+                        style: TextStyle(
+                          color: mutedColor.withValues(alpha: 0.8),
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),

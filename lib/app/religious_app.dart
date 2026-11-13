@@ -65,11 +65,28 @@ class _ReligiousAppState extends State<ReligiousApp> {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFF6F7FB),
         colorScheme: ColorScheme.fromSeed(
           seedColor: seedColor,
+          brightness: Brightness.light,
           primary: seedColor,
           secondary: const Color(0xFFE65100),
-          surface: const Color(0xFFF5F5F5),
+          surface: const Color(0xFFFFFFFF),
+        ),
+        cardTheme: const CardThemeData(
+          color: Colors.white,
+          surfaceTintColor: Colors.transparent,
+        ),
+        dialogTheme: const DialogThemeData(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          foregroundColor: Colors.black87,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
         ),
         textTheme: GoogleFonts.cairoTextTheme(ThemeData.light().textTheme),
       ),
@@ -82,18 +99,42 @@ class _ReligiousAppState extends State<ReligiousApp> {
           seedColor: seedColor,
           primary: seedColor,
           secondary: const Color(0xFFFFB74D),
-          surface: const Color(0xFF000000), // OLED Pure Black
+          surface: const Color(0xFF141414),
+        ),
+        cardTheme: const CardThemeData(
+          color: Color(0xFF161616),
+          surfaceTintColor: Colors.transparent,
+        ),
+        dialogTheme: const DialogThemeData(
+          backgroundColor: Color(0xFF1E1E1E),
+          surfaceTintColor: Colors.transparent,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          foregroundColor: Colors.white,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
         ),
         textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
       ),
       themeMode: themeProvider.themeMode,
       home: SplashScreen(themeProvider: themeProvider),
       builder: (context, child) {
-        return Stack(
-          children: [
-            child!,
-            const GlobalUpdateIndicator(),
-          ],
+        final mediaQuery = MediaQuery.of(context);
+        return MediaQuery(
+          data: mediaQuery.copyWith(
+            textScaler: mediaQuery.textScaler.clamp(
+              minScaleFactor: 0.85,
+              maxScaleFactor: 1.25,
+            ),
+          ),
+          child: Stack(
+            children: [
+              child!,
+              const GlobalUpdateIndicator(),
+            ],
+          ),
         );
       },
     );

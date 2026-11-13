@@ -33,6 +33,8 @@ void main() {
     expect(preferences.morningAthkarReminderEnabled, isTrue);
     expect(preferences.eveningAthkarReminderEnabled, isTrue);
     expect(preferences.floatingDhikrEnabled, isFalse);
+    expect(preferences.salawatReminderEnabled, isTrue);
+    expect(preferences.salawatIntervalMinutes, 15);
     expect(preferences.isAdhanEnabled('fajr'), isTrue);
     expect(preferences.getPrayerOffset('fajr'), 0);
   });

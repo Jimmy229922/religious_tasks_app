@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:hijri/hijri_calendar.dart' as hijri;
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:religious_tasks_app/core/constants/app_constants.dart';
 import 'package:religious_tasks_app/core/constants/strings.dart';
@@ -410,23 +411,28 @@ class TasksViewModel extends ChangeNotifier {
           // fallback to default
         }
       }
+      final prefs = await SharedPreferences.getInstance();
+      final prophetCount = prefs.getInt('prophet_prayer_counter') ?? 0;
+      final prophetIndex =
+          _tasks.indexWhere((t) => t.name.contains(kProphetPrayer));
+      if (prophetIndex != -1) {
+        _tasks[prophetIndex].currentCount = prophetCount;
+        if (prophetCount >= _tasks[prophetIndex].targetCount) {
+          _tasks[prophetIndex].isCompleted = true;
+        }
+      }
     }
     _updateTaskDescriptions();
     notifyListeners();
   }
 
   Future<void> _resetTasksForNewDay(String today) async {
-    // Check missing daily tasks to break streak if needed before resetting
-    // But simplistic approach: we check streaks on completion, and if user missed yesterday, we reset.
-    // Actually, on new day, if yesterday wasn't completed, streak might break.
-    // For now, let's keep streak logic simple: We update streak when user completes task.
-    // If we want to reset if missed, we need to check yesterday's status.
-    // Let's rely on stored "last completed date" for streaks logic below.
-
     for (var task in _tasks) {
       task.isCompleted = false;
       task.currentCount = 0;
     }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('prophet_prayer_counter', 0);
     await _storage.setString(_dateKey, today);
     await _saveTasks();
   }
@@ -587,6 +593,9 @@ class TasksViewModel extends ChangeNotifier {
       debugPrint("Failed to detect country method: $e");
     }
 
+    // Save calculation method for background use
+    await _storage.setString('calculation_method', method.name);
+
     final params = method.getParameters();
     params.madhab = Madhab.shafi;
 
@@ -612,6 +621,12 @@ class TasksViewModel extends ChangeNotifier {
         DateComponents(tomorrow.year, tomorrow.month, tomorrow.day);
     final tomorrowTimes = PrayerTimes(coordinates, tomorrowComponents, params);
 
+    final afterTomorrow = DateTime.now().add(const Duration(days: 2));
+    final afterTomorrowTimes = PrayerTimes(
+        coordinates,
+        DateComponents(afterTomorrow.year, afterTomorrow.month, afterTomorrow.day),
+        params);
+
     _prayerTimes = todayTimes;
     _tomorrowPrayerTimes = tomorrowTimes;
     _isLoadingLocation = false;
@@ -621,9 +636,11 @@ class TasksViewModel extends ChangeNotifier {
     _updateTaskDescriptions();
     notifyListeners();
 
-    // Schedule notifications
+    // Schedule notifications for 3 days
     await _notificationService.schedulePrayerNotifications(
-        today: todayTimes, tomorrow: tomorrowTimes);
+        today: todayTimes,
+        tomorrow: tomorrowTimes,
+        afterTomorrow: afterTomorrowTimes);
     await _updatePrayerWidget();
   }
 
@@ -780,6 +797,17 @@ class TasksViewModel extends ChangeNotifier {
         if (_tasks[index].name == kAthkarEvening) _updateStreak('evening');
         if (_tasks[index].name == kAthkarSleep) _updateStreak('sleep');
       }
+      _saveTasks();
+      _updateOtherWidgets();
+      notifyListeners();
+    }
+  }
+
+  void updateProphetPrayerCount(int count) {
+    final index = _tasks.indexWhere((t) => t.name.contains(kProphetPrayer));
+    if (index != -1) {
+      _tasks[index].currentCount = count;
+      _tasks[index].isCompleted = (count >= _tasks[index].targetCount);
       _saveTasks();
       _updateOtherWidgets();
       notifyListeners();

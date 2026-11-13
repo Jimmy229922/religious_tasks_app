@@ -53,20 +53,20 @@ class AppStrings {
   static const String gregorianDate = 'التاريخ الميلاد: ';
 
   // Notifications
-  static const String notificationPrayerChannelName = 'تنبيهات الصلاة';
+  static const String notificationPrayerChannelName = 'تَنْبِيهَاتُ الصَّلَاةِ';
   static const String notificationPrayerChannelDesc =
-      'تذكيرات قبل مواقيت الصلاة بخمس دقائق حسب موقعك';
-  static const String notificationAdhanChannelName = 'الأذان';
+      'تَذْكِيرَاتٌ قَبْلَ مَوَاقِيتِ الصَّلَاةِ بِخَمْسِ دَقَائِقَ حَسَبَ مَوْقِعِكَ';
+  static const String notificationAdhanChannelName = 'الْأَذَانُ';
   static const String notificationAdhanChannelDesc =
-      'تنبيهات الأذان في وقت الصلاة';
-  static const String notificationDhikrChannelName = 'أذكار متكررة';
+      'تَنْبِيهَاتُ الْأَذَانِ فِي وَقْتِ الصَّلَاةِ';
+  static const String notificationDhikrChannelName = 'أَذْكَارٌ مُتَكَرِّرَةٌ';
   static const String notificationDhikrChannelDesc =
-      'تذكيرات دورية بالأذكار كل ساعة';
+      'تَذْكِيرَاتٌ دَوْرِيَّةٌ بِالْأَذْكَارِ كُلَّ سَاعَةٍ';
 
-  static const String remainingTimeTitle = 'تبقى 5 دقائق على صلاة';
-  static const String prepareForPrayer = 'حان وقت الاستعداد للصلاة';
-  static const String timeForAdhan = 'حان وقت الأذان';
-  static const String nowPrayer = 'الآن: صلاة';
+  static const String remainingTimeTitle = 'تَبَقَّى 5 دَقَائِقَ عَلَى صَلَاةِ';
+  static const String prepareForPrayer = 'حَانَ وَقْتُ الِاسْتِعْدَادِ لِلصَّلَاةِ';
+  static const String timeForAdhan = 'حَانَ وَقْتُ الْأَذَانِ';
+  static const String nowPrayer = 'الْآنَ: صَلَاةُ';
 
   static const List<String> hijriWeekdays = ['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'];
 }

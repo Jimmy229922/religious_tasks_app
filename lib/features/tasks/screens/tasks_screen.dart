@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:religious_tasks_app/core/constants/app_constants.dart';
 import 'package:religious_tasks_app/features/athkar/providers/athkar_view_model.dart';
+import 'package:religious_tasks_app/features/athkar/models/athkar_time_helper.dart';
 import '../providers/tasks_view_model.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import '../widgets/task_item_widget.dart';
@@ -18,7 +20,6 @@ import '../../athkar/screens/athkar_details_screen.dart';
 import '../../tasbeeh/screens/custom_tasbeeh_screen.dart';
 import '../../athkar/screens/prophet_prayers_screen.dart';
 import '../../settings/screens/settings_screen.dart';
-import '../../athkar/screens/surah_kahf_screen.dart';
 import '../../statistics/screens/statistics_screen.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -47,107 +48,118 @@ class _TasksScreenState extends State<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // We use a Consumer here so only the main content rebuilds if needed,
-    // but the Scaffold structure is stable.
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final backgroundColor = isDark ? Colors.black : const Color(0xFFF6F7FB);
+    final iconColor = isDark ? Colors.white : const Color(0xFF0F172A);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? Colors.black : null,
-        gradient: isDark
-            ? null
-            : const LinearGradient(
-                colors: [
-                  Color(0xFF0F2027),
-                  Color(0xFF203A43),
-                  Color(0xFF2C5364)
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Directionality(
-          textDirection: TextDirection.rtl,
-          child: SafeArea(
-            child: Consumer<TasksViewModel>(
-              builder: (context, vm, child) {
-                return RefreshIndicator(
-                  onRefresh: () => _handleRefresh(vm, isDark),
-                  child: CustomScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    slivers: [
-                      SliverAppBar(
-                        floating: true,
-                        pinned: true,
-                        backgroundColor: Colors.transparent,
-                        elevation: 0,
-                        actions: [
-                          IconButton(
-                            icon: const Icon(Icons.bar_chart_rounded,
-                                color: Colors.white),
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => StatisticsScreen(
-                                  morningStreak: vm.morningStreak,
-                                  eveningStreak: vm.eveningStreak,
-                                  sleepStreak: vm.sleepStreak,
-                                ),
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      body: Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Consumer<TasksViewModel>(
+            builder: (context, vm, child) {
+              return RefreshIndicator(
+                onRefresh: () => _handleRefresh(vm, isDark),
+                child: CustomScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  slivers: [
+                    SliverAppBar(
+                      floating: true,
+                      pinned: true,
+                      backgroundColor: backgroundColor,
+                      surfaceTintColor: Colors.transparent,
+                      systemOverlayStyle: isDark
+                          ? SystemUiOverlayStyle.light
+                          : SystemUiOverlayStyle.dark,
+                      elevation: 0,
+                      actions: [
+                        IconButton(
+                          icon: Icon(Icons.bar_chart_rounded, color: iconColor),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => StatisticsScreen(
+                                morningStreak: vm.morningStreak,
+                                eveningStreak: vm.eveningStreak,
+                                sleepStreak: vm.sleepStreak,
                               ),
                             ),
                           ),
-                        ],
-                        leading: IconButton(
-                          icon: const Icon(Icons.settings_outlined,
-                              color: Colors.white),
-                          onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const SettingsScreen())),
                         ),
-                        title: Text(
+                      ],
+                      leading: IconButton(
+                        icon: Icon(Icons.settings_outlined, color: iconColor),
+                        onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const SettingsScreen())),
+                      ),
+                      title: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
                           kAppName,
                           style: GoogleFonts.arefRuqaa(
                             fontWeight: FontWeight.bold,
                             fontSize: 26,
-                            color: Colors.white,
+                            color: iconColor,
                           ),
                         ),
-                        centerTitle: true,
                       ),
-                      SliverToBoxAdapter(
-                        child: RepaintBoundary(
-                          child: HeaderSection(vm: vm, isDark: isDark),
-                        ),
+                      centerTitle: true,
+                    ),
+                    SliverToBoxAdapter(
+                      child: RepaintBoundary(
+                        child: HeaderSection(vm: vm, isDark: isDark),
                       ),
-                      SliverToBoxAdapter(
+                    ),
+                    SliverToBoxAdapter(
+                      child: RepaintBoundary(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
                             children: [
-                              IntrinsicHeight(
-                                child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    if (vm.activeEvent != null) ...[
-                                      Expanded(
-                                        flex: 4,
-                                        child: _buildSmartEventBanner(
-                                            vm.activeEvent!, isDark),
-                                      ),
-                                      const SizedBox(width: 8),
-                                    ],
-                                    Expanded(
-                                      flex: 6,
-                                      child: _buildContextAwareSuggestion(
-                                          context, vm, isDark),
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final activeEvent = vm.activeEvent;
+                                  if (activeEvent == null) {
+                                    return _buildContextAwareSuggestion(
+                                        context, vm, isDark);
+                                  }
+
+                                  if (constraints.maxWidth < 460) {
+                                    return Column(
+                                      children: [
+                                        _buildSmartEventBanner(
+                                            activeEvent, isDark),
+                                        const SizedBox(height: 8),
+                                        _buildContextAwareSuggestion(
+                                            context, vm, isDark),
+                                      ],
+                                    );
+                                  }
+
+                                  return IntrinsicHeight(
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Expanded(
+                                          flex: 4,
+                                          child: _buildSmartEventBanner(
+                                              activeEvent, isDark),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          flex: 6,
+                                          child: _buildContextAwareSuggestion(
+                                              context, vm, isDark),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  );
+                                },
                               ),
                               const SizedBox(height: 12),
                               QuickAccessSection(vm: vm, isDark: isDark),
@@ -155,33 +167,41 @@ class _TasksScreenState extends State<TasksScreen> {
                           ),
                         ),
                       ),
+                    ),
+                    SliverToBoxAdapter(
+                        child: RepaintBoundary(
+                            child:
+                                DailyInspirationCard(vm: vm, isDark: isDark))),
+                    if (vm.prayerTimes != null)
                       SliverToBoxAdapter(
-                          child: DailyInspirationCard(vm: vm, isDark: isDark)),
-                      if (vm.prayerTimes != null)
-                        SliverToBoxAdapter(
-                            child: PrayerCountdownCard(vm: vm, isDark: isDark)),
-                      SliverToBoxAdapter(
-                          child: _buildDailyProgress(context, vm, isDark)),
-                      if (vm.prayerTasks.isNotEmpty) ...[
-                        _buildSectionHeader("الصلوات المفروضة", isDark),
-                        _buildTasksSliverList(
-                            context, vm, vm.prayerTasks, isDark),
-                      ],
-                      if (vm.otherTasks.isNotEmpty) ...[
-                        _buildSectionHeader("السنن والأذكار", isDark),
-                        _buildTasksSliverList(
-                            context, vm, vm.otherTasks, isDark),
-                      ],
-                      SliverToBoxAdapter(
-                          child: _buildGratitudeSection(context, vm, isDark)),
-                      if (vm.earnedBadges.isNotEmpty)
-                        SliverToBoxAdapter(child: _buildBadgesSection(vm, isDark)),
-                      const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                          child: RepaintBoundary(
+                              child:
+                                  PrayerCountdownCard(vm: vm, isDark: isDark))),
+                    SliverToBoxAdapter(
+                        child: RepaintBoundary(
+                            child: _buildDailyProgress(context, vm, isDark))),
+                    if (vm.prayerTasks.isNotEmpty) ...[
+                      _buildSectionHeader("الصلوات المفروضة", isDark),
+                      _buildTasksSliverList(
+                          context, vm, vm.prayerTasks, isDark),
                     ],
-                  ),
-                );
-              },
-            ),
+                    if (vm.otherTasks.isNotEmpty) ...[
+                      _buildSectionHeader("السنن والأذكار", isDark),
+                      _buildTasksSliverList(context, vm, vm.otherTasks, isDark),
+                    ],
+                    SliverToBoxAdapter(
+                        child: RepaintBoundary(
+                            child:
+                                _buildGratitudeSection(context, vm, isDark))),
+                    if (vm.earnedBadges.isNotEmpty)
+                      SliverToBoxAdapter(
+                          child: RepaintBoundary(
+                              child: _buildBadgesSection(vm, isDark))),
+                    const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                  ],
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -196,11 +216,15 @@ class _TasksScreenState extends State<TasksScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               "أوسمتك المستحقة",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
             ),
           ),
           SingleChildScrollView(
@@ -221,14 +245,23 @@ class _TasksScreenState extends State<TasksScreen> {
                 }
 
                 return Card(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                   elevation: 2,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Column(
                       children: [
                         Icon(icon, color: color, size: 40),
                         const SizedBox(height: 4),
-                        Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -243,9 +276,8 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Widget _buildGratitudeSection(
       BuildContext context, TasksViewModel vm, bool isDark) {
-    final blessingOfDay = vm.currentBlessing.isEmpty
-        ? "نعمة الإسلام"
-        : vm.currentBlessing;
+    final blessingOfDay =
+        vm.currentBlessing.isEmpty ? "نعمة الإسلام" : vm.currentBlessing;
 
     return Container(
       margin: const EdgeInsets.all(20),
@@ -315,27 +347,31 @@ class _TasksScreenState extends State<TasksScreen> {
       padding: const EdgeInsets.all(12),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFF5E35B1),
+        color: isDark ? const Color(0xFF5E35B1) : const Color(0xFFEDE7F6),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.purpleAccent.withValues(alpha: 0.3)
+              : const Color(0xFFD1C4E9),
+        ),
         boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.stars_rounded, color: Colors.amber, size: 28),
+          Icon(Icons.stars_rounded,
+              color: isDark ? Colors.amber : const Color(0xFF7E57C2), size: 28),
           const SizedBox(height: 4),
           Text(
             event,
             textAlign: TextAlign.center,
             style: GoogleFonts.cairo(
-              color: Colors.white,
+              color: isDark ? Colors.white : const Color(0xFF4A148C),
               fontWeight: FontWeight.bold,
               fontSize: 12,
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -415,18 +451,41 @@ class _TasksScreenState extends State<TasksScreen> {
 
   void _navigateToAthkar(
       BuildContext context, TasksViewModel vm, bool isMorning) {
+    final now = DateTime.now();
+    final isActive = isMorning
+        ? AthkarTimeHelper.isMorningWindow(now)
+        : AthkarTimeHelper.isEveningWindow(now);
+
+    if (isActive) {
+      _openAthkarScreen(context, vm, isMorning);
+    } else {
+      AthkarTimeHelper.showInactiveTimeDialog(
+        context: context,
+        isMorning: isMorning,
+        onProceedAnyway: () => _openAthkarScreen(context, vm, isMorning),
+        onSwitchToActive: () => _openAthkarScreen(context, vm, !isMorning),
+      );
+    }
+  }
+
+  void _openAthkarScreen(
+      BuildContext context, TasksViewModel vm, bool isMorning) {
+    final title = isMorning ? kAthkarMorning : kAthkarEvening;
     Navigator.push(
         context,
         MaterialPageRoute(
             builder: (_) => AthkarDetailsScreen(
-                title: isMorning ? kAthkarMorning : kAthkarEvening,
-                isMorning: isMorning))).then((result) {
-      if (result == true) {
-        final index = vm.tasks.indexWhere(
-            (t) => t.name == (isMorning ? kAthkarMorning : kAthkarEvening));
-        if (index != -1) {
-          vm.toggleTask(index, completionValue: true);
-        }
+                title: title,
+                isMorning: isMorning))).then((_) async {
+      if (!context.mounted) return;
+      final athkarVM = Provider.of<AthkarViewModel>(context, listen: false);
+      await athkarVM.loadDailyData();
+      final isComplete = isMorning
+          ? athkarVM.data.morning.isComplete
+          : athkarVM.data.evening.isComplete;
+      final index = vm.tasks.indexWhere((t) => t.name == title);
+      if (index != -1) {
+        vm.toggleTask(index, completionValue: isComplete);
       }
     });
   }
@@ -467,10 +526,11 @@ class _TasksScreenState extends State<TasksScreen> {
             // Get original index to avoid search if possible, or just pass the task object
             return TaskItemWidget(
               task: task,
-              index: localIndex, 
+              index: localIndex,
               isDark: isDark,
               now: vm.now,
               prayerTimes: vm.prayerTimes,
+              prayerTimesTomorrow: vm.tomorrowPrayerTimes,
               onTap: () {
                 final globalIndex = vm.tasks.indexOf(task);
                 if (globalIndex != -1) {
@@ -494,13 +554,7 @@ class _TasksScreenState extends State<TasksScreen> {
   void _handleTaskTap(
       BuildContext context, TasksViewModel vm, int index, dynamic task) {
     if (task.name == kQuranWird) {
-      final isFriday = vm.now.weekday == DateTime.friday;
-      if (isFriday) {
-        Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const SurahKahfScreen()));
-      } else {
-        vm.toggleTask(index);
-      }
+      vm.toggleTask(index);
     } else if (task.name.contains(kAthkarLabel)) {
       final isMorning = task.name.contains(kAthkarMorning);
       final isSleep = task.name.contains(kAthkarSleep);
@@ -508,38 +562,32 @@ class _TasksScreenState extends State<TasksScreen> {
           ? kAthkarSleep
           : (isMorning ? kAthkarMorning : kAthkarEvening);
 
-      Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) =>
-                      AthkarDetailsScreen(title: title, isMorning: isMorning)))
-          .then((_) async {
-        if (!context.mounted) return;
-        final athkarVM = Provider.of<AthkarViewModel>(context, listen: false);
-        await athkarVM.loadDailyData();
+      final now = DateTime.now();
+      final isActive = isSleep ||
+          (isMorning
+              ? AthkarTimeHelper.isMorningWindow(now)
+              : AthkarTimeHelper.isEveningWindow(now));
 
-        bool isComplete = false;
-        if (isSleep) {
-          isComplete = athkarVM.data.sleep.isComplete;
-        } else if (isMorning) {
-          isComplete = athkarVM.data.morning.isComplete;
-        } else {
-          isComplete = athkarVM.data.evening.isComplete;
-        }
-
-        vm.toggleTask(index, completionValue: isComplete);
-      });
+      if (isActive) {
+        _openAthkarDetailsAndSync(
+            context, vm, title, isMorning, isSleep);
+      } else {
+        AthkarTimeHelper.showInactiveTimeDialog(
+          context: context,
+          isMorning: isMorning,
+          onProceedAnyway: () => _openAthkarDetailsAndSync(
+              context, vm, title, isMorning, isSleep),
+          onSwitchToActive: () => _openAthkarDetailsAndSync(context, vm,
+              isMorning ? kAthkarEvening : kAthkarMorning, !isMorning, false),
+        );
+      }
     } else if (task.name.contains(kProphetPrayer)) {
       Navigator.push(context,
               MaterialPageRoute(builder: (_) => const ProphetPrayersScreen()))
           .then((_) async {
         final prefs = await SharedPreferences.getInstance();
         final count = prefs.getInt('prophet_prayer_counter') ?? 0;
-        if (count == 0) {
-          vm.toggleTask(index, completionValue: false);
-        } else if (count >= (task.targetCount ?? 200)) {
-          vm.toggleTask(index, completionValue: true);
-        }
+        vm.updateProphetPrayerCount(count);
       });
     } else if (task.name == kCustomWird) {
       Navigator.push(context,
@@ -547,6 +595,34 @@ class _TasksScreenState extends State<TasksScreen> {
     } else {
       vm.toggleTask(index);
     }
+  }
+
+  void _openAthkarDetailsAndSync(BuildContext context, TasksViewModel vm,
+      String title, bool isMorning, bool isSleep) {
+    Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) =>
+                    AthkarDetailsScreen(title: title, isMorning: isMorning)))
+        .then((_) async {
+      if (!context.mounted) return;
+      final athkarVM = Provider.of<AthkarViewModel>(context, listen: false);
+      await athkarVM.loadDailyData();
+
+      bool isComplete = false;
+      if (isSleep) {
+        isComplete = athkarVM.data.sleep.isComplete;
+      } else if (isMorning) {
+        isComplete = athkarVM.data.morning.isComplete;
+      } else {
+        isComplete = athkarVM.data.evening.isComplete;
+      }
+
+      final taskIndex = vm.tasks.indexWhere((t) => t.name == title);
+      if (taskIndex != -1) {
+        vm.toggleTask(taskIndex, completionValue: isComplete);
+      }
+    });
   }
 
   Widget _buildDailyProgress(
@@ -575,23 +651,27 @@ class _TasksScreenState extends State<TasksScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.check_circle_outline_rounded,
-                      color: Colors.teal, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    "إنجازك اليومي",
-                    style: GoogleFonts.cairo(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle_outline_rounded,
+                        color: Colors.teal, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "إنجازك اليومي",
+                        style: GoogleFonts.cairo(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -646,24 +726,30 @@ class _TasksScreenState extends State<TasksScreen> {
           ),
           const SizedBox(height: 8),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "${vm.completedCount} من ${vm.totalCount} مهام مكتملة",
-                style: GoogleFonts.cairo(
-                  fontSize: 12,
-                  color: isDark ? Colors.white60 : Colors.grey[600],
-                ),
-              ),
-              if (progress == 1.0)
-                const Text(
-                  "ممتاز! 🎉",
-                  style: TextStyle(
+              Expanded(
+                child: Text(
+                  "${vm.completedCount} من ${vm.totalCount} مهام مكتملة",
+                  style: GoogleFonts.cairo(
                     fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amber,
+                    color: isDark ? Colors.white60 : Colors.grey[600],
                   ),
                 ),
+              ),
+              if (progress == 1.0) ...[
+                const SizedBox(width: 8),
+                const Flexible(
+                  child: Text(
+                    "ممتاز! 🎉",
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ],

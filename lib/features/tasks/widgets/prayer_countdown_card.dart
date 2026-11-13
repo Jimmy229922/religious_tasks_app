@@ -61,50 +61,53 @@ class _PrayerCountdownCardState extends State<PrayerCountdownCard> {
 
     switch (nextPrayer) {
       case Prayer.fajr:
-        gradientColors = [
-          const Color(0xFF141E30),
-          const Color(0xFF243B55)
-        ]; // Deep Night
+        gradientColors = widget.isDark
+            ? [const Color(0xFF141E30), const Color(0xFF243B55)]
+            : [const Color(0xFF1E3C72), const Color(0xFF2A5298)];
         timeIcon = Icons.nights_stay_rounded;
         break;
       case Prayer.sunrise:
-        gradientColors = [
-          const Color(0xFFcc2b5e),
-          const Color(0xFF753a88)
-        ]; // Purple Sunrise
+        gradientColors = widget.isDark
+            ? [const Color(0xFF753A88), const Color(0xFFCC2B5E)]
+            : [const Color(0xFFEA580C), const Color(0xFFF97316)];
         timeIcon = Icons.wb_twilight_rounded;
         break;
       case Prayer.dhuhr:
-        gradientColors = [
-          const Color(0xFF2980B9),
-          const Color(0xFF6DD5FA)
-        ]; // Blue Sky
+        gradientColors = widget.isDark
+            ? [const Color(0xFF1565C0), const Color(0xFF0D47A1)]
+            : [const Color(0xFF0288D1), const Color(0xFF00ACC1)];
         timeIcon = Icons.wb_sunny_rounded;
         break;
       case Prayer.asr:
-        gradientColors = [
-          const Color(0xFFFF8008),
-          const Color(0xFFFFC837)
-        ]; // Orange Afternoon
+        gradientColors = widget.isDark
+            ? [const Color(0xFFE65100), const Color(0xFFBF360C)]
+            : [const Color(0xFFF59E0B), const Color(0xFFD97706)];
         timeIcon = Icons.wb_sunny_outlined;
         break;
       case Prayer.maghrib:
-        gradientColors = [
-          const Color(0xFF8E2DE2),
-          const Color(0xFF4A00E0)
-        ]; // Twilight Purple
+        gradientColors = widget.isDark
+            ? [const Color(0xFF4A00E0), const Color(0xFF8E2DE2)]
+            : [const Color(0xFF7C3AED), const Color(0xFF6D28D9)];
         timeIcon = Icons.wb_twilight_sharp;
         break;
       case Prayer.isha:
-        gradientColors = [
-          const Color(0xFF0F2027),
-          const Color(0xFF203A43),
-          const Color(0xFF2C5364)
-        ]; // Dark Night
+        gradientColors = widget.isDark
+            ? [
+                const Color(0xFF0F2027),
+                const Color(0xFF203A43),
+                const Color(0xFF2C5364)
+              ]
+            : [
+                const Color(0xFF0F766E),
+                const Color(0xFF0D9488),
+                const Color(0xFF14B8A6)
+              ];
         timeIcon = Icons.bedtime_rounded;
         break;
       default:
-        gradientColors = [const Color(0xFF141E30), const Color(0xFF243B55)];
+        gradientColors = widget.isDark
+            ? [const Color(0xFF141E30), const Color(0xFF243B55)]
+            : [const Color(0xFF0F766E), const Color(0xFF14B8A6)];
         timeIcon = Icons.access_time_rounded;
     }
 
@@ -118,32 +121,43 @@ class _PrayerCountdownCardState extends State<PrayerCountdownCard> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
+        boxShadow: widget.isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: gradientColors.first.withValues(alpha: 0.25),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "الصلاة القادمة",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "الصلاة القادمة",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                  Text(
-                    widget.vm.nextPrayerName,
-                    style: GoogleFonts.arefRuqaa(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
+                    Text(
+                      widget.vm.nextPrayerName,
+                      style: GoogleFonts.arefRuqaa(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -161,15 +175,18 @@ class _PrayerCountdownCardState extends State<PrayerCountdownCard> {
               color: Colors.black.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildTimeBlock(seconds, "ثانية"),
-                _buildSeparator(),
-                _buildTimeBlock(minutes, "دقيقة"),
-                _buildSeparator(),
-                _buildTimeBlock(hours, "ساعة"),
-              ],
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildTimeBlock(seconds, "ثانية"),
+                  _buildSeparator(),
+                  _buildTimeBlock(minutes, "دقيقة"),
+                  _buildSeparator(),
+                  _buildTimeBlock(hours, "ساعة"),
+                ],
+              ),
             ),
           ),
         ],

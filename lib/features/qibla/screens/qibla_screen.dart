@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 
 class QiblaScreen extends StatefulWidget {
@@ -15,15 +16,33 @@ class QiblaScreen extends StatefulWidget {
 
 class _QiblaScreenState extends State<QiblaScreen> {
   double? _heading;
+  bool _wasAligned = false;
   StreamSubscription<CompassEvent>? _subscription;
 
   @override
   void initState() {
     super.initState();
+    _initCompass();
+  }
+
+  void _initCompass() {
     _subscription = FlutterCompass.events?.listen((event) {
-      if (mounted) {
+      if (!mounted) return;
+
+      final heading = event.heading;
+      if (heading != null) {
+        final qibla = Qibla(widget.coordinates);
+        final qiblaDir = qibla.direction;
+        final diff = ((qiblaDir - heading + 540) % 360) - 180;
+        final isAligned = diff.abs() < 5.0;
+
+        if (isAligned && !_wasAligned) {
+          HapticFeedback.heavyImpact();
+        }
+        _wasAligned = isAligned;
+
         setState(() {
-          _heading = event.heading;
+          _heading = heading;
         });
       }
     });
@@ -37,220 +56,361 @@ class _QiblaScreenState extends State<QiblaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // حساب اتجاه القبلة
     final qibla = Qibla(widget.coordinates);
-    final qiblaDirection = qibla.direction; // الزاوية من الشمال
+    final qiblaDirection = qibla.direction; // الزاوية الرياضية الدقيقة للقبلة من الشمال
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final double? heading = _heading;
+    final double diff = heading != null
+        ? (((qiblaDirection - heading + 540) % 360) - 180)
+        : 180;
+    final bool isAligned = heading != null && diff.abs() < 5.0;
+
+    final primaryColor = isAligned
+        ? Colors.greenAccent.shade400
+        : (isDark ? Colors.tealAccent : const Color(0xFF0F766E));
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text("اتجاه القبلة")),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: Center(
+        backgroundColor:
+            isDark ? const Color(0xFF0B131E) : const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: const Text(
+            "اتجاه القبلة",
+            style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'ArefRuqaa'),
+          ),
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+        ),
+        body: SafeArea(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[800] : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  "اتجاه القبلة: ${qiblaDirection.toStringAsFixed(1)}°",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-              ),
               const SizedBox(height: 10),
-              if (_heading == null)
-                const Text("جاري معايرة البوصلة...",
-                    style: TextStyle(color: Colors.red))
-              else
-                Text(
-                  "زاوية الجوال: ${_heading!.toStringAsFixed(1)}°",
-                  style: TextStyle(
-                      fontSize: 16,
-                      color: isDark ? Colors.white70 : Colors.grey[700]),
-                ),
-              const SizedBox(height: 50),
 
-              // البوصلة
-              SizedBox(
-                width: 300,
-                height: 300,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // قرص البوصلة (الشمال يدور ليكون في اتجاه الشمال الحقيقي)
-                    // إذا كان heading 0، الشمال في الأعلى. إذا heading 90 (شرق)، الشمال يجب أن يكون يساراً (-90).
-                    if (_heading != null)
-                      Transform.rotate(
-                        angle: -_heading! * (math.pi / 180),
-                        child: Container(
-                          decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isDark
-                                  ? const Color(0xFF2C2C2C)
-                                  : Colors.white,
-                              border: Border.fromBorderSide(BorderSide(
-                                  color:
-                                      isDark ? Colors.white24 : Colors.black12,
-                                  width: 2)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: isDark
-                                      ? Colors.black.withValues(alpha: 0.5)
-                                      : const Color(0x0D000000),
-                                  blurRadius: 15,
-                                  spreadRadius: 5,
-                                )
-                              ]),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // تدريج البوصلة (صورة أو رسم بسيط)
-                              ...List.generate(12, (index) {
-                                return Transform.rotate(
-                                  angle: (index * 30) * (math.pi / 180),
-                                  child: Align(
-                                    alignment: Alignment.topCenter,
-                                    child: Container(
-                                      height: 10,
-                                      width: 2,
-                                      color: index % 3 == 0
-                                          ? (isDark
-                                              ? Colors.white
-                                              : Colors.black)
-                                          : (isDark
-                                              ? Colors.white54
-                                              : Colors.black54),
-                                      margin: const EdgeInsets.only(top: 10),
-                                    ),
-                                  ),
-                                );
-                              }),
-
-                              // أيقونة البوصلة الأساسية (يمكن استبدالها برسمة مخصصة)
-                              // Icon(Icons.explore,
-                              //     size: 300, color: Colors.blueGrey.withOpacity(0.2)),
-
-                              // حرف N
-                              Positioned(
-                                top: 25,
-                                child: Text('N',
-                                    style: TextStyle(
-                                        color: Colors.red,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 24,
-                                        shadows: [
-                                          Shadow(
-                                              blurRadius: 2,
-                                              color: Colors.black
-                                                  .withValues(alpha: 0.3))
-                                        ])),
-                              ),
-                              Positioned(
-                                bottom: 25,
-                                child: Text('S',
-                                    style: TextStyle(
-                                        color: isDark
-                                            ? Colors.white
-                                            : Colors.black,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 24)),
-                              ),
-                              Positioned(
-                                right: 25,
-                                child: Text('E',
-                                    style: TextStyle(
-                                        color: isDark
-                                            ? Colors.white
-                                            : Colors.black,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 24)),
-                              ),
-                              Positioned(
-                                left: 25,
-                                child: Text('W',
-                                    style: TextStyle(
-                                        color: isDark
-                                            ? Colors.white
-                                            : Colors.black,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 24)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                    // سهم القبلة (نحتاج أن يشير للقبلة بالنسبة للشمال)
-                    // إذا كانت القبلة 135 درجة، والسهم مثبت على القرص،
-                    // فإذا دورنا القرص ليتجه للشمال، يمكننا رسم سهم ثابت على القرص عند الزاوية 135.
-                    if (_heading != null)
-                      Transform.rotate(
-                        // ندور هذا السهم مع قرص البوصلة، ولكن نضيف له زاوية القبلة
-                        angle: (-_heading! + qiblaDirection) * (math.pi / 180),
-                        child: const Align(
-                          alignment: Alignment.topCenter,
-                          child: Padding(
-                            padding: EdgeInsets.only(top: 40),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.location_on,
-                                    size: 40,
-                                    color: Color(0xFF1E5128)), // لون التطبيق
-                                Text('القبلة',
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF1E5128)))
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+              // بطاقة حالة الاتجاه التفاعلية
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                decoration: BoxDecoration(
+                  color: isAligned
+                      ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5))
+                      : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isAligned
+                        ? Colors.green.shade600
+                        : (isDark ? Colors.white10 : Colors.black12),
+                    width: isAligned ? 2 : 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isAligned
+                          ? Colors.green.withValues(alpha: 0.25)
+                          : Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
                   ],
                 ),
-              ),
-
-              const SizedBox(height: 30),
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 40),
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF333333)
-                      : const Color(0xFFFFF3E0),
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(
-                      color: isDark ? Colors.orange[900]! : Colors.orange,
-                      width: 1),
-                ),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.info_outline,
-                        color:
-                            isDark ? Colors.orangeAccent : Colors.orange[800]),
+                    Icon(
+                      isAligned
+                          ? Icons.check_circle_rounded
+                          : Icons.compass_calibration_rounded,
+                      color: isAligned
+                          ? (isDark ? Colors.greenAccent : Colors.green.shade800)
+                          : primaryColor,
+                      size: 26,
+                    ),
                     const SizedBox(width: 10),
-                    const Expanded(
+                    Flexible(
                       child: Text(
-                        "ضع هاتفك على سطح مستوٍ وابتعد عن المعادن والمغناطيس للحصول على دقة أفضل.",
-                        style: TextStyle(fontSize: 12),
+                        isAligned
+                            ? "أنت الآن بالاتجاه الصحيح للقبلة 🕋"
+                            : "زاوية القبلة: ${qiblaDirection.toStringAsFixed(1)}°",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isAligned
+                              ? (isDark
+                                  ? Colors.greenAccent
+                                  : Colors.green.shade900)
+                              : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              )
+              ),
+
+              const Spacer(),
+
+              // البوصلة التفاعلية السلسة
+              Center(
+                child: SizedBox(
+                  width: 320,
+                  height: 320,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // توهج دائم عند التوجه للقبلة
+                      if (isAligned)
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 500),
+                          width: 310,
+                          height: 310,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.green.withValues(alpha: 0.4),
+                                blurRadius: 40,
+                                spreadRadius: 10,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // قرص البوصلة الحقيقي (يدور بسلاسة بعكس اتجاه الهاتف)
+                      if (heading != null)
+                        TweenAnimationBuilder<double>(
+                          tween: Tween<double>(
+                            begin: 0,
+                            end: -heading * (math.pi / 180),
+                          ),
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, angle, child) {
+                            return Transform.rotate(
+                              angle: angle,
+                              child: _buildCompassDial(isDark),
+                            );
+                          },
+                        )
+                      else
+                        _buildCompassDial(isDark),
+
+                      // مؤشر القبلة الكعبة المشرفة (يدور مع الشمال + زاوية القبلة)
+                      if (heading != null)
+                        TweenAnimationBuilder<double>(
+                          tween: Tween<double>(
+                            begin: 0,
+                            end: (-heading + qiblaDirection) * (math.pi / 180),
+                          ),
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, angle, child) {
+                            return Transform.rotate(
+                              angle: angle,
+                              child: _buildQiblaPointer(isAligned, isDark),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const Spacer(),
+
+              // زاوية الهاتف وتنبيه المعايرة
+              if (heading != null)
+                Text(
+                  "زاوية الهاتف الحالية: ${heading.toStringAsFixed(1)}°",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white60 : Colors.grey[700],
+                  ),
+                )
+              else
+                const Text(
+                  "جاري قياس اتجاه البوصلة...",
+                  style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
+                ),
+
+              const SizedBox(height: 16),
+
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.amber.withValues(alpha: 0.3)
+                        : Colors.amber.shade300,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.tips_and_updates_rounded,
+                      color: isDark ? Colors.amberAccent : Colors.amber.shade900,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "للحصول على أفضل دقة: ضع الهاتف على سطح مستوٍ وحركه على شكل رقم 8 كالتالي ♾️ للعايرة، وابتعد عن الأجهزة المغناطيسية.",
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.3,
+                          color: isDark
+                              ? Colors.amber.shade100
+                              : Colors.amber.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompassDial(bool isDark) {
+    final dialBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final borderColor = isDark ? Colors.white12 : Colors.grey[300]!;
+
+    return Container(
+      width: 280,
+      height: 280,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: dialBg,
+        border: Border.all(color: borderColor, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+            blurRadius: 20,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          ...List.generate(36, (index) {
+            final isMain = index % 9 == 0;
+            return Transform.rotate(
+              angle: (index * 10) * (math.pi / 180),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Container(
+                  height: isMain ? 12 : 6,
+                  width: isMain ? 3 : 1.5,
+                  color: isMain
+                      ? (isDark ? Colors.white : Colors.black87)
+                      : (isDark ? Colors.white38 : Colors.black38),
+                  margin: const EdgeInsets.only(top: 8),
+                ),
+              ),
+            );
+          }),
+
+          Positioned(
+            top: 24,
+            child: Text(
+              'N',
+              style: TextStyle(
+                color: Colors.red.shade600,
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 24,
+            child: Text(
+              'S',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black87,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+          ),
+          Positioned(
+            right: 24,
+            child: Text(
+              'E',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black87,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 24,
+            child: Text(
+              'W',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black87,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQiblaPointer(bool isAligned, bool isDark) {
+    final pointerColor = isAligned
+        ? Colors.green.shade500
+        : (isDark ? Colors.amberAccent : const Color(0xFFD97706));
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.navigation_rounded,
+              size: 48,
+              color: pointerColor,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: pointerColor,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 4,
+                  )
+                ],
+              ),
+              child: const Text(
+                'القبلة 🕋',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

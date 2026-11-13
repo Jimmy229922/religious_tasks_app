@@ -104,7 +104,7 @@ class _PermissionsOnboardingScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            "مينفعش نبدا من غير ما ناخد كل الصلاحيات عشان التطبيق يشتغل صح",
+            "يرجى السماح بكافة الصلاحيات المطلوبة لضمان عمل الأذان والتنبيهات بدقة عالية.",
             style: TextStyle(color: Colors.white),
           ),
           backgroundColor: Colors.red,
@@ -132,8 +132,11 @@ class _PermissionsOnboardingScreenState
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor:
+          isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF6F7FB),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -141,15 +144,19 @@ class _PermissionsOnboardingScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 20),
-              Icon(Icons.security, size: 80, color: Colors.teal.shade800),
+              Icon(
+                Icons.security,
+                size: 80,
+                color: isDark ? Colors.tealAccent.shade400 : Colors.teal.shade800,
+              ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 "إعداد التطبيق",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: isDark ? Colors.white : Colors.black87,
                 ),
               ),
               const SizedBox(height: 10),
@@ -158,7 +165,7 @@ class _PermissionsOnboardingScreenState
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey[600],
+                  color: isDark ? Colors.white70 : Colors.grey[600],
                 ),
               ),
               const SizedBox(height: 40),
@@ -171,6 +178,7 @@ class _PermissionsOnboardingScreenState
                           "عشان نقدر نبعتلك الأذان وتذكيرات الأوراد في وقتها.",
                       icon: Icons.notifications_active,
                       status: _notificationStatus,
+                      isDark: isDark,
                       onTap: () => _requestPermission(Permission.notification),
                     ),
                     const SizedBox(height: 16),
@@ -180,6 +188,7 @@ class _PermissionsOnboardingScreenState
                           "لتحديد مواقيت الصلاة واتجاه القبلة بدقة حسب مكانك.",
                       icon: Icons.location_on,
                       status: _locationStatus,
+                      isDark: isDark,
                       onTap: () =>
                           _requestPermission(Permission.locationWhenInUse),
                     ),
@@ -191,6 +200,7 @@ class _PermissionsOnboardingScreenState
                             "لضمان ان الأذان يشتغل في ميعاده بالظبط حتى لو الموبايل مقفول.",
                         icon: Icons.alarm,
                         status: _exactAlarmStatus,
+                        isDark: isDark,
                         onTap: () =>
                             _requestPermission(Permission.scheduleExactAlarm),
                       ),
@@ -228,6 +238,7 @@ class _PermissionsOnboardingScreenState
     required String description,
     required IconData icon,
     required PermissionStatus status,
+    required bool isDark,
     required VoidCallback onTap,
   }) {
     final bool isGranted = status.isGranted;
@@ -235,77 +246,160 @@ class _PermissionsOnboardingScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color:
-            isGranted ? const Color(0xFFE3F2FD) : Colors.grey[50], // Blue shade
+        color: isGranted
+            ? (isDark
+                ? Colors.teal.withValues(alpha: 0.15)
+                : const Color(0xFFE3F2FD))
+            : (isDark ? const Color(0xFF161616) : Colors.white),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isGranted ? const Color(0xFF1565C0) : Colors.grey[300]!,
+          color: isGranted
+              ? (isDark
+                  ? Colors.tealAccent.withValues(alpha: 0.5)
+                  : const Color(0xFF1565C0))
+              : (isDark ? Colors.white12 : Colors.grey[300]!),
           width: isGranted ? 1.5 : 1,
         ),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isGranted
-                  ? const Color(0xFFBBDEFB)
-                  : Colors.grey[200], // Blue shade
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: isGranted ? Colors.teal : Colors.grey[600],
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 300;
+          final actionWidget = !isGranted
+              ? TextButton(
+                  onPressed: onTap,
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text(
+                    "تفعيل",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                )
+              : Icon(
+                  Icons.check_circle,
+                  color: isDark ? Colors.tealAccent : Colors.teal,
+                  size: 28,
+                );
+
+          if (isNarrow) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isGranted ? Colors.teal[800] : Colors.black87,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isGranted
+                            ? (isDark
+                                ? Colors.teal.withValues(alpha: 0.25)
+                                : const Color(0xFFBBDEFB))
+                            : (isDark ? Colors.white10 : Colors.grey[200]),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        color: isGranted
+                            ? (isDark ? Colors.tealAccent : Colors.teal)
+                            : (isDark ? Colors.white70 : Colors.grey[600]),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isGranted
+                              ? (isDark
+                                  ? Colors.tealAccent.shade100
+                                  : Colors.teal[800])
+                              : (isDark ? Colors.white : Colors.black87),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Text(
                   description,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: isDark ? Colors.white60 : Colors.grey[600],
                   ),
                 ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: actionWidget,
+                ),
               ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (!isGranted)
-            TextButton(
-              onPressed: onTap,
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.teal,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text(
-                "تفعيل",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+            );
+          }
+
+          return Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isGranted
+                      ? (isDark
+                          ? Colors.teal.withValues(alpha: 0.25)
+                          : const Color(0xFFBBDEFB))
+                      : (isDark ? Colors.white10 : Colors.grey[200]),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: isGranted
+                      ? (isDark ? Colors.tealAccent : Colors.teal)
+                      : (isDark ? Colors.white70 : Colors.grey[600]),
+                  size: 24,
                 ),
               ),
-            )
-          else
-            const Icon(Icons.check_circle, color: Colors.teal, size: 28),
-        ],
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isGranted
+                            ? (isDark
+                                ? Colors.tealAccent.shade100
+                                : Colors.teal[800])
+                            : (isDark ? Colors.white : Colors.black87),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white60 : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              actionWidget,
+            ],
+          );
+        },
       ),
     );
   }

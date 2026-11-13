@@ -21,47 +21,62 @@ class HeaderSection extends StatelessWidget {
     final gregorianStr =
         intl.DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.now());
 
+    final primaryTextColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final secondaryTextColor = isDark ? Colors.white70 : const Color(0xFF475569);
+    final cardBg = isDark ? const Color(0xFF151515) : Colors.white;
+    final cardBorder = isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06);
+    final weatherBg = isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFF1F5F9);
+    final weatherBorder = isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.05);
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF151515)
-            : Colors.white.withValues(alpha: 0.1),
+        color: cardBg,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isDark ? Colors.white10 : Colors.white24,
+          color: cardBorder,
           width: 1,
         ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Stack(
-            alignment: Alignment.center,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Rings Section
-                  GestureDetector(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) =>
-                            ProfessionalClockDialog(vm: vm, isDark: isDark),
-                      );
-                    },
-                    child: SizedBox(
-                      width: 100,
-                      height: 100,
-                      child: CustomPaint(
-                        painter: _RingsPainter(
-                          prayersProgress: vm.prayersProgress,
-                          athkarProgress: vm.athkarProgress,
-                          quranProgress: vm.quranProgress,
-                        ),
-                        child: Center(
+              // Rings Section
+              GestureDetector(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) =>
+                        ProfessionalClockDialog(vm: vm, isDark: isDark),
+                  );
+                },
+                child: SizedBox(
+                  width: 90,
+                  height: 90,
+                  child: CustomPaint(
+                    painter: _RingsPainter(
+                      prayersProgress: vm.prayersProgress,
+                      athkarProgress: vm.athkarProgress,
+                      quranProgress: vm.quranProgress,
+                    ),
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Padding(
+                          padding: const EdgeInsets.all(6.0),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -69,22 +84,24 @@ class HeaderSection extends StatelessWidget {
                                 intl.DateFormat('hh:mm')
                                     .format(vm.now), // 12-hour format
                                 style: GoogleFonts.ibmPlexMono(
-                                    color: Colors.white,
+                                    color: primaryTextColor,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 26, // Bigger font
-                                    shadows: [
-                                      const Shadow(
-                                          color: Colors.black54,
-                                          blurRadius: 4,
-                                          offset: Offset(0, 2))
-                                    ]),
+                                    fontSize: 24,
+                                    shadows: isDark
+                                        ? [
+                                            const Shadow(
+                                                color: Colors.black54,
+                                                blurRadius: 4,
+                                                offset: Offset(0, 2))
+                                          ]
+                                        : null),
                               ),
                               Text(
                                 intl.DateFormat('a', 'ar')
                                     .format(vm.now), // AM/PM
                                 style: GoogleFonts.cairo(
-                                    color: Colors.white70,
-                                    fontSize: 12,
+                                    color: secondaryTextColor,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.bold),
                               )
                             ],
@@ -93,99 +110,117 @@ class HeaderSection extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
+              ),
 
-                  // Date & Location Info
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        // Weather Info Widget
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.15)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    vm.weatherInfo['temp'] ?? "",
-                                    style: GoogleFonts.ibmPlexMono(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Icon(Icons.cloud_outlined,
-                                      color: Colors.white70, size: 16),
-                                ],
-                              ),
-                              if (vm.weatherInfo['advice'] != null)
+              const SizedBox(width: 16),
+
+              // Date & Weather Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Weather Info Widget
+                    if (vm.weatherInfo['temp'] != null &&
+                        vm.weatherInfo['temp']!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: weatherBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: weatherBorder),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
                                 Text(
-                                  vm.weatherInfo['advice']!,
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 10,
+                                  vm.weatherInfo['temp']!,
+                                  style: GoogleFonts.ibmPlexMono(
+                                    color: primaryTextColor,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 15,
                                   ),
                                 ),
+                                const SizedBox(width: 6),
+                                Icon(Icons.cloud_outlined,
+                                    color: secondaryTextColor, size: 16),
+                              ],
+                            ),
+                            if (vm.weatherInfo['advice'] != null &&
+                                vm.weatherInfo['advice']!.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                vm.weatherInfo['advice']!,
+                                textAlign: TextAlign.end,
+                                style: TextStyle(
+                                  color: secondaryTextColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ],
-                          ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
+                      ),
+                    const SizedBox(height: 8),
 
-                        InkWell(
-                          onTap: () {
-                            // Open Calendar
-                            showDialog(
-                              context: context,
-                              builder: (context) =>
-                                  const CalendarExplorerDialog(initialTab: 0),
-                            );
-                          },
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(gregorianStr,
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold)),
-                              Text(hijriStr,
-                                  style: GoogleFonts.arefRuqaa(
-                                      color: Colors.white70, fontSize: 14)),
-                            ],
+                    InkWell(
+                      onTap: () {
+                        // Open Calendar
+                        showDialog(
+                          context: context,
+                          builder: (context) =>
+                              const CalendarExplorerDialog(initialTab: 0),
+                        );
+                      },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              gregorianStr,
+                              style: TextStyle(
+                                  color: primaryTextColor,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold),
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 2),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              hijriStr,
+                              style: GoogleFonts.arefRuqaa(
+                                  color: secondaryTextColor, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Divider(color: Colors.white.withValues(alpha: 0.1), height: 1),
+          Divider(color: cardBorder, height: 1),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.location_on_rounded,
-                  color: Colors.tealAccent, size: 14),
+              Icon(Icons.location_on_rounded,
+                  color: isDark ? Colors.tealAccent : Colors.teal, size: 14),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(vm.locationName,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: Colors.white,
+                    style: TextStyle(
+                        color: primaryTextColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 13)),
               ),

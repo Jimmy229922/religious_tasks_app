@@ -40,9 +40,15 @@ class AppUpdateService {
           debugPrint('Checking update: Update FOUND!');
           final assets = data['assets'] as List;
           var apkAsset = assets.firstWhere(
-            (asset) => (asset['name'] as String).toLowerCase().contains('v7a'),
+            (asset) {
+              final name = (asset['name'] as String).toLowerCase();
+              return name == 'app-release.apk' || name.contains('universal');
+            },
             orElse: () => assets.firstWhere(
-              (asset) => (asset['name'] as String).toLowerCase().contains('universal'),
+              (asset) {
+                final name = (asset['name'] as String).toLowerCase();
+                return name.contains('arm64') || name.contains('v7a');
+              },
               orElse: () => assets.firstWhere(
                 (asset) => (asset['name'] as String).endsWith('.apk'),
                 orElse: () => null,

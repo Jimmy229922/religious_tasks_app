@@ -18,8 +18,9 @@ class DhikrBackgroundRefresher {
       // calls _ensureInitialized which handles it.
       
       await notificationService.scheduleDhikrNotifications(forceReschedule: false);
+      await notificationService.reschedulePrayerNotificationsFromSavedLocation();
       
-      debugPrint("✅ Dhikr Background Refresher Completed Successfully");
+      debugPrint("✅ Background Refresher Completed Successfully");
     } catch (e, stack) {
       debugPrint("❌ Dhikr Background Refresher Failed: $e\n$stack");
     }

@@ -11,7 +11,8 @@ class NotificationPreferencesService {
     'maghrib',
     'isha',
   ];
-  static const List<int> dhikrIntervalOptions = [5, 10, 60, 90, 120];
+  static const List<int> dhikrIntervalOptions = [5, 10, 15, 60, 90, 120];
+  static const List<int> salawatIntervalOptions = [15, 30, 45, 60, 90, 120];
 
   static const String adhanSoundTypeKey = 'adhan_sound_type_v1';
   static const String hourlyDhikrEnabledKey = 'hourly_dhikr_enabled_v1';
@@ -23,6 +24,8 @@ class NotificationPreferencesService {
       'evening_athkar_reminder_enabled_v1';
   static const String floatingDhikrEnabledKey = 'floating_dhikr_enabled_v1';
   static const String selectedMoazzenIdKey = 'selected_moazzen_id_v1';
+  static const String salawatReminderEnabledKey = 'salawat_reminder_enabled_v1';
+  static const String salawatIntervalKey = 'salawat_interval_minutes_v1';
 
   Future<NotificationPreferences> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -30,6 +33,7 @@ class NotificationPreferencesService {
     final adhanEnabled = <String, bool>{};
     final prayerOffsets = <String, int>{};
     final storedInterval = prefs.getInt(hourlyDhikrIntervalKey);
+    final storedSalawatInterval = prefs.getInt(salawatIntervalKey);
     final soundTypeIndex = prefs.getInt(adhanSoundTypeKey) ?? 
         AdhanSoundType.full.index;
     final adhanSoundType = AdhanSoundType.values[soundTypeIndex.clamp(0, AdhanSoundType.values.length - 1)];
@@ -61,6 +65,12 @@ class NotificationPreferencesService {
           prefs.getBool(floatingDhikrEnabledKey) ?? defaults.floatingDhikrEnabled,
       selectedMoazzenId:
           prefs.getString(selectedMoazzenIdKey) ?? defaults.selectedMoazzenId,
+      salawatReminderEnabled:
+          prefs.getBool(salawatReminderEnabledKey) ?? defaults.salawatReminderEnabled,
+      salawatIntervalMinutes:
+          salawatIntervalOptions.contains(storedSalawatInterval)
+              ? storedSalawatInterval!
+              : defaults.salawatIntervalMinutes,
     );
   }
 
@@ -107,5 +117,15 @@ class NotificationPreferencesService {
   Future<void> setSelectedMoazzenId(String moazzenId) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(selectedMoazzenIdKey, moazzenId);
+  }
+
+  Future<void> setSalawatReminderEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(salawatReminderEnabledKey, value);
+  }
+
+  Future<void> setSalawatIntervalMinutes(int minutes) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(salawatIntervalKey, minutes);
   }
 }

@@ -11,6 +11,8 @@ class StorageService {
     _instance = StorageService._();
   }
 
+  static bool get isInitialized => _instance != null && _prefs != null;
+
   static StorageService get instance {
     if (_instance == null) {
       throw Exception("StorageService not initialized");
