@@ -8,7 +8,6 @@ import '../data/athkar_data.dart';
 import '../models/dhikr_item.dart';
 import 'package:religious_tasks_app/core/services/athkar_tracking_service.dart';
 import 'package:religious_tasks_app/core/services/storage_service.dart';
-import 'package:religious_tasks_app/core/services/audio_service.dart';
 import 'package:religious_tasks_app/features/athkar/models/athkar_time_helper.dart';
 import '../widgets/dhikr_card.dart';
 import '../widgets/details/athkar_header.dart';
@@ -52,15 +51,13 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   late final String _progressKey;
   late final String _dateKey;
 
-  final AudioService _audioService = AudioService();
-  int? _playingIndex;
+  bool get _isSleepAthkar => widget.title == "أذكار النوم";
 
   @override
   void initState() {
     super.initState();
-    _audioService.init();
 
-    if (widget.title == "أذكار النوم") {
+    if (_isSleepAthkar) {
       _progressKey = 'athkar_sleep_progress';
       _dateKey = 'athkar_sleep_date';
     } else {
@@ -101,32 +98,8 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
 
   @override
   void dispose() {
-    _audioService.stop();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  Future<void> _speak(DhikrItem item, int index) async {
-    if (_playingIndex == index) {
-      await _audioService.stop();
-      setState(() => _playingIndex = null);
-      return;
-    }
-
-    await _audioService.stop();
-    setState(() => _playingIndex = index);
-
-    if (_scrollController.hasClients && !_focusMode) {
-      _scrollController.animateTo(
-        (index * 220.0).clamp(0.0, _scrollController.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
-      );
-    }
-
-    await _audioService.speak(item.text, onCompletion: () {
-      if (mounted) setState(() => _playingIndex = null);
-    });
   }
 
   String _todayKey() {
@@ -143,7 +116,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
     final savedScale = prefs.getDouble(_fontScaleKey);
 
     List<DhikrItem> list;
-    if (widget.title == "أذكار النوم") {
+    if (_isSleepAthkar) {
       list = buildSleepAthkar();
     } else {
       list = widget.isMorning ? buildMorningAthkar() : buildEveningAthkar();
@@ -152,15 +125,20 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
     if (savedDate == today) {
       final saved = prefs.getString(_progressKey);
       if (saved != null) {
-        final List<dynamic> counts = jsonDecode(saved);
-        for (int i = 0; i < list.length && i < counts.length; i++) {
-          final value = counts[i];
-          if (value is int) {
-            final capped =
-                value < 0 ? 0 : (value > list[i].count ? list[i].count : value);
-            list[i].current = capped;
+        try {
+          final decoded = jsonDecode(saved);
+          if (decoded is List) {
+            for (int i = 0; i < list.length && i < decoded.length; i++) {
+              final value = decoded[i];
+              if (value is int) {
+                final capped = value < 0
+                    ? 0
+                    : (value > list[i].count ? list[i].count : value);
+                list[i].current = capped;
+              }
+            }
           }
-        }
+        } catch (_) {}
       }
     } else {
       await prefs.setString(_dateKey, today);
@@ -272,7 +250,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   void _checkCelebration() {
     if (_allDone && !_hasCelebrated) {
       _hasCelebrated = true;
-      AthkarTrackingService.markCompleted(isMorning: widget.isMorning);
+      if (!_isSleepAthkar) {
+        AthkarTrackingService.markCompleted(isMorning: widget.isMorning);
+      }
 
       showDialog(
         context: context,
@@ -298,8 +278,8 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
               Text(
                 "أتممت أذكار ${widget.title} بحمد الله وتوفيقه ✨",
                 textAlign: TextAlign.center,
-                style:
-                    GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold),
+                style: GoogleFonts.cairo(
+                    fontSize: 14, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               Container(
@@ -400,12 +380,14 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
     return _totalCurrent / total;
   }
 
-  String get _fallbackReward => widget.isMorning
-      ? 'ذكر عظيم من أذكار الصباح'
-      : 'ذكر عظيم من أذكار المساء';
+  String get _fallbackReward => _isSleepAthkar
+      ? 'ذكر من أذكار النوم'
+      : widget.isMorning
+          ? 'ذكر عظيم من أذكار الصباح'
+          : 'ذكر عظيم من أذكار المساء';
 
   Future<void> _exitScreen() async {
-    if (_allDone) {
+    if (_allDone && !_isSleepAthkar) {
       await AthkarTrackingService.markCompleted(isMorning: widget.isMorning);
     }
     if (!mounted) return;
@@ -454,11 +436,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
                 isFocus: false,
                 isMorning: widget.isMorning,
                 trueBlackMode: _isNightMode,
-                isPlaying: _playingIndex == index,
                 fontScale: _fontScale,
                 fallbackReward: _fallbackReward,
                 onIncrement: _increment,
-                onSpeak: (idx) => _speak(item, idx),
               ),
             ),
     );
@@ -507,11 +487,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
                     isFocus: true,
                     isMorning: widget.isMorning,
                     trueBlackMode: _isNightMode,
-                    isPlaying: _playingIndex == _focusIndex,
                     fontScale: _fontScale,
                     fallbackReward: _fallbackReward,
                     onIncrement: _increment,
-                    onSpeak: (idx) => _speak(item, idx),
                   ),
                 ),
         ),
@@ -670,7 +648,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: _isNightMode ? Colors.amber.shade200 : Colors.amber.shade900,
+                color: _isNightMode
+                    ? Colors.amber.shade200
+                    : Colors.amber.shade900,
               ),
             ),
           ),
@@ -724,30 +704,6 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
                     ? const Color(0xFF2E7D32)
                     : const Color(0xFF3949AB)));
 
-        final background = isDark
-            ? null
-            : LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: widget.title == "أذكار النوم"
-                    ? const [
-                        Color(0xFF0F172A),
-                        Color(0xFF1E293B),
-                        Color(0xFF0F172A)
-                      ]
-                    : (widget.isMorning
-                        ? const [
-                            Color(0xFFFFFBEB),
-                            Color(0xFFFEF3C7),
-                            Color(0xFFFFFBEB)
-                          ]
-                        : const [
-                            Color(0xFFEEF2FF),
-                            Color(0xFFE0E7FF),
-                            Color(0xFFEEF2FF)
-                          ]),
-              );
-
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) {
@@ -785,8 +741,19 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
               body: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : Container(
-                      decoration:
-                          isDark ? null : BoxDecoration(gradient: background),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: isDark
+                              ? const [Color(0xFF0B131E), Color(0xFF152233)]
+                              : (_isSleepAthkar
+                                  ? const [Color(0xFF0F172A), Color(0xFF1E293B)]
+                                  : (widget.isMorning
+                                      ? const [Color(0xFFF0FDF4), Color(0xFFE6F4EA), Color(0xFFF0FDF4)]
+                                      : const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)])),
+                        ),
+                      ),
                       child: _buildContent(context),
                     ),
             ),

@@ -9,17 +9,22 @@ class DhikrBackgroundRefresher {
   static Future<void> refreshCallback() async {
     try {
       debugPrint("🔄 Dhikr Background Refresher Started");
-      
+
       // Initialize timezones since this runs in a separate isolate
       tz_data.initializeTimeZones();
-      
+
       final notificationService = AppNotificationService();
-      // We don't need to call init() here because scheduleDhikrNotifications 
+      // We don't need to call init() here because scheduleDhikrNotifications
       // calls _ensureInitialized which handles it.
-      
-      await notificationService.scheduleDhikrNotifications(forceReschedule: false);
-      await notificationService.reschedulePrayerNotificationsFromSavedLocation();
-      
+
+      await notificationService.scheduleDhikrNotifications(
+          forceReschedule: false);
+      await notificationService.scheduleSalawatNotifications(
+        forceReschedule: false,
+      );
+      await notificationService
+          .reschedulePrayerNotificationsFromSavedLocation();
+
       debugPrint("✅ Background Refresher Completed Successfully");
     } catch (e, stack) {
       debugPrint("❌ Dhikr Background Refresher Failed: $e\n$stack");

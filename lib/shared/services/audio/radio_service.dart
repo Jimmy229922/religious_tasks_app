@@ -32,24 +32,24 @@ class RadioService {
   static const List<RadioStation> stations = [
     RadioStation(
       id: 'cairo_quran',
-      title: 'إذاعة القرآن الكريم من القاهرة',
-      url: 'https://stream.radiojar.com/8s5u5tpdtwzuv',
-      fallbackUrl: 'https://qurango.net/radio/cairo',
+      title: 'إذاعة القرآن الكريم (عامة ومباشرة)',
+      url: 'https://backup.qurango.net/radio/mix',
+      fallbackUrl: 'https://backup.qurango.net/radio/tarateel',
       category: 'radios',
       artUri: 'https://i.ibb.co/X7R0qjC/quran-radio.png',
     ),
     RadioStation(
       id: 'saudi_quran',
-      title: 'إذاعة القرآن الكريم من السعودية',
-      url: 'https://stream.radiojar.com/0tpy1h0kxtzuv',
-      fallbackUrl: 'https://qurango.net/radio/saudi',
+      title: 'إذاعة القرآن الكريم (تلاوات ممتازة)',
+      url: 'https://backup.qurango.net/radio/salma',
+      fallbackUrl: 'https://backup.qurango.net/radio/tarateel',
       category: 'radios',
     ),
     RadioStation(
       id: 'quran_live',
-      title: 'بث مباشر للقرآن الكريم (قناة القرآن)',
+      title: 'بث مباشر للقرآن الكريم (تراويح وتلاوات)',
       url: 'https://backup.qurango.net/radio/tarateel',
-      fallbackUrl: 'https://qurango.net/radio/tarateel',
+      fallbackUrl: 'https://backup.qurango.net/radio/mix',
       category: 'radios',
     ),
     RadioStation(
@@ -240,8 +240,8 @@ class RadioService {
         // preload: false guarantees ExoPlayer starts Shoutcast/Icecast streaming immediately without blocking
         await _player
             .setAudioSource(source, preload: false)
-            .timeout(const Duration(seconds: 5));
-        _player.play();
+            .timeout(const Duration(seconds: 15));
+        await _player.play();
         return; // Success!
       } catch (e) {
         debugPrint("Failed to play stream URL $url: $e");

@@ -19,6 +19,7 @@ import '../widgets/prayer_countdown_card.dart';
 import '../../athkar/screens/athkar_details_screen.dart';
 import '../../tasbeeh/screens/custom_tasbeeh_screen.dart';
 import '../../athkar/screens/prophet_prayers_screen.dart';
+import '../../athkar/screens/qiyam_layl_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../statistics/screens/statistics_screen.dart';
 
@@ -446,6 +447,11 @@ class _TasksScreenState extends State<TasksScreen> {
           ),
         ),
       );
+    } else if (text == kPrayerQiyam || text.contains("قيام")) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const QiyamLaylScreen()),
+      );
     }
   }
 
@@ -592,6 +598,9 @@ class _TasksScreenState extends State<TasksScreen> {
     } else if (task.name == kCustomWird) {
       Navigator.push(context,
           MaterialPageRoute(builder: (_) => const CustomTasbeehScreen()));
+    } else if (task.name.contains(kPrayerQiyam) || task.name.contains('قيام')) {
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const QiyamLaylScreen()));
     } else {
       vm.toggleTask(index);
     }

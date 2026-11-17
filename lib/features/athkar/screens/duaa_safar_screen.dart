@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:religious_tasks_app/core/services/audio_service.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 
 class DuaaSafarItem {
@@ -26,8 +25,6 @@ class DuaaSafarScreen extends StatefulWidget {
 }
 
 class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
-  final AudioService _audioService = AudioService();
-  int? _playingIndex;
   late final List<int> _counters;
 
   final List<DuaaSafarItem> _items = const [
@@ -79,28 +76,11 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
   void initState() {
     super.initState();
     _counters = List<int>.filled(_items.length, 0);
-    _audioService.init();
   }
 
   @override
   void dispose() {
-    _audioService.stop();
     super.dispose();
-  }
-
-  Future<void> _speak(String text, int index) async {
-    if (_playingIndex == index) {
-      await _audioService.stop();
-      setState(() => _playingIndex = null);
-      return;
-    }
-
-    await _audioService.stop();
-    setState(() => _playingIndex = index);
-
-    await _audioService.speak(text, onCompletion: () {
-      if (mounted) setState(() => _playingIndex = null);
-    });
   }
 
   @override
@@ -193,7 +173,6 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
                 final item = _items[index];
                 final currentCount = _counters[index];
                 final isDone = currentCount >= item.count;
-                final isPlaying = _playingIndex == index;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),
@@ -339,20 +318,10 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
                           const SizedBox(height: 12),
                         ],
 
-                        // Action buttons (Audio, Copy, Share)
+                        // Action buttons (Copy, Share)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            IconButton(
-                              icon: Icon(
-                                isPlaying
-                                    ? Icons.stop_circle_outlined
-                                    : Icons.volume_up_rounded,
-                                color: isPlaying ? accentColor : (isDark ? Colors.white60 : Colors.black54),
-                              ),
-                              onPressed: () => _speak(item.text, index),
-                              tooltip: 'استماع',
-                            ),
                             IconButton(
                               icon: Icon(
                                 Icons.copy_rounded,

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
@@ -106,6 +105,7 @@ class TasksViewModel extends ChangeNotifier {
 
   // Clock timer state
   DateTime _now = DateTime.now();
+  String _activeDate = intl.DateFormat('yyyy-MM-dd').format(DateTime.now());
   DateTime get now => _now;
   Timer? _clockTimer;
   DateTime? _lastLocationRefresh;
@@ -225,18 +225,25 @@ class TasksViewModel extends ChangeNotifier {
   void _loadBadges() {
     final badgesJson = _storage.getString(_badgesKey);
     if (badgesJson != null) {
-      _earnedBadges = List<String>.from(jsonDecode(badgesJson));
+      try {
+        final decoded = jsonDecode(badgesJson);
+        if (decoded is List && decoded.every((item) => item is String)) {
+          _earnedBadges = List<String>.from(decoded);
+        }
+      } catch (_) {
+        _earnedBadges = [];
+      }
     }
   }
 
   void _loadTotalDhikr() {
     final count = _storage.getString(_totalDhikrCountKey);
-    _totalDhikrCount = count != null ? int.parse(count) : 0;
+    _totalDhikrCount = count == null ? 0 : (int.tryParse(count) ?? 0);
   }
 
   Future<void> _checkMilestones() async {
     bool changed = false;
-    
+
     // Milestone: 1000 Dhikr
     if (_totalDhikrCount >= 1000 && !_earnedBadges.contains('dhikr_1000')) {
       _earnedBadges.add('dhikr_1000');
@@ -284,8 +291,6 @@ class TasksViewModel extends ChangeNotifier {
     // Event Banner: Check date first
     _currentEventBanner = _getDateSpecificEvent() ??
         _generalEventsList[dayOfYear % _generalEventsList.length];
-
-    _updateWeather();
   }
 
   void refreshRandomContent() {
@@ -317,8 +322,6 @@ class TasksViewModel extends ChangeNotifier {
           _generalEventsList[random % _generalEventsList.length];
     }
 
-    _updateWeather();
-
     notifyListeners();
   }
 
@@ -336,7 +339,7 @@ class TasksViewModel extends ChangeNotifier {
   }
 
   Future<void> refreshLocation() async {
-    await _initLocationAndPrayers();
+    await _initLocationAndPrayers(requestPermission: true);
   }
 
   @override
@@ -351,19 +354,31 @@ class TasksViewModel extends ChangeNotifier {
       // Only notify listeners if the minute has changed (drastic optimization)
       if (newNow.minute != _now.minute) {
         _now = newNow;
+        final newDate = intl.DateFormat('yyyy-MM-dd').format(newNow);
+        if (newDate != _activeDate) {
+          _activeDate = newDate;
+          unawaited(_handleDateChange());
+        }
         _updatePrayerWidget();
-        
+
         // Auto-refresh location every hour
-        if (_lastLocationRefresh == null || 
+        if (_lastLocationRefresh == null ||
             newNow.difference(_lastLocationRefresh!).inHours >= 1) {
           refreshLocation();
         }
-        
+
         notifyListeners();
       } else {
         _now = newNow;
       }
     });
+  }
+
+  Future<void> _handleDateChange() async {
+    await _initTasks();
+    await _initLocationAndPrayers();
+    _initRandomContent();
+    notifyListeners();
   }
 
   Future<void> _initTasks() async {
@@ -441,10 +456,18 @@ class TasksViewModel extends ChangeNotifier {
   Future<void> _loadStreaks() async {
     final jsonStr = _storage.getString(_athkarStreaksKey);
     if (jsonStr != null) {
-      final data = jsonDecode(jsonStr);
-      _morningStreak = data['morning'] ?? 0;
-      _eveningStreak = data['evening'] ?? 0;
-      _sleepStreak = data['sleep'] ?? 0;
+      try {
+        final decoded = jsonDecode(jsonStr);
+        if (decoded is Map) {
+          _morningStreak = decoded['morning'] is int ? decoded['morning'] : 0;
+          _eveningStreak = decoded['evening'] is int ? decoded['evening'] : 0;
+          _sleepStreak = decoded['sleep'] is int ? decoded['sleep'] : 0;
+        }
+      } catch (_) {
+        _morningStreak = 0;
+        _eveningStreak = 0;
+        _sleepStreak = 0;
+      }
     }
   }
 
@@ -498,16 +521,18 @@ class TasksViewModel extends ChangeNotifier {
     await _storage.setString(_tasksKey, jsonEncode(tasksJson));
   }
 
-  Future<void> _initLocationAndPrayers() async {
+  Future<void> _initLocationAndPrayers({bool requestPermission = false}) async {
     // 1. Try to load cached location first for instant UI
     final savedLat = _storage.getString(_latKey);
     final savedLng = _storage.getString(_lngKey);
     _locationName = _storage.getString(_locNameKey) ?? AppStrings.locating;
 
-    if (savedLat != null && savedLng != null) {
+    final parsedLat = savedLat == null ? null : double.tryParse(savedLat);
+    final parsedLng = savedLng == null ? null : double.tryParse(savedLng);
+    if (parsedLat != null && parsedLng != null) {
       final pos = Position(
-        latitude: double.parse(savedLat),
-        longitude: double.parse(savedLng),
+        latitude: parsedLat,
+        longitude: parsedLng,
         timestamp: DateTime.now(),
         accuracy: 0,
         altitude: 0,
@@ -525,11 +550,12 @@ class TasksViewModel extends ChangeNotifier {
     notifyListeners();
 
     // 2. Fetch fresh location in background
-    final result = await _locationService.getCurrentPosition();
+    final result = await _locationService.getCurrentPosition(
+      requestPermission: requestPermission,
+    );
+    _lastLocationRefresh = DateTime.now();
 
     if (result.position != null) {
-      _lastLocationRefresh = DateTime.now();
-      
       // Save for next time
       await _storage.setString(_latKey, result.position!.latitude.toString());
       await _storage.setString(_lngKey, result.position!.longitude.toString());
@@ -541,7 +567,7 @@ class TasksViewModel extends ChangeNotifier {
         _storage.setString(_locNameKey, name);
         notifyListeners();
       });
-    } else if (savedLat == null) {
+    } else if (parsedLat == null || parsedLng == null) {
       // Only show error if we don't even have a cached version
       _locationName = result.message.isNotEmpty
           ? result.message
@@ -574,7 +600,8 @@ class TasksViewModel extends ChangeNotifier {
           case 'MA':
           case 'DZ':
           case 'TN':
-            method = CalculationMethod.muslim_world_league; // Fallback from committee
+            method = CalculationMethod
+                .muslim_world_league; // Fallback from committee
             break;
           case 'JO':
           case 'LB':
@@ -601,15 +628,12 @@ class TasksViewModel extends ChangeNotifier {
 
     // Load manual offsets from settings
     try {
-      final notificationPrefs =
-          await NotificationPreferencesService().load();
+      final notificationPrefs = await NotificationPreferencesService().load();
       params.adjustments.fajr = notificationPrefs.getPrayerOffset('fajr');
-      params.adjustments.sunrise =
-          notificationPrefs.getPrayerOffset('sunrise');
+      params.adjustments.sunrise = notificationPrefs.getPrayerOffset('sunrise');
       params.adjustments.dhuhr = notificationPrefs.getPrayerOffset('dhuhr');
       params.adjustments.asr = notificationPrefs.getPrayerOffset('asr');
-      params.adjustments.maghrib =
-          notificationPrefs.getPrayerOffset('maghrib');
+      params.adjustments.maghrib = notificationPrefs.getPrayerOffset('maghrib');
       params.adjustments.isha = notificationPrefs.getPrayerOffset('isha');
     } catch (e) {
       debugPrint("Failed to load prayer offsets: $e");
@@ -624,7 +648,8 @@ class TasksViewModel extends ChangeNotifier {
     final afterTomorrow = DateTime.now().add(const Duration(days: 2));
     final afterTomorrowTimes = PrayerTimes(
         coordinates,
-        DateComponents(afterTomorrow.year, afterTomorrow.month, afterTomorrow.day),
+        DateComponents(
+            afterTomorrow.year, afterTomorrow.month, afterTomorrow.day),
         params);
 
     _prayerTimes = todayTimes;
@@ -660,33 +685,40 @@ class TasksViewModel extends ChangeNotifier {
       final safeDuration = duration.isNegative ? Duration.zero : duration;
       final hours = safeDuration.inHours;
       final minutes = safeDuration.inMinutes % 60;
-      final remaining = hours > 0
-          ? '$hours\u0633 $minutes\u062f'
-          : '$minutes\u062f';
+      final remaining =
+          hours > 0 ? '$hours\u0633 $minutes\u062f' : '$minutes\u062f';
 
-      await HomeWidget.saveWidgetData<int>('next_prayer_timestamp', nextTime.millisecondsSinceEpoch);
+      await HomeWidget.saveWidgetData<int>(
+          'next_prayer_timestamp', nextTime.millisecondsSinceEpoch);
       await HomeWidget.saveWidgetData<String>(
           'prayer_name', _getPrayerNameForWidget(nextPrayer));
       await HomeWidget.saveWidgetData<String>(
           'prayer_time', intl.DateFormat.jm('ar').format(nextTime));
       await HomeWidget.saveWidgetData<String>('remaining_time', remaining);
-      
+
       // Additional interactive data
       final nowHijri = hijri.HijriCalendar.now();
-      await HomeWidget.saveWidgetData<String>('hijri_date', "${nowHijri.hDay} ${nowHijri.longMonthName} ${nowHijri.hYear}");
+      await HomeWidget.saveWidgetData<String>('hijri_date',
+          "${nowHijri.hDay} ${nowHijri.longMonthName} ${nowHijri.hYear}");
       await HomeWidget.saveWidgetData<String>('location_name', _locationName);
 
       // Send all prayer times to widget
       final formatter = intl.DateFormat.jm('ar');
-      await HomeWidget.saveWidgetData<String>('fajr_time', formatter.format(_prayerTimes!.fajr));
-      await HomeWidget.saveWidgetData<String>('dhuhr_time', formatter.format(_prayerTimes!.dhuhr));
-      await HomeWidget.saveWidgetData<String>('asr_time', formatter.format(_prayerTimes!.asr));
-      await HomeWidget.saveWidgetData<String>('maghrib_time', formatter.format(_prayerTimes!.maghrib));
-      await HomeWidget.saveWidgetData<String>('isha_time', formatter.format(_prayerTimes!.isha));
-      await HomeWidget.saveWidgetData<String>('next_prayer_id', nextPrayer.name);
+      await HomeWidget.saveWidgetData<String>(
+          'fajr_time', formatter.format(_prayerTimes!.fajr));
+      await HomeWidget.saveWidgetData<String>(
+          'dhuhr_time', formatter.format(_prayerTimes!.dhuhr));
+      await HomeWidget.saveWidgetData<String>(
+          'asr_time', formatter.format(_prayerTimes!.asr));
+      await HomeWidget.saveWidgetData<String>(
+          'maghrib_time', formatter.format(_prayerTimes!.maghrib));
+      await HomeWidget.saveWidgetData<String>(
+          'isha_time', formatter.format(_prayerTimes!.isha));
+      await HomeWidget.saveWidgetData<String>(
+          'next_prayer_id', nextPrayer.name);
 
       await HomeWidget.updateWidget(androidName: _prayerWidgetName);
-      
+
       // Update Other Widgets
       await _updateOtherWidgets();
     } catch (e) {
@@ -702,15 +734,20 @@ class TasksViewModel extends ChangeNotifier {
       await HomeWidget.updateWidget(androidName: 'DhikrWidgetProvider');
 
       // 2. Verse Widget
-      await HomeWidget.saveWidgetData<String>('verse_text', _currentInspiration);
-      await HomeWidget.saveWidgetData<String>('verse_source', _currentInspirationSource.isEmpty ? "حكمة اليوم" : _currentInspirationSource);
+      await HomeWidget.saveWidgetData<String>(
+          'verse_text', _currentInspiration);
+      await HomeWidget.saveWidgetData<String>(
+          'verse_source',
+          _currentInspirationSource.isEmpty
+              ? "حكمة اليوم"
+              : _currentInspirationSource);
       await HomeWidget.updateWidget(androidName: 'VerseWidgetProvider');
 
       // 3. Quran Widget
       await HomeWidget.saveWidgetData<String>('last_surah', _lastSurah);
-      await HomeWidget.saveWidgetData<String>('last_ayah', _lastAyah.toString());
+      await HomeWidget.saveWidgetData<String>(
+          'last_ayah', _lastAyah.toString());
       await HomeWidget.updateWidget(androidName: 'QuranWidgetProvider');
-      
     } catch (e) {
       debugPrint("Other widgets update failed: $e");
     }
@@ -858,7 +895,7 @@ class TasksViewModel extends ChangeNotifier {
     // _lastAyah = int.tryParse(_storage.getString(_quranAyahKey) ?? "1") ?? 1;
     // But usually it supports others. Let's try to see if I can simply store as Json or String to be safe.
     final a = _storage.getString(_quranAyahKey);
-    _lastAyah = a != null ? int.parse(a) : 1;
+    _lastAyah = a == null ? 1 : (int.tryParse(a) ?? 1);
   }
 
   Future<void> updateQuranProgress(String surah, int ayah) async {
@@ -940,56 +977,6 @@ class TasksViewModel extends ChangeNotifier {
     }
 
     return "استغفر الله";
-  }
-
-  // 4. Weather Mock
-  Map<String, String> _weatherInfo = {};
-  Map<String, String> get weatherInfo => _weatherInfo;
-
-  void _updateWeather() {
-    final month = _now.month;
-    // hour is not used anymore
-    final random = Random();
-
-    String temp = "25°";
-    String advice = "جو معتدل";
-
-    // Add some random variation to temp to make it look "updated"
-    int variation = random.nextInt(5) - 2; // -2 to +2
-
-    if (month >= 11 || month <= 2) {
-      // Winter
-      temp = "${12 + variation}°";
-      List<String> advices = [
-        "الجو بارد، ارتدِ ملابس ثقيلة للصلاة",
-        "جو شتوي لطيف، لا تنسى الأذكار",
-        "برودة الجو تذكرنا بزمهرير جهنم، استجر بالله",
-        "اغتنم ليل الشتاء الطويل في القيام"
-      ];
-      advice = advices[random.nextInt(advices.length)];
-    } else if (month >= 6 && month <= 8) {
-      // Summer
-      temp = "${38 + variation}°";
-      List<String> advices = [
-        "حار ومشمش، حافظ على رطوبتك",
-        "حر الدنيا يذكرنا بحر الآخرة",
-        "تجنب الشمس وقت الظهيرة",
-        "سبحان من يسبح الرعد بحمده"
-      ];
-      advice = advices[random.nextInt(advices.length)];
-    } else {
-      // Spring/Autumn
-      temp = "${25 + variation}°";
-      List<String> advices = [
-        "جو معتدل ولطيف",
-        "سبحان مغير الأحوال",
-        "استمتع بنعم الله في خلقه",
-        "الجو مناسب للمشي إلى المسجد"
-      ];
-      advice = advices[random.nextInt(advices.length)];
-    }
-
-    _weatherInfo = {"temp": temp, "advice": advice};
   }
 
   // --- Dynamic Background Logic ---

@@ -14,11 +14,9 @@ class DhikrCard extends StatelessWidget {
   final bool isFocus;
   final bool isMorning;
   final bool trueBlackMode;
-  final bool isPlaying;
   final double fontScale;
   final String fallbackReward;
   final Function(int) onIncrement;
-  final Function(int) onSpeak;
 
   const DhikrCard({
     super.key,
@@ -28,11 +26,9 @@ class DhikrCard extends StatelessWidget {
     required this.isFocus,
     required this.isMorning,
     required this.trueBlackMode,
-    required this.isPlaying,
     required this.fontScale,
     required this.fallbackReward,
     required this.onIncrement,
-    required this.onSpeak,
   });
 
   double _scaled(double size) => size * fontScale;
@@ -41,14 +37,14 @@ class DhikrCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = isMorning
-        ? (isDark ? const Color(0xFF10B981) : const Color(0xFF059669))
-        : (isDark ? const Color(0xFF6366F1) : const Color(0xFF4F46E5));
+        ? (isDark ? const Color(0xFF10B981) : const Color(0xFF0F766E))
+        : (isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5));
 
     final isDone = item.current >= item.count;
     final progress = item.count == 0 ? 0.0 : item.current / item.count;
 
     final surface = isDone
-        ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFECFDF5))
+        ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5))
         : (trueBlackMode
             ? Colors.black
             : (isDark ? const Color(0xFF141A1E) : Colors.white));
@@ -57,11 +53,11 @@ class DhikrCard extends StatelessWidget {
         ? (isDark ? Colors.teal.shade400 : Colors.teal.shade600)
         : (trueBlackMode
             ? Colors.white24
-            : (isDark ? Colors.white10 : Colors.black12));
+            : (isDark ? Colors.white10 : accent.withValues(alpha: 0.22)));
 
-    final textPrimary = isDark ? Colors.white : Colors.black87;
-    final textMuted = isDark ? Colors.white70 : Colors.black54;
-    final rewardColor = isDark ? Colors.white70 : const Color(0xFF475569);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final textMuted = isDark ? Colors.white70 : Colors.grey.shade700;
+    final rewardColor = isDark ? Colors.white70 : const Color(0xFF334155);
 
     final rewardText =
         item.reward.trim().isEmpty ? fallbackReward : item.reward;
@@ -97,34 +93,38 @@ class DhikrCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: border,
-            width: isDone ? 2 : 1,
+            width: isDone ? 2 : 1.2,
           ),
-          boxShadow: isDone
-              ? [
-                  BoxShadow(
-                    color: accent.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
+          boxShadow: [
+            BoxShadow(
+              color: accent.withValues(alpha: isDone ? 0.2 : 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Padding(
           padding: EdgeInsets.all(isFocus ? 20 : 16),
           child: Column(
             children: [
-              // Header Row: Audio Button + Card Generator Button + Status Badge
+              // Header Row: Category Badge + Status Badge + Card Generator Button
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
+                      Icon(
+                        Icons.auto_awesome_rounded,
+                        color: accent,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 6),
                       if (isDone) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                            color: const Color(0xFF10B981).withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: const Color(0xFF10B981), width: 1),
                           ),
@@ -149,61 +149,40 @@ class DhikrCard extends StatelessWidget {
                           "الذكر ${index + 1} من $totalCount",
                           style: GoogleFonts.cairo(
                             color: textMuted,
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ],
                   ),
-                  Row(
-                    children: [
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        icon: const Icon(Icons.style_rounded,
-                            color: Colors.teal, size: 20),
-                        tooltip: "صانع البطاقات الإيمانية",
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (_) => IslamicCardGeneratorDialog(
-                              title: isMorning ? "أذكار الصباح 🌅" : "أذكار المساء 🌌",
-                              content: item.text,
-                              subtitle: item.reward,
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      if (!isFocus)
-                        GestureDetector(
-                          onTap: () => onSpeak(index),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              isPlaying
-                                  ? Icons.stop_circle_outlined
-                                  : Icons.volume_up_rounded,
-                              key: ValueKey(isPlaying),
-                              size: 22,
-                              color: isPlaying ? accent : textMuted,
-                            ),
-                          ),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: Icon(Icons.style_rounded, color: accent, size: 20),
+                    tooltip: "صانع البطاقات الإيمانية",
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => IslamicCardGeneratorDialog(
+                          title: isMorning ? "أذكار الصباح 🌅" : "أذكار المساء 🌌",
+                          content: item.text,
+                          subtitle: item.reward,
                         ),
-                    ],
+                      );
+                    },
                   ),
                 ],
               ),
 
-              const SizedBox(height: 12),
+              Divider(height: 20, color: accent.withValues(alpha: 0.15)),
 
-              // Dhikr Main Text
+              // Dhikr Main Text with Amiri font style
               _buildDhikrText(item.text, textPrimary, accent, textSize),
 
               const SizedBox(height: 16),
 
-              // Reward / Virtue Section
+              // Reward / Virtue Section (matching Ruqyah & Qiyam Layl info cards)
               if (rewardText.isNotEmpty) ...[
                 Container(
                   width: double.infinity,
@@ -213,17 +192,19 @@ class DhikrCard extends StatelessWidget {
                         ? Colors.white10
                         : (isDark
                             ? Colors.white.withValues(alpha: 0.05)
-                            : Colors.grey.withValues(alpha: 0.08)),
+                            : accent.withValues(alpha: 0.07)),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                      color: isDark
+                          ? Colors.white10
+                          : accent.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.auto_awesome_rounded,
-                          color: Colors.amber, size: rewardSize + 4),
+                      const Icon(Icons.info_outline_rounded,
+                          color: Colors.amber, size: 18),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -329,9 +310,9 @@ class DhikrCard extends StatelessWidget {
     Color accent,
     double fontSize,
   ) {
-    final baseStyle = TextStyle(
+    final baseStyle = GoogleFonts.amiri(
       fontSize: fontSize,
-      height: 1.8,
+      height: 1.85,
       fontWeight: FontWeight.w600,
       color: textPrimary,
     );
@@ -360,7 +341,7 @@ class DhikrCard extends StatelessWidget {
       style: baseStyle,
       strutStyle: StrutStyle(
         fontSize: fontSize,
-        height: 1.8,
+        height: 1.85,
         forceStrutHeight: true,
       ),
     );

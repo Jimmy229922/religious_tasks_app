@@ -14,18 +14,29 @@ class RadioViewModel extends ChangeNotifier {
 
   // Search, Categories & Favorites State
   String _searchQuery = '';
-  String _selectedCategory = 'all'; // 'all', 'favorites', 'radios', 'reciters', 'tafseer'
+  String _selectedCategory =
+      'all'; // 'all', 'favorites', 'radios', 'reciters', 'tafseer'
   List<String> _favoriteStationIds = [];
 
   // Sleep Timer State
   Timer? _sleepTimer;
   Timer? _countdownTicker;
   Duration? _remainingSleepTime;
+  StreamSubscription<PlayerState>? _playerStateSubscription;
+  Future<void> _overlayOperation = Future<void>.value();
+  int _overlayGeneration = 0;
+  bool _isDisposed = false;
 
   RadioViewModel() {
     _loadFavorites();
-    _radioService.player.playerStateStream.listen((state) {
-      _handleOverlay();
+    _playerStateSubscription =
+        _radioService.player.playerStateStream.listen((state) {
+      final generation = ++_overlayGeneration;
+      _overlayOperation = _overlayOperation
+          .then((_) => _handleOverlay(generation))
+          .catchError((Object error) {
+        debugPrint('Error updating radio overlay: $error');
+      });
       notifyListeners();
     });
   }
@@ -105,7 +116,8 @@ class RadioViewModel extends ChangeNotifier {
     });
 
     _countdownTicker = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_remainingSleepTime == null || _remainingSleepTime! <= Duration.zero) {
+      if (_remainingSleepTime == null ||
+          _remainingSleepTime! <= Duration.zero) {
         timer.cancel();
       } else {
         _remainingSleepTime = _remainingSleepTime! - const Duration(seconds: 1);
@@ -117,18 +129,23 @@ class RadioViewModel extends ChangeNotifier {
   String get formattedRemainingSleepTime {
     if (_remainingSleepTime == null) return '';
     final minutes = _remainingSleepTime!.inMinutes.toString().padLeft(2, '0');
-    final seconds = (_remainingSleepTime!.inSeconds % 60).toString().padLeft(2, '0');
+    final seconds =
+        (_remainingSleepTime!.inSeconds % 60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
   }
 
-  void _handleOverlay() async {
+  Future<void> _handleOverlay(int generation) async {
+    bool isStale() => _isDisposed || generation != _overlayGeneration;
+
+    if (isStale()) return;
     if (isPlaying) {
       if (!await FlutterOverlayWindow.isPermissionGranted()) {
-        await FlutterOverlayWindow.requestPermission();
         return;
       }
+      if (isStale() || !isPlaying) return;
 
       final bool isRunning = await FlutterOverlayWindow.isActive();
+      if (isStale() || !isPlaying) return;
       if (!isRunning) {
         await FlutterOverlayWindow.showOverlay(
           enableDrag: true,
@@ -138,9 +155,10 @@ class RadioViewModel extends ChangeNotifier {
           alignment: OverlayAlignment.centerRight,
         );
       }
-      Future.delayed(const Duration(milliseconds: 500), () {
-        FlutterOverlayWindow.shareData("RADIO_MODE");
-      });
+      if (isStale() || !isPlaying) return;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (isStale() || !isPlaying) return;
+      await FlutterOverlayWindow.shareData("RADIO_MODE");
     } else {
       await FlutterOverlayWindow.closeOverlay();
     }
@@ -185,8 +203,17 @@ class RadioViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _sleepTimer?.cancel();
     _countdownTicker?.cancel();
+    _playerStateSubscription?.cancel();
     super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
   }
 }

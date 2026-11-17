@@ -60,30 +60,42 @@ class _FullAdhanOverlayDialogState extends State<FullAdhanOverlayDialog>
     }
   }
 
-  void _onPrayerCompleted() {
+  Future<void> _onPrayerCompleted() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final vm = Provider.of<TasksViewModel>(context, listen: false);
       vm.toggleTask(_getPrayerIndex(widget.prayerKey), completionValue: true);
     } catch (_) {}
 
-    AppNotificationService().stopAdhanAudio();
+    await AppNotificationService().stopAdhanAudio();
+    if (!mounted) return;
     Navigator.pop(context);
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       SnackBar(
-        content: Text("تقبل الله طاعتك وصالح أعمالك في صلاة ${widget.prayerName} 🤲"),
+        content: Text(
+            "تقبل الله طاعتك وصالح أعمالك في صلاة ${widget.prayerName} 🤲"),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  void _snoozeTenMinutes() {
-    AppNotificationService().stopAdhanAudio();
+  Future<void> _snoozeTenMinutes() async {
+    final messenger = ScaffoldMessenger.of(context);
+    var scheduled = false;
+    try {
+      await AppNotificationService().stopAdhanAudio();
+      await AppNotificationService().snoozePrayerReminder(widget.prayerName);
+      scheduled = true;
+    } catch (_) {}
+    if (!mounted) return;
     Navigator.pop(context);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("سيتم تذكيرك بالصلاة بعد 10 دقائق ⏱️"),
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(scheduled
+            ? "سيتم تذكيرك بالصلاة بعد 10 دقائق ⏱️"
+            : "تعذر جدولة التذكير. حاول مرة أخرى من إعدادات التنبيهات."),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -108,7 +120,8 @@ class _FullAdhanOverlayDialogState extends State<FullAdhanOverlayDialog>
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

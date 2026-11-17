@@ -70,7 +70,7 @@ class _SplashScreenState extends State<SplashScreen> {
       ]);
 
       if (!mounted) return;
-      
+
       final prefs = await prefsFuture;
       final bool onboardingCompleted =
           prefs.getBool('onboarding_completed') ?? false;
@@ -80,7 +80,8 @@ class _SplashScreenState extends State<SplashScreen> {
       if (onboardingCompleted) {
         _navigateToHome();
       } else {
-        bool allGranted = await _areAllPermissionsGranted().catchError((e) => false);
+        bool allGranted =
+            await _areAllPermissionsGranted().catchError((e) => false);
         if (allGranted) {
           await prefs.setBool('onboarding_completed', true);
           _navigateToHome();
@@ -90,7 +91,8 @@ class _SplashScreenState extends State<SplashScreen> {
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
                   const PermissionsOnboardingScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
               transitionDuration: const Duration(milliseconds: 350),
@@ -146,12 +148,10 @@ class _SplashScreenState extends State<SplashScreen> {
         ? const [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)]
         : const [Color(0xFFF0FDFA), Color(0xFFE0F2F1), Color(0xFFCCFBF1)];
     final titleColor = isDark ? Colors.white : const Color(0xFF0F3D3E);
-    final subtitleColor = isDark
-        ? Colors.white.withValues(alpha: 0.9)
-        : const Color(0xFF115E59);
-    final mutedColor = isDark
-        ? Colors.white.withValues(alpha: 0.75)
-        : const Color(0xFF334155);
+    final subtitleColor =
+        isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF115E59);
+    final mutedColor =
+        isDark ? Colors.white.withValues(alpha: 0.75) : const Color(0xFF334155);
 
     return Scaffold(
       body: SizedBox.expand(
@@ -172,7 +172,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(height: 10),
-                  
+
                   // Center Logo & Title Block
                   Column(
                     children: [
@@ -242,7 +242,7 @@ class _SplashScreenState extends State<SplashScreen> {
                         ),
                       ),
                       const SizedBox(height: 32),
-                      
+
                       // Loading Indicator
                       SizedBox(
                         width: 28,
@@ -264,7 +264,7 @@ class _SplashScreenState extends State<SplashScreen> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 24),
-                      
+
                       // Daily Ayah / Quote Glass Card
                       if (_dailyQuote.isNotEmpty)
                         Container(
@@ -306,7 +306,7 @@ class _SplashScreenState extends State<SplashScreen> {
                         ),
                     ],
                   ),
-                  
+
                   // Footer
                   Column(
                     children: [
@@ -319,7 +319,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '© 2027 جميع الحقوق محفوظة - أحمد جمال',
+                        '© 2026 جميع الحقوق محفوظة - أحمد جمال',
                         style: TextStyle(
                           color: mutedColor.withValues(alpha: 0.8),
                           fontSize: 11,

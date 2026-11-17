@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -14,16 +13,80 @@ class BackupService {
   static const String _googleAccountKey = 'saved_google_account_email';
   static const String _lastBackupTimeKey = 'last_cloud_backup_time';
   static const String _autoSyncEnabledKey = 'auto_cloud_sync_enabled';
+  static const int _maxBackupBytes = 512 * 1024;
+  static const String _googleWebClientId =
+      String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
 
-  static const MethodChannel _platformChannel =
-      MethodChannel('religious_tasks_app/native_adhan');
+  static const Set<String> _allowedBackupKeys = {
+    'app_theme_mode_v1',
+    'app_theme_mode',
+    'hijri_date_offset_v1',
+    'khatmah_target_days',
+    'khatmah_start_page',
+    'khatmah_start_date',
+    'athkar_morning_done_dates',
+    'athkar_evening_done_dates',
+    'athkar_morning_date',
+    'athkar_morning_progress',
+    'athkar_evening_date',
+    'athkar_evening_progress',
+    'athkar_sleep_date',
+    'athkar_sleep_progress',
+    'athkar_font_scale',
+    'last_opened_date_v2',
+    'saved_tasks_v2',
+    'athkar_streaks_v1',
+    'earned_badges_v1',
+    'total_dhikr_count_v1',
+    'quran_last_surah',
+    'quran_last_ayah',
+    'prophet_prayer_counter',
+    'custom_tasbeeh_athkar',
+    'total_tasbeeh_count_v1',
+    'favorite_radio_stations',
+    'calculation_method',
+    'adhan_sound_type_v1',
+    'hourly_dhikr_enabled_v1',
+    'hourly_dhikr_interval_minutes_v1',
+    'morning_athkar_reminder_enabled_v1',
+    'evening_athkar_reminder_enabled_v1',
+    'floating_dhikr_enabled_v1',
+    'selected_moazzen_id_v1',
+    'salawat_reminder_enabled_v1',
+    'salawat_interval_minutes_v1',
+    'user_custom_dhikrs_v1',
+  };
 
-  static final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email']);
+  static const Set<String> _allowedBackupKeyPrefixes = {
+    'adhan_enabled_',
+    'prayer_offset_',
+    'saved_tasks_v2_last_date_',
+  };
+
+  static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: const ['email'],
+    serverClientId: _googleWebClientId.isEmpty ? null : _googleWebClientId,
+  );
+
+  static bool _isAllowedBackupKey(String key) {
+    return _allowedBackupKeys.contains(key) ||
+        _allowedBackupKeyPrefixes.any(key.startsWith);
+  }
+
+  static String _normalizedEmail(String email) => email.trim().toLowerCase();
 
   // Get saved Gmail / Google account email
   static Future<String?> getSavedGoogleAccount() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_googleAccountKey);
+    final savedEmail = prefs.getString(_googleAccountKey);
+    final user = Supabase.instance.client.auth.currentUser;
+    if (savedEmail == null ||
+        user == null ||
+        user.email == null ||
+        _normalizedEmail(savedEmail) != _normalizedEmail(user.email!)) {
+      return null;
+    }
+    return savedEmail;
   }
 
   // Save Gmail / Google account email
@@ -41,21 +104,71 @@ class BackupService {
         await _googleSignIn.signOut();
       }
     } catch (_) {}
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (_) {}
   }
 
-  // Native Android Google Account Picker Dialog
+  // Authenticate with Google, then exchange the verified ID token for a
+  // Supabase Auth session. An email address alone is never proof of ownership.
   static Future<String?> selectGoogleAccount() async {
+    if (_googleWebClientId.isEmpty) {
+      debugPrint('Google authentication is not configured for this build.');
+      return null;
+    }
+
     try {
-      final String? email =
-          await _platformChannel.invokeMethod<String>('pickGoogleAccount');
-      if (email != null && email.isNotEmpty) {
-        await saveGoogleAccount(email);
-        return email;
+      final account = await _googleSignIn.signIn();
+      if (account == null) return null;
+
+      final googleAuth = await account.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+      if (idToken == null ||
+          idToken.isEmpty ||
+          accessToken == null ||
+          accessToken.isEmpty) {
+        await _googleSignIn.signOut();
+        return null;
       }
+
+      final response = await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+      final user = response.user;
+      if (response.session == null ||
+          user == null ||
+          user.email == null ||
+          _normalizedEmail(user.email!) != _normalizedEmail(account.email)) {
+        await unlinkGoogleAccount();
+        return null;
+      }
+
+      // This RPC has no email parameter. It may only claim an unowned legacy
+      // row whose email matches the verified Google identity on the server.
+      await Supabase.instance.client.rpc('claim_legacy_app_backup');
+      await saveGoogleAccount(user.email!);
+      return user.email;
     } catch (e) {
-      debugPrint("Native Account Picker Error: $e");
+      debugPrint('Google/Supabase authentication failed: $e');
+      await unlinkGoogleAccount();
     }
     return null;
+  }
+
+  static String? _authenticatedOwnerId(String googleEmail) {
+    final auth = Supabase.instance.client.auth;
+    final session = auth.currentSession;
+    final user = auth.currentUser;
+    if (session == null ||
+        user == null ||
+        user.email == null ||
+        _normalizedEmail(user.email!) != _normalizedEmail(googleEmail)) {
+      return null;
+    }
+    return user.id;
   }
 
   // Get last backup time formatted
@@ -85,6 +198,7 @@ class BackupService {
     final Map<String, dynamic> backupMap = {};
 
     for (final key in prefs.getKeys()) {
+      if (!_isAllowedBackupKey(key)) continue;
       final value = prefs.get(key);
       backupMap[key] = value;
     }
@@ -95,7 +209,11 @@ class BackupService {
       'data': backupMap,
     };
 
-    return jsonEncode(fullPackage);
+    final encoded = jsonEncode(fullPackage);
+    if (utf8.encode(encoded).length > _maxBackupBytes) {
+      throw const FormatException('Backup data is too large.');
+    }
+    return encoded;
   }
 
   // Share Backup as .json file
@@ -109,7 +227,7 @@ class BackupService {
       ShareParams(
         files: [XFile(file.path)],
         subject: 'نسخة احتياطية - تطبيق رفيق المسلم',
-        text: '🌿 نسخة احتياطية محفوطة من تطبيق رفيق المسلم',
+        text: '🌿 نسخة احتياطية محفوظة من تطبيق رفيق المسلم',
       ),
     );
   }
@@ -128,49 +246,63 @@ class BackupService {
   // Cloud Sync to Supabase / Remote storage using Google Account Email
   static Future<bool> uploadToCloud(String googleEmail) async {
     try {
-      await saveGoogleAccount(googleEmail);
-      final jsonStr = await exportBackupData();
+      final ownerId = _authenticatedOwnerId(googleEmail);
+      if (ownerId == null) return false;
 
-      final nowMillis = DateTime.now().millisecondsSinceEpoch;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_lastBackupTimeKey, nowMillis);
+      final jsonStr = await exportBackupData();
 
       final supabase = Supabase.instance.client;
       await supabase.from('app_backups').upsert({
-        'user_email': googleEmail.trim().toLowerCase(),
+        'owner_id': ownerId,
         'backup_data': jsonStr,
         'updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'user_email');
+      }, onConflict: 'owner_id');
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(
+        _lastBackupTimeKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
 
       return true;
     } catch (e) {
       debugPrint("Cloud backup upload error: $e");
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_lastBackupTimeKey, DateTime.now().millisecondsSinceEpoch);
-      return true;
+      return false;
     }
   }
 
   // Get Cloud Backup Metadata before restoring
-  static Future<Map<String, dynamic>?> getCloudBackupMetadata(String googleEmail) async {
+  static Future<Map<String, dynamic>?> getCloudBackupMetadata(
+      String googleEmail) async {
     try {
+      final ownerId = _authenticatedOwnerId(googleEmail);
+      if (ownerId == null) return null;
+
       final supabase = Supabase.instance.client;
       final response = await supabase
           .from('app_backups')
           .select('backup_data, updated_at')
-          .eq('user_email', googleEmail.trim().toLowerCase())
+          .eq('owner_id', ownerId)
           .maybeSingle();
 
       if (response != null && response['backup_data'] != null) {
-        final Map<String, dynamic> fullPackage = jsonDecode(response['backup_data'].toString());
+        final backupJson = response['backup_data'].toString();
+        if (utf8.encode(backupJson).length > _maxBackupBytes) return null;
+        final decoded = jsonDecode(backupJson);
+        if (decoded is! Map<String, dynamic> ||
+            decoded['header'] != _backupHeader) {
+          return null;
+        }
+        final fullPackage = decoded;
         final int timestamp = fullPackage['timestamp'] ?? 0;
         final dt = DateTime.fromMillisecondsSinceEpoch(
             timestamp > 0 ? timestamp : DateTime.now().millisecondsSinceEpoch);
-        final formattedDate = intl.DateFormat('yyyy/MM/dd - hh:mm a', 'ar').format(dt);
+        final formattedDate =
+            intl.DateFormat('yyyy/MM/dd - hh:mm a', 'ar').format(dt);
 
         return {
           'formattedDate': formattedDate,
-          'jsonStr': response['backup_data'].toString(),
+          'jsonStr': backupJson,
         };
       }
       return null;
@@ -183,7 +315,7 @@ class BackupService {
   // Cloud Restore from Supabase / Remote storage using Google Account Email
   static Future<bool> restoreFromCloud(String googleEmail) async {
     try {
-      await saveGoogleAccount(googleEmail);
+      if (_authenticatedOwnerId(googleEmail) == null) return false;
       final metadata = await getCloudBackupMetadata(googleEmail);
 
       if (metadata != null && metadata['jsonStr'] != null) {
@@ -196,19 +328,59 @@ class BackupService {
     }
   }
 
+  // Delete Cloud Backup record & account from Supabase (Google Play Data Deletion Policy Compliance)
+  static Future<bool> deleteCloudBackup(String googleEmail) async {
+    try {
+      final ownerId = _authenticatedOwnerId(googleEmail);
+      if (ownerId == null) return false;
+
+      final supabase = Supabase.instance.client;
+      try {
+        await supabase.rpc('delete_user_account');
+      } catch (e) {
+        debugPrint("RPC delete_user_account fallback: $e");
+        await supabase.from('app_backups').delete().eq('owner_id', ownerId);
+      }
+      await unlinkGoogleAccount();
+      return true;
+    } catch (e) {
+      debugPrint("Error deleting cloud backup: $e");
+      return false;
+    }
+  }
+
   // Restore app data from JSON string
   static Future<bool> restoreBackupData(String jsonStr) async {
     try {
-      final Map<String, dynamic> fullPackage = jsonDecode(jsonStr);
+      if (utf8.encode(jsonStr).length > _maxBackupBytes) return false;
+
+      final decoded = jsonDecode(jsonStr);
+      if (decoded is! Map<String, dynamic>) return false;
+      final fullPackage = decoded;
       if (fullPackage['header'] != _backupHeader) {
         return false;
       }
 
-      final Map<String, dynamic> data =
-          Map<String, dynamic>.from(fullPackage['data']);
+      final rawData = fullPackage['data'];
+      if (rawData is! Map) return false;
+      final data = Map<String, dynamic>.from(rawData);
+      final approvedEntries = data.entries
+          .where((entry) => _isAllowedBackupKey(entry.key))
+          .toList(growable: false);
+
+      // Validate the complete approved payload before changing any local value.
+      // This prevents a malformed late entry from leaving a partial restore.
+      for (final entry in approvedEntries) {
+        final val = entry.value;
+        final isPrimitive =
+            val is bool || val is int || val is double || val is String;
+        final isStringList = val is List && val.every((item) => item is String);
+        if (!isPrimitive && !isStringList) return false;
+      }
+
       final prefs = await SharedPreferences.getInstance();
 
-      for (final entry in data.entries) {
+      for (final entry in approvedEntries) {
         final key = entry.key;
         final val = entry.value;
 
@@ -222,7 +394,9 @@ class BackupService {
           await prefs.setString(key, val);
         } else if (val is List) {
           await prefs.setStringList(
-              key, val.map((e) => e.toString()).toList());
+            key,
+            List<String>.from(val),
+          );
         }
       }
 

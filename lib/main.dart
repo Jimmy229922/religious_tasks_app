@@ -27,18 +27,6 @@ void overlayMain() {
   runApp(
     MaterialApp(
       debugShowCheckedModeBanner: false,
-      builder: (context, child) {
-        final mediaQuery = MediaQuery.of(context);
-        return MediaQuery(
-          data: mediaQuery.copyWith(
-            textScaler: mediaQuery.textScaler.clamp(
-              minScaleFactor: 0.85,
-              maxScaleFactor: 1.25,
-            ),
-          ),
-          child: child!,
-        );
-      },
       home: StreamBuilder(
         stream: FlutterOverlayWindow.overlayListener,
         builder: (context, snapshot) {
@@ -56,7 +44,7 @@ void overlayMain() {
 void main() async {
   debugPrint("🟢 Application Main Function Started");
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Supabase
   try {
     await Supabase.initialize(
@@ -73,7 +61,7 @@ void main() async {
   await AndroidAlarmManager.initialize();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   await initializeDateFormatting('ar', null);
   HijriCalendar.setLocal('ar');
   // NotificationManager().init() removed to prevent startup crash.
@@ -89,7 +77,11 @@ void main() async {
     debugPrint("Notification init failed: $e");
   });
 
-  await RadioService().init();
+  try {
+    await RadioService().init();
+  } catch (e) {
+    debugPrint("Radio service init failed: $e");
+  }
 
   runApp(
     MultiProvider(

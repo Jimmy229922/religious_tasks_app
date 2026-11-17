@@ -1,8 +1,10 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:religious_tasks_app/core/constants/strings.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
@@ -12,8 +14,6 @@ import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.da
 import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
 import 'package:religious_tasks_app/shared/services/notifications/notification_preferences.dart';
 import 'package:religious_tasks_app/shared/services/notifications/notification_preferences_service.dart';
-import 'package:religious_tasks_app/shared/services/updates/app_update_service.dart';
-import 'package:religious_tasks_app/shared/services/updates/update_view_model.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -47,7 +47,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoading = true;
   bool _isRefreshingLocation = false;
   String _appVersion = "";
-  bool _isCheckingUpdate = false;
 
   String? _linkedGoogleEmail;
   String? _lastSyncTime;
@@ -106,11 +105,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _updateOffset(String key, int value) async {
+    final safeValue = value.clamp(-60, 60);
     setState(() {
-      prayerOffsets[key] = value;
+      prayerOffsets[key] = safeValue;
     });
 
-    await _prefsService.setPrayerOffset(key, value);
+    await _prefsService.setPrayerOffset(key, safeValue);
 
     if (mounted) {
       final tasksViewModel =
@@ -120,85 +120,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _reschedulePrayers();
   }
 
-  void _checkUpdate() async {
-    setState(() {
-      _isCheckingUpdate = true;
-    });
-
-    final updateInfo = await AppUpdateService.checkForUpdate();
-    if (!mounted) return;
-    final updateVM = Provider.of<UpdateViewModel>(context, listen: false);
-
-    setState(() {
-      _isCheckingUpdate = false;
-    });
-
-    if (updateInfo != null) {
-      updateVM.setUpdateInfo(updateInfo);
-      if (!mounted) return;
-      _showUpdateDialog(updateInfo);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("أنت تستخدم أحدث إصدار بالفعل")),
-        );
-      }
-    }
-  }
-
-  void _showUpdateDialog(Map<String, dynamic> updateInfo) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => Consumer<UpdateViewModel>(
-        builder: (context, vm, _) {
-          return AlertDialog(
-            title: const Text("تحديث جديد متاح"),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                      "إصدار: ${updateInfo['version']}+${updateInfo['buildNumber']}"),
-                  const SizedBox(height: 10),
-                  const Text("ما الجديد:"),
-                  Text(updateInfo['releaseNotes'] ?? "تحسينات عامة"),
-                  if (vm.isDownloading) ...[
-                    const SizedBox(height: 20),
-                    LinearProgressIndicator(value: vm.downloadProgress / 100),
-                    const SizedBox(height: 8),
-                    Center(
-                        child: Text(
-                            "جاري التحميل في الخلفية: ${vm.downloadProgress.toInt()}%")),
-                  ],
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("لاحقاً"),
-              ),
-              if (vm.isDownloadFinished)
-                ElevatedButton(
-                  onPressed: () => vm.startUpdate(),
-                  child: const Text("تثبيت الآن"),
-                )
-              else if (!vm.isDownloading)
-                ElevatedButton(
-                  onPressed: () => vm.startUpdate(),
-                  child: const Text("تحديث الآن"),
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
   void _showRestoreDialog() {
     final controller = TextEditingController();
+    final messenger = ScaffoldMessenger.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -207,7 +131,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("الصق نص النسخة الاحتياطية هنا لاستعادة كافة بياناتك:"),
+            const Text(
+              "الصق نص النسخة الاحتياطية لدمج مفاتيحها المعتمدة مع بيانات التطبيق الحالية:",
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
@@ -228,12 +154,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () async {
               final success =
                   await BackupService.restoreBackupData(controller.text.trim());
-              if (ctx.mounted) {
+              if (ctx.mounted && mounted) {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(ctx).showSnackBar(
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text(success
-                        ? "تمت استعادة البيانات بنجاح 🎉"
+                        ? "تم دمج البيانات بنجاح. أعد فتح التطبيق لتحديث جميع الشاشات."
                         : "عذراً، نص النسخة الاحتياطية غير صالح"),
                   ),
                 );
@@ -246,195 +172,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showGoogleCloudBackupDialog() async {
-    final currentEmail = await BackupService.getSavedGoogleAccount() ?? '';
-    final controller = TextEditingController(text: currentEmail);
-
+  Future<void> _showGoogleCloudBackupDialog() async {
+    final email = await BackupService.selectGoogleAccount();
     if (!mounted) return;
 
-    showDialog(
+    if (email == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تعذر توثيق حساب Google. تحقق من إعداد تسجيل الدخول ثم حاول مجددًا.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final success = await BackupService.uploadToCloud(email);
+    await _loadSettings();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'تم توثيق الحساب ورفع النسخة الاحتياطية بأمان.'
+              : 'تم توثيق الحساب، لكن تعذر رفع النسخة الاحتياطية.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteAuthenticatedCloudData() async {
+    final email = _linkedGoogleEmail;
+    if (email == null) return;
+
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          return AlertDialog(
-            title: const Text("ربط واستعادة حساب الجيميل (Google) ☁️"),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "اختر حساب الجيميل من هاتفك لربطه وتوثيقه ومزامنة كافة أوسمتك وإنجازاتك سحابياً:",
-                    style: TextStyle(fontSize: 13),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Native Google Account Picker
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        final email =
-                            await BackupService.selectGoogleAccount();
-                        if (email != null && email.isNotEmpty) {
-                          setDialogState(() {
-                            controller.text = email;
-                          });
-                          await BackupService.saveGoogleAccount(email);
-                          await _loadSettings();
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx);
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(
-                                content: Text("تم ربط الحساب ($email) بنجاح ✓"),
-                              ),
-                            );
-                          }
-                        } else {
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(
-                                content: Text("يمكنك كتابة البريد الإلكتروني أدناه يدوياً"),
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      icon: const Icon(Icons.account_circle_rounded,
-                          color: Colors.white, size: 22),
-                      label: const Text(
-                        "اختيار حساب جوجل من الهاتف 👤",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  TextField(
-                    controller: controller,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: "عنوان البريد الإلكتروني (Gmail)",
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.mark_email_read_rounded,
-                          color: Colors.teal),
-                      hintText: "example@gmail.com",
-                    ),
-                  ),
-                ],
-              ),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف البيانات السحابية'),
+        content: const Text(
+          'سيتم حذف النسخة الاحتياطية المرتبطة بحسابك الحالي نهائيًا، '
+          'ثم تسجيل الخروج من المزامنة السحابية. لن تُحذف بيانات الجهاز.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('تراجع'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text(
+              'حذف نهائي',
+              style: TextStyle(color: Colors.white),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("إلغاء"),
-              ),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final email = controller.text.trim();
-                  if (email.isEmpty || !email.contains('@')) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                          content: Text("يرجى إدخال بريد إلكتروني صحيح")),
-                    );
-                    return;
-                  }
+          ),
+        ],
+      ),
+    );
 
-                  final success = await BackupService.uploadToCloud(email);
-                  await _loadSettings();
-                  if (ctx.mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(
-                        content: Text(success
-                            ? "تم رفع ومزامنة البيانات بحساب ($email) بنجاح ☁️🎉"
-                            : "حدثت مشكلة أثناء رفع البيانات السحابية"),
-                      ),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.cloud_upload_rounded,
-                    color: Colors.white, size: 18),
-                label: const Text("رفع ومزامنة"),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-              ),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final email = controller.text.trim();
-                  if (email.isEmpty || !email.contains('@')) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                          content: Text("يرجى إدخال بريد إلكتروني صحيح")),
-                    );
-                    return;
-                  }
+    if (confirmed != true || !mounted) return;
 
-                  final metadata =
-                      await BackupService.getCloudBackupMetadata(email);
-                  if (ctx.mounted) {
-                    if (metadata == null) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(
-                            content: Text(
-                                "لم نجد أي نسخة احتياطية سحابية مسجلة بحساب ($email)")),
-                      );
-                      return;
-                    }
+    final deleted = await BackupService.deleteCloudBackup(email);
+    await _loadSettings();
+    if (!mounted) return;
 
-                    final confirm = await showDialog<bool>(
-                      context: ctx,
-                      builder: (c) => AlertDialog(
-                        title: const Text("تأكيد استعادة النسخة السحابية"),
-                        content: Text(
-                          "وجدت نسخة احتياطية سحابية بتاريخ (${metadata['formattedDate']}).\nهل تريد استبدال بياناتك الحالية بهذه النسخة؟",
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(c, false),
-                            child: const Text("إلغاء"),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(c, true),
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.teal),
-                            child: const Text("تأكيد الاستعادة"),
-                          ),
-                        ],
-                      ),
-                    );
-
-                    if (confirm == true && ctx.mounted) {
-                      final success =
-                          await BackupService.restoreFromCloud(email);
-                      await _loadSettings();
-                      if (ctx.mounted) {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(
-                            content: Text(success
-                                ? "تم استرجاع بياناتك بنجاح من حساب ($email) ☁️🎉"
-                                : "حدث خطأ أثناء استعادة النسخة الاحتياطية"),
-                          ),
-                        );
-                      }
-                    }
-                  }
-                },
-                icon: const Icon(Icons.cloud_download_rounded, size: 18),
-                label: const Text("استعادة سحابية"),
-              ),
-            ],
-          );
-        },
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          deleted
+              ? 'تم حذف بياناتك السحابية وتسجيل الخروج.'
+              : 'تعذر حذف البيانات السحابية. لم يتم اعتبار الطلب مكتملًا.',
+        ),
       ),
     );
   }
@@ -502,19 +311,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(16.0),
       children: [
-        _buildSectionHeader(Icons.my_location_rounded, "الموقع الجغرافي ومواقيت الصلاة"),
+        _buildSectionHeader(
+            Icons.my_location_rounded, "الموقع الجغرافي ومواقيت الصلاة"),
         Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: ListTile(
             leading: _isRefreshingLocation
                 ? const SizedBox(
                     width: 24,
                     height: 24,
                     child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.my_location_rounded,
-                    color: Colors.orange),
+                : const Icon(Icons.my_location_rounded, color: Colors.orange),
             title: const Text("تحديث الموقع الحالي"),
             subtitle: Text(tasksViewModel.locationName,
                 style: const TextStyle(fontSize: 12)),
@@ -529,9 +338,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     await tasksViewModel.refreshLocation();
 
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text("تم تحديث الموقع بنجاح")));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text("تم تحديث الموقع بنجاح")));
                       setState(() {
                         _isRefreshingLocation = false;
                       });
@@ -539,14 +347,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
           ),
         ),
-
         const SizedBox(height: 20),
-
-        _buildSectionHeader(Icons.volume_up_rounded, "تنبيهات الأذان والتعديل اليدوي"),
+        _buildSectionHeader(
+            Icons.volume_up_rounded, "تنبيهات الأذان والتعديل اليدوي"),
         Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
             padding: const EdgeInsets.all(14.0),
             child: Column(
@@ -560,8 +367,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   isExpanded: true,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 12),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
                   ),
                   items: const [
                     DropdownMenuItem(
@@ -603,11 +409,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(16.0),
       children: [
-        _buildSectionHeader(Icons.notifications_active_rounded, "إشعار ومتابعة الأذكار اليومية"),
+        _buildSectionHeader(Icons.notifications_active_rounded,
+            "إشعار ومتابعة الأذكار اليومية"),
         Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: ListTile(
             leading: const Icon(Icons.notifications_active_rounded,
                 color: Colors.teal),
@@ -641,8 +448,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildSectionHeader(Icons.palette_rounded, "المظهر العام والسمات"),
         Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: ListTile(
             title: const Text(
               "نمط السمة",
@@ -698,30 +505,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(16.0),
       children: [
-        _buildSectionHeader(Icons.cloud_sync_rounded, "النسخ الاحتياطي والمزامنة السحابية ☁️"),
-        _buildGoogleAccountCard(isDark),
-
+        _buildSectionHeader(
+          Icons.cloud_sync_rounded,
+          "النسخ الاحتياطي والمزامنة السحابية ☁️",
+          badgeText: "قريباً ⏳",
+        ),
+        _buildGlassmorphicCloudSection(isDark),
         const SizedBox(height: 20),
-
         _buildSectionHeader(Icons.support_agent_rounded, "تواصل معنا والدعم"),
         Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Column(
             children: [
               ListTile(
-                leading: const Icon(Icons.email_outlined,
-                    color: Colors.blue),
+                leading: const Icon(Icons.email_outlined, color: Colors.blue),
                 title: const Text("أرسل اقتراحاتك"),
                 subtitle: const Text("ahmed9ahmed779@gmail.com"),
-                trailing:
-                    const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () async {
                   final Uri emailUri = Uri(
                     scheme: 'mailto',
                     path: 'ahmed9ahmed779@gmail.com',
-                    query: 'subject=اقتراح لتطبيق المهام الدينية',
+                    query: 'subject=اقتراح لتطبيق رفيق المسلم',
                   );
                   try {
                     await launchUrl(emailUri);
@@ -734,8 +541,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: Colors.green),
                 title: const Text("تواصل عبر واتساب"),
                 subtitle: const Text("+201096304673"),
-                trailing:
-                    const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () async {
                   final Uri whatsappUri =
                       Uri.parse('https://wa.me/201096304673');
@@ -747,35 +553,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const Divider(height: 1),
               ListTile(
-                leading: const Icon(Icons.groups_2_rounded,
-                    color: Colors.teal),
-                title: const Text("قناة التطبيق علي واتساب"),
-                subtitle:
-                    const Text("تابع أحدث التحديثات والورد اليومي"),
-                trailing:
-                    const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                leading: const Icon(Icons.groups_2_rounded, color: Colors.teal),
+                title: const Text("قناة التطبيق على واتساب"),
+                subtitle: const Text("تابع أحدث التحديثات والورد اليومي"),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () async {
                   final Uri url = Uri.parse(
                       'https://whatsapp.com/channel/0029VaNwp3YDzgT3fxWoGx2z');
                   if (!await launchUrl(url,
                       mode: LaunchMode.externalApplication)) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  "عذراً، لا يمكن فتح الرابط حالياً")));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text("عذراً، لا يمكن فتح الرابط حالياً")));
                     }
                   }
                 },
               ),
               const Divider(height: 1),
               ListTile(
-                leading: const Icon(Icons.share_rounded,
-                    color: Colors.blueAccent),
+                leading:
+                    const Icon(Icons.share_rounded, color: Colors.blueAccent),
                 title: const Text("مشاركة التطبيق"),
                 subtitle: const Text("الدال على الخير كفاعله"),
-                trailing:
-                    const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () {
                   SharePlus.instance.share(
                     ShareParams(
@@ -783,60 +583,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'السلام عليكم، أنصحك بتحميل هذا التطبيق الرائع للمهام الدينية والأذكار:\n\n'
                           'https://whatsapp.com/channel/0029VaNwp3YDzgT3fxWoGx2z\n\n'
                           'نسألكم الدعاء',
-                      subject: 'تطبيق المهام الدينية',
+                      subject: 'تطبيق رفيق المسلم',
                     ),
                   );
                 },
               ),
               const Divider(height: 1),
               ListTile(
-                leading: const Icon(Icons.star_rate_rounded,
-                    color: Colors.amber),
+                leading:
+                    const Icon(Icons.star_rate_rounded, color: Colors.amber),
                 title: const Text("قيم تطبيق رفيق المسلم"),
-                trailing:
-                    const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () {},
               ),
             ],
           ),
         ),
-
         const SizedBox(height: 20),
-
-        _buildSectionHeader(Icons.info_outline_rounded, "عن التطبيق والتحديثات"),
+        _buildSectionHeader(
+            Icons.info_outline_rounded, "عن التطبيق ℹ️"),
         Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16)),
-          child: Column(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.info_outline_rounded,
-                    color: Colors.blueGrey),
-                title: const Text("إصدار تطبيق رفيق المسلم"),
-                trailing: Text(_appVersion,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.teal)),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: _isCheckingUpdate
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child:
-                            CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.system_update_rounded,
-                        color: Colors.blue),
-                title: const Text("التحقق من التحديثات"),
-                subtitle:
-                    const Text("تحميل وتثبيت أحدث نسخة تلقائياً"),
-                trailing:
-                    const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                onTap: _isCheckingUpdate ? null : _checkUpdate,
-              ),
-            ],
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: ListTile(
+            leading: const Icon(Icons.info_outline_rounded,
+                color: Colors.blueGrey),
+            title: const Text("إصدار تطبيق رفيق المسلم"),
+            trailing: Text(_appVersion,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, color: Colors.teal)),
           ),
         ),
         const SizedBox(height: 30),
@@ -844,8 +620,134 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildGlassmorphicCloudSection(bool isDark) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Stack(
+        children: [
+          IgnorePointer(
+            child: _buildGoogleAccountCard(isDark),
+          ),
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 4.5, sigmaY: 4.5),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.black.withValues(alpha: 0.45)
+                      : Colors.white.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.15)
+                        : Colors.teal.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
+                ),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
+                    margin: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF1E293B).withValues(alpha: 0.9)
+                          : Colors.white.withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.teal.withValues(alpha: 0.5),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 15,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.lock_clock_rounded,
+                            color: Colors.amber,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    "قريباً",
+                                    style: GoogleFonts.cairo(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark
+                                          ? Colors.tealAccent
+                                          : Colors.teal.shade800,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade700,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      "مغلق حالياً",
+                                      style: GoogleFonts.cairo(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                "خدمة المزامنة السحابية والنسخ الاحتياطي ستتوفر قريباً إن شاء الله",
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11,
+                                  color: isDark
+                                      ? Colors.white70
+                                      : Colors.grey.shade700,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGoogleAccountCard(bool isDark) {
-    final bool isLinked = _linkedGoogleEmail != null && _linkedGoogleEmail!.isNotEmpty;
+    final bool isLinked =
+        _linkedGoogleEmail != null && _linkedGoogleEmail!.isNotEmpty;
 
     return Card(
       elevation: 2,
@@ -866,7 +768,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    isLinked ? Icons.check_circle_rounded : Icons.mark_email_read_rounded,
+                    isLinked
+                        ? Icons.check_circle_rounded
+                        : Icons.mark_email_read_rounded,
                     color: isLinked ? Colors.green.shade700 : Colors.teal,
                     size: 26,
                   ),
@@ -880,12 +784,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           Flexible(
                             child: Text(
-                              isLinked ? "مرتبط بحساب الجيميل" : "غير مرتبط بحساب",
+                              isLinked
+                                  ? "مرتبط بحساب Google"
+                                  : "غير مرتبط بحساب",
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: isLinked
-                                    ? (isDark ? Colors.greenAccent : Colors.green.shade900)
+                                    ? (isDark
+                                        ? Colors.greenAccent
+                                        : Colors.green.shade900)
                                     : (isDark ? Colors.white : Colors.black87),
                               ),
                             ),
@@ -915,7 +823,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (isLinked && _lastSyncTime != null) ...[
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: isDark ? Colors.white10 : Colors.teal.shade50,
                   borderRadius: BorderRadius.circular(10),
@@ -927,7 +836,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(width: 6),
                     Text(
                       "آخر مزامنة ناجحة: $_lastSyncTime",
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -943,8 +853,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _showGoogleCloudBackupDialog();
                         return;
                       }
-                      final success =
-                          await BackupService.uploadToCloud(_linkedGoogleEmail!);
+                      final success = await BackupService.uploadToCloud(
+                          _linkedGoogleEmail!);
                       await _loadSettings();
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -957,14 +867,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       }
                     },
                     icon: Icon(
-                      isLinked ? Icons.cloud_upload_rounded : Icons.add_link_rounded,
+                      isLinked
+                          ? Icons.cloud_upload_rounded
+                          : Icons.add_link_rounded,
                       color: Colors.white,
                       size: 18,
                     ),
                     label: Text(
-                      isLinked ? "رفع ومزامنة الآن" : "ربط حساب الجيميل",
+                      isLinked ? "رفع ومزامنة الآن" : "ربط حساب Google",
                       style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.teal,
@@ -978,14 +892,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
                     onPressed: () async {
-                      final metadata = await BackupService.getCloudBackupMetadata(
-                          _linkedGoogleEmail!);
+                      final metadata =
+                          await BackupService.getCloudBackupMetadata(
+                              _linkedGoogleEmail!);
                       if (!mounted) return;
 
                       if (metadata == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text("لم نجد أي نسخة احتياطية سحابية لهذا الحساب")),
+                              content: Text(
+                                  "لم نجد أي نسخة احتياطية سحابية لهذا الحساب")),
                         );
                         return;
                       }
@@ -995,7 +911,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         builder: (c) => AlertDialog(
                           title: const Text("تأكيد استعادة النسخة السحابية"),
                           content: Text(
-                            "وجدت نسخة احتياطية سحابية بتاريخ (${metadata['formattedDate']}).\nهل تريد استبدال بياناتك الحالية بهذه النسخة؟",
+                            "وجدت نسخة احتياطية سحابية بتاريخ (${metadata['formattedDate']}).\nهل تريد دمج مفاتيحها المعتمدة مع بيانات التطبيق الحالية؟",
                           ),
                           actions: [
                             TextButton(
@@ -1020,7 +936,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(success
-                                  ? "تم استرجاع بياناتك بنجاح من حساب الجيميل ☁️🎉"
+                                  ? "تم دمج النسخة السحابية. أعد فتح التطبيق لتحديث جميع الشاشات."
                                   : "حدث خطأ أثناء استعادة النسخة"),
                             ),
                           );
@@ -1028,16 +944,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       }
                     },
                     icon: const Icon(Icons.cloud_download_rounded, size: 18),
-                    label: const Text("استعادة", style: TextStyle(fontSize: 13)),
+                    label:
+                        const Text("استعادة", style: TextStyle(fontSize: 13)),
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 12),
                     ),
                   ),
                   const SizedBox(width: 6),
                   IconButton(
-                    icon: Icon(Icons.no_accounts_rounded, color: Colors.red.shade600),
+                    icon: Icon(Icons.no_accounts_rounded,
+                        color: Colors.red.shade600),
                     tooltip: "إلغاء ربط الحساب",
                     onPressed: () async {
                       final confirm = await showDialog<bool>(
@@ -1045,7 +964,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         builder: (ctx) => AlertDialog(
                           title: const Text("تأكيد إلغاء ربط الحساب"),
                           content: Text(
-                            "هل أنت تأكد من إلغاء ربط حساب الجيميل ($_linkedGoogleEmail)؟\n\nتنبيه: لن تُحذف بياناتك المحلية، لكن ستتوقف المزامنة السحابية لهذا الحساب.",
+                            "هل أنت متأكد من إلغاء ربط حساب Google ($_linkedGoogleEmail)؟\n\nتنبيه: لن تُحذف بياناتك المحلية، لكن ستتوقف المزامنة السحابية لهذا الحساب.",
                           ),
                           actions: [
                             TextButton(
@@ -1069,7 +988,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         await _loadSettings();
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("تم إلغاء ربط الحساب بنجاح")),
+                            const SnackBar(
+                                content: Text("تم إلغاء ربط الحساب بنجاح")),
                           );
                         }
                       }
@@ -1078,6 +998,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ],
             ),
+            if (isLinked) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: TextButton.icon(
+                  onPressed: _deleteAuthenticatedCloudData,
+                  icon: const Icon(Icons.delete_forever_rounded),
+                  label: const Text('حذف بياناتي السحابية'),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                ),
+              ),
+            ],
             const Divider(height: 24),
             Row(
               children: [
@@ -1086,14 +1018,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () async {
                       await BackupService.shareBackupFile();
                     },
-                    icon: const Icon(Icons.folder_zip_rounded, size: 18, color: Colors.blue),
+                    icon: const Icon(Icons.folder_zip_rounded,
+                        size: 18, color: Colors.blue),
                     label: const Text("تصدير ملف (جوجل درايف / الملفات 📁)",
                         style: TextStyle(fontSize: 12)),
                   ),
                 ),
                 TextButton.icon(
                   onPressed: _showRestoreDialog,
-                  icon: const Icon(Icons.text_snippet_rounded, size: 18, color: Colors.amber),
+                  icon: const Icon(Icons.text_snippet_rounded,
+                      size: 18, color: Colors.amber),
                   label: const Text("نص 📝", style: TextStyle(fontSize: 12)),
                 ),
               ],
@@ -1104,7 +1038,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSectionHeader(IconData icon, String title) {
+  Widget _buildSectionHeader(IconData icon, String title, {String? badgeText}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, right: 4.0),
       child: Row(
@@ -1123,6 +1057,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (badgeText != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.shade700, width: 1),
+              ),
+              child: Text(
+                badgeText,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber.shade900,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

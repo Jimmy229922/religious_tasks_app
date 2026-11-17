@@ -126,32 +126,8 @@ class _PermissionsOnboardingScreenState
   }
 
   Future<void> _finishOnboarding() async {
-    // Check if all essential permissions are granted
-    bool isAllGranted =
-        _notificationStatus.isGranted && _locationStatus.isGranted;
-
-    if (Platform.isAndroid) {
-      // On Android 12+, we want exact alarm too, typically.
-      // If it's not granted, we block.
-      if (!_exactAlarmStatus.isGranted) {
-        isAllGranted = false;
-      }
-    }
-
-    if (!isAllGranted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "يرجى السماح بكافة الصلاحيات المطلوبة لضمان عمل الأذان والتنبيهات بدقة عالية.",
-            style: TextStyle(color: Colors.white),
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    // Save that we've finished onboarding
+    // Permissions remain optional. Features that depend on a denied permission
+    // already provide reduced functionality or an inexact scheduling fallback.
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_completed', true);
 
@@ -192,7 +168,8 @@ class _PermissionsOnboardingScreenState
               Icon(
                 Icons.security,
                 size: 80,
-                color: isDark ? Colors.tealAccent.shade400 : Colors.teal.shade800,
+                color:
+                    isDark ? Colors.tealAccent.shade400 : Colors.teal.shade800,
               ),
               const SizedBox(height: 20),
               Text(
@@ -241,7 +218,7 @@ class _PermissionsOnboardingScreenState
                       _buildPermissionCard(
                         title: "المنبه الدقيق",
                         description:
-                            "لضمان انطلاق صوت الأذان في الوقت المحدد تماماً.",
+                            "لتحسين دقة توقيت التنبيهات. عند عدم تفعيله قد يعمل التنبيه بتوقيت تقريبي.",
                         icon: Icons.alarm,
                         status: _exactAlarmStatus,
                         isDark: isDark,
@@ -252,7 +229,7 @@ class _PermissionsOnboardingScreenState
                       _buildPermissionCard(
                         title: "إلغاء قيود البطارية",
                         description:
-                            "لضمان استمرار عمل التنبيهات والأذكار دون توقف في الخلفية.",
+                            "اختياري لتحسين موثوقية التنبيهات في الخلفية على بعض الأجهزة.",
                         icon: Icons.battery_charging_full,
                         status: _ignoreBatteryStatus,
                         isDark: isDark,
@@ -286,7 +263,7 @@ class _PermissionsOnboardingScreenState
                   ),
                 ),
                 child: const Text(
-                  "ابدأ الرحلة",
+                  "متابعة",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -340,13 +317,15 @@ class _PermissionsOnboardingScreenState
                   children: [
                     Icon(
                       Icons.lock_outline,
-                      color: isDark ? Colors.orange.shade300 : Colors.orange.shade800,
+                      color: isDark
+                          ? Colors.orange.shade300
+                          : Colors.orange.shade800,
                       size: 28,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        "تأمين التطبيق (Lock App)",
+                        "قفل التطبيق",
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -360,7 +339,7 @@ class _PermissionsOnboardingScreenState
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "اضغط هنا لتعرف كيف تمنع النظام من إغلاق الأذان تلقائياً.",
+                  "قد يساعد ذلك على تقليل إيقاف التنبيهات في الخلفية، ولا يضمن عملها على جميع الأجهزة.",
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark ? Colors.white70 : Colors.black87,
@@ -388,7 +367,7 @@ class _PermissionsOnboardingScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "تأمين التطبيق (Lock App)",
+                      "قفل التطبيق",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -398,7 +377,7 @@ class _PermissionsOnboardingScreenState
                       ),
                     ),
                     Text(
-                      "اضغط هنا لتعرف كيف تمنع النظام من إغلاق الأذان تلقائياً.",
+                      "قد يساعد ذلك على تقليل إيقاف التنبيهات في الخلفية، ولا يضمن عملها على جميع الأجهزة.",
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? Colors.white70 : Colors.black87,
@@ -431,7 +410,7 @@ class _PermissionsOnboardingScreenState
               Text("3. اضغط على علامة القفل (Lock) 🔒."),
               SizedBox(height: 10),
               Text(
-                "ملاحظة: هذا يضمن بقاء الأذان والأذكار قيد العمل حتى لو قمت بتنظيف الرامات.",
+                "ملاحظة: قد يساعد قفل التطبيق على تقليل إيقاف الأذان والأذكار عند تنظيف الذاكرة، لكنه لا يضمن عملها على جميع الأجهزة.",
                 style: TextStyle(fontSize: 12, color: Colors.red),
               ),
             ],

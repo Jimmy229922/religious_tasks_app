@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سياسة الخصوصية وحذف البيانات - رفيق المسلم</title>
+    <style>
+        :root {
+            --primary: #0f766e;
+            --primary-dark: #115e59;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --card-bg: #1e293b;
+                --text: #f1f5f9;
+                --text-muted: #94a3b8;
+                --border: #334155;
+            }
+        }
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            margin: 0;
+            padding: 24px 16px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 32px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border);
+        }
+        h1 { color: var(--primary); font-size: 28px; margin-bottom: 8px; }
+        h2 { color: var(--primary); font-size: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-top: 32px; }
+        .meta { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: right; }
+        th { background: rgba(15, 118, 110, 0.1); color: var(--primary); }
+        .contact-box {
+            background: rgba(15, 118, 110, 0.05);
+            border: 1px solid var(--primary);
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 24px;
+        }
+        .badge {
+            display: inline-block;
+            background: var(--primary);
+            color: #fff;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <span class="badge">تطبيق رفيق المسلم</span>
+        <h1>سياسة الخصوصية وطلب حذف البيانات والحساب</h1>
+        <div class="meta">آخر تحديث: 16 نوفمبر 2026 | التطبيق: com.jimmy.religiousapp | المطوّر: Ahmed Gamal (Jimmy)</div>
+
+        <p>مرحبًا بكم في تطبيق <strong>«رفيق المسلم»</strong>. نحن نلتزم بحماية خصوصيتك وضمان سلامة بياناتك. التطبيق مجاني، خالي تمامًا من الإعلانات، ولا يقوم ببيع أو مشاركة بياناتك الشخصية لأي أغراض تجارية أو إعلانية.</p>
+
+        <h2>1. البيانات التي نجمعها ونعالجها</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>نوع البيانات</th>
+                    <th>الغرض من المعالجة</th>
+                    <th>مكان التخزين والمعالجة</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>الموقع الجغرافي (الدقيق والتقريبي)</td>
+                    <td>حساب مواقيت الصلاة واتجاه القبلة محليًا على الجهاز</td>
+                    <td>محليًا على جهاز المستخدم فقط. لا يتم رفع الإحداثيات أو موقعك إلى الخوادم السحابية.</td>
+                </tr>
+                <tr>
+                    <td>تفضيلات العبادة والتقدم (الأذكار، التسبيح، الختمة)</td>
+                    <td>حفظ وإدارة تقدمك اليومي</td>
+                    <td>تُخزن محليًا، وفي حال اختيار "المزامنة السحابية" تُخزن مشفرة ومحميّة بحسابك على Supabase.</td>
+                </tr>
+                <tr>
+                    <td>حساب Google (المصادقة)</td>
+                    <td>توثيق ملكية النسخة السحابية المزامنة</td>
+                    <td>يتم توثيق الهوية عبر Google Sign-In وإنشاء جلسة Supabase Auth آمنة مرتبطة برمز مستخدم (User ID) فريد.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>2. طلب حذف الحساب والبيانات (Account & Data Deletion)</h2>
+        <p>امتثالاً لسياسات Google Play الخاصة بحذف البيانات، يتيح التطبيق للمستخدمين حذف كافة بياناتهم وحساباتهم بسهولة عبر المسارين التاليين:</p>
+
+        <h3>أولاً: الحذف المباشر من داخل التطبيق (In-App Deletion)</h3>
+        <ol>
+            <li>افتح التطبيق وانتقل إلى شاشة <strong>«الإعدادات»</strong>.</li>
+            <li>اختر تبويب <strong>«الحساب والمزامنة»</strong>.</li>
+            <li>اضغط على زر <strong>«حذف الحساب والبيانات السحابية»</strong> واكتمل الحذف النهائي. سيتم حذف جميع النسخ الاحتياطية وحساب المستخدم السحابي فورًا وتسجيل الخروج.</li>
+        </ol>
+
+        <h3>ثانياً: طلب حذف البيانات والحساب عبر الويب (Web Data Deletion Request)</h3>
+        <div class="contact-box">
+            <p>إذا قمت بالحذف أو لم تكن قادراً على الوصول للتطبيق، يمكنك تقديم طلب حذف نهائي لحسابك وبياناتك عن طريق التواصل معنا بريديًا:</p>
+            <ul>
+                <li><strong>البريد الإلكتروني للطلبات:</strong> <code>ahmed9ahmed779@gmail.com</code></li>
+                <li><strong>عنوان الرسالة:</strong> طلب حذف حساب وبيانات - رفيق المسلم</li>
+                <li><strong>المحتوى المطلوبة:</strong> يرجى إرسال البريد الإلكتروني (Gmail) المرتبط بالحساب السحابي المراد حذفه.</li>
+                <li><strong>مدة التنفيذ:</strong> يتم تنفيذ الحذف النهائي والكامل لكافة البيانات المخزنة وسجلات الحساب خلال 48 ساعة من تاريخ استلام الطلب وتأكيده.</li>
+            </ul>
+        </div>
+
+        <h2>3. الصلاحيات المطلوب منحها</h2>
+        <ul>
+            <li><strong>الموقع (Location):</strong> لحساب مواقيت الصلاة واتجاه القبلة.</li>
+            <li><strong>الإشعارات والمنبهات الدقيقة (Exact Alarm & Notifications):</strong> لتذكيرك في مواقيت الصلاة والأذكار.</li>
+            <li><strong>خدمات الصوت والمقدمة (Foreground Service):</strong> لتشغيل صوت الأذان وراديو القرآن الكريم دون انقطاع عند إغلاق الشاشة.</li>
+        </ul>
+
+        <h2>4. التواصل معنا</h2>
+        <p>إذا كان لديك أي استفسار حول سياسة الخصوصية أو طلبات الحذف، يمكنك مراسلتنا عبر البريد الإلكتروني:<br>
+        <code>ahmed9ahmed779@gmail.com</code></p>
+    </div>
+</body>
+</html>

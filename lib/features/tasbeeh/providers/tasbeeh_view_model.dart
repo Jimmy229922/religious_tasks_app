@@ -7,18 +7,37 @@ import 'package:religious_tasks_app/core/services/global_challenge_service.dart'
 class TasbeehViewModel extends ChangeNotifier {
   static const String _prefsKey = 'custom_tasbeeh_athkar';
   static const String _totalCountKey = 'total_tasbeeh_count_v1';
+  static const String _pendingGlobalCountKey =
+      'pending_global_tasbeeh_count_v1';
   static const String customOption = '__custom__';
 
   final GlobalChallengeService _globalService = GlobalChallengeService();
   int _globalCount = 0;
   final int _maxTarget = 1000000;
-  int _localSessionCount = 0; 
+  int _localSessionCount = 0;
+  bool _globalSyncFailed = false;
+  bool _isSyncing = false;
   Timer? _syncTimer;
-  
-  final List<int> _milestones = [1000, 5000, 10000, 50000, 100000, 500000, 1000000];
+  StreamSubscription<Map<String, dynamic>>? _challengeSubscription;
+  StreamSubscription<dynamic>? _authSubscription;
+  bool _isDisposed = false;
+
+  final List<int> _milestones = [
+    1000,
+    5000,
+    10000,
+    50000,
+    100000,
+    500000,
+    1000000
+  ];
 
   int get globalCount => _globalCount;
   int get maxTarget => _maxTarget;
+  bool get globalSyncFailed => _globalSyncFailed;
+  bool get hasPendingGlobalSync => _localSessionCount > 0;
+  bool get globalContributionRequiresAccount =>
+      !_globalService.hasAuthenticatedSession;
 
   int get currentMilestone {
     for (int milestone in _milestones) {
@@ -75,23 +94,34 @@ class TasbeehViewModel extends ChangeNotifier {
 
   void _initGlobalSync() {
     _globalService.subscribeToChallenge();
-    _globalService.challengeStream.listen((data) {
+    _challengeSubscription = _globalService.challengeStream.listen((data) {
       _globalCount = data['count'] ?? 0;
       notifyListeners();
+    });
+    _authSubscription = _globalService.authStateChanges.listen((_) {
+      if (_localSessionCount > 0 && _globalService.hasAuthenticatedSession) {
+        _startSyncTimer(Duration.zero);
+      }
     });
   }
 
   Future<void> _loadTotalCount() async {
     final prefs = StorageService.instance.prefs;
     _totalCounter = prefs.getInt(_totalCountKey) ?? 0;
+    _localSessionCount = prefs.getInt(_pendingGlobalCountKey) ?? 0;
+    if (_localSessionCount > 0) {
+      _startSyncTimer();
+    }
     notifyListeners();
   }
 
   @override
   void dispose() {
-    customController.dispose();
     _syncTimer?.cancel();
-    _syncToSupabase(); // Final sync on close
+    _challengeSubscription?.cancel();
+    _authSubscription?.cancel();
+    customController.dispose();
+    _isDisposed = true;
     super.dispose();
   }
 
@@ -113,26 +143,68 @@ class TasbeehViewModel extends ChangeNotifier {
     _totalCounter++;
     _localSessionCount++;
     HapticFeedback.lightImpact();
-    StorageService.instance.prefs.setInt(_totalCountKey, _totalCounter);
-    
+    unawaited(
+      StorageService.instance.prefs.setInt(_totalCountKey, _totalCounter),
+    );
+    unawaited(_persistPendingGlobalCount());
+
     // Batch sync to avoid hitting Supabase on EVERY click (throttling)
     _startSyncTimer();
-    
+
     notifyListeners();
   }
 
-  void _startSyncTimer() {
+  void _startSyncTimer([
+    Duration delay = const Duration(seconds: 2),
+  ]) {
     _syncTimer?.cancel();
-    _syncTimer = Timer(const Duration(seconds: 2), () {
-      _syncToSupabase();
+    _syncTimer = Timer(delay, () {
+      unawaited(_syncToSupabase());
     });
   }
 
   Future<void> _syncToSupabase() async {
-    if (_localSessionCount > 0) {
-      final amountToSync = _localSessionCount;
-      _localSessionCount = 0; // Clear immediately to avoid double counting
-      await _globalService.incrementGlobalCounter(amountToSync);
+    if (_isSyncing || _localSessionCount <= 0) return;
+    if (!_globalService.hasAuthenticatedSession) {
+      _globalSyncFailed = true;
+      notifyListeners();
+      return;
+    }
+
+    _isSyncing = true;
+    var successfulBatches = 0;
+    try {
+      while (_localSessionCount > 0 && successfulBatches < 3) {
+        final amountToSync = _localSessionCount.clamp(1, 100);
+        final success =
+            await _globalService.incrementGlobalCounter(amountToSync);
+        if (!success) {
+          _globalSyncFailed = true;
+          _startSyncTimer(const Duration(minutes: 1));
+          break;
+        }
+
+        _localSessionCount -= amountToSync;
+        successfulBatches++;
+        _globalSyncFailed = false;
+        await _persistPendingGlobalCount();
+      }
+
+      if (_localSessionCount > 0 && !_globalSyncFailed) {
+        _startSyncTimer(const Duration(minutes: 1));
+      }
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _persistPendingGlobalCount() async {
+    final prefs = StorageService.instance.prefs;
+    if (_localSessionCount <= 0) {
+      await prefs.remove(_pendingGlobalCountKey);
+    } else {
+      await prefs.setInt(_pendingGlobalCountKey, _localSessionCount);
     }
   }
 
@@ -183,5 +255,12 @@ class TasbeehViewModel extends ChangeNotifier {
     notifyListeners();
 
     return 'تمت إضافة الذكر';
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
   }
 }

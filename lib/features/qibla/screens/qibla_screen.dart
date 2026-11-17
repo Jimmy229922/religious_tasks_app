@@ -17,7 +17,9 @@ class QiblaScreen extends StatefulWidget {
 class _QiblaScreenState extends State<QiblaScreen> {
   double? _heading;
   bool _wasAligned = false;
+  bool _sensorUnavailable = false;
   StreamSubscription<CompassEvent>? _subscription;
+  Timer? _sensorTimeout;
 
   @override
   void initState() {
@@ -26,11 +28,22 @@ class _QiblaScreenState extends State<QiblaScreen> {
   }
 
   void _initCompass() {
-    _subscription = FlutterCompass.events?.listen((event) {
+    final events = FlutterCompass.events;
+    if (events == null) {
+      _sensorUnavailable = true;
+      return;
+    }
+    _sensorTimeout = Timer(const Duration(seconds: 5), () {
+      if (mounted && _heading == null) {
+        setState(() => _sensorUnavailable = true);
+      }
+    });
+    _subscription = events.listen((event) {
       if (!mounted) return;
 
       final heading = event.heading;
       if (heading != null) {
+        _sensorTimeout?.cancel();
         final qibla = Qibla(widget.coordinates);
         final qiblaDir = qibla.direction;
         final diff = ((qiblaDir - heading + 540) % 360) - 180;
@@ -43,6 +56,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
 
         setState(() {
           _heading = heading;
+          _sensorUnavailable = false;
         });
       }
     });
@@ -50,6 +64,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
 
   @override
   void dispose() {
+    _sensorTimeout?.cancel();
     _subscription?.cancel();
     super.dispose();
   }
@@ -57,7 +72,8 @@ class _QiblaScreenState extends State<QiblaScreen> {
   @override
   Widget build(BuildContext context) {
     final qibla = Qibla(widget.coordinates);
-    final qiblaDirection = qibla.direction; // الزاوية الرياضية الدقيقة للقبلة من الشمال
+    final qiblaDirection =
+        qibla.direction; // الزاوية الرياضية الدقيقة للقبلة من الشمال
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final double? heading = _heading;
@@ -78,7 +94,8 @@ class _QiblaScreenState extends State<QiblaScreen> {
         appBar: AppBar(
           title: const Text(
             "اتجاه القبلة",
-            style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'ArefRuqaa'),
+            style:
+                TextStyle(fontWeight: FontWeight.bold, fontFamily: 'ArefRuqaa'),
           ),
           centerTitle: true,
           elevation: 0,
@@ -97,7 +114,9 @@ class _QiblaScreenState extends State<QiblaScreen> {
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 decoration: BoxDecoration(
                   color: isAligned
-                      ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5))
+                      ? (isDark
+                          ? const Color(0xFF064E3B)
+                          : const Color(0xFFD1FAE5))
                       : (isDark ? const Color(0xFF1E293B) : Colors.white),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
@@ -124,7 +143,9 @@ class _QiblaScreenState extends State<QiblaScreen> {
                           ? Icons.check_circle_rounded
                           : Icons.compass_calibration_rounded,
                       color: isAligned
-                          ? (isDark ? Colors.greenAccent : Colors.green.shade800)
+                          ? (isDark
+                              ? Colors.greenAccent
+                              : Colors.green.shade800)
                           : primaryColor,
                       size: 26,
                     ),
@@ -141,7 +162,9 @@ class _QiblaScreenState extends State<QiblaScreen> {
                               ? (isDark
                                   ? Colors.greenAccent
                                   : Colors.green.shade900)
-                              : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                              : (isDark
+                                  ? Colors.white
+                                  : const Color(0xFF0F172A)),
                         ),
                       ),
                     ),
@@ -229,10 +252,25 @@ class _QiblaScreenState extends State<QiblaScreen> {
                     color: isDark ? Colors.white60 : Colors.grey[700],
                   ),
                 )
+              else if (_sensorUnavailable)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    "تعذر قراءة حساس البوصلة على هذا الجهاز. يمكنك الاستعانة بزاوية القبلة المعروضة بالأعلى أو تجربة جهاز يدعم الحساس.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
               else
                 const Text(
                   "جاري قياس اتجاه البوصلة...",
-                  style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.amber,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
 
               const SizedBox(height: 16),
@@ -255,7 +293,8 @@ class _QiblaScreenState extends State<QiblaScreen> {
                   children: [
                     Icon(
                       Icons.tips_and_updates_rounded,
-                      color: isDark ? Colors.amberAccent : Colors.amber.shade900,
+                      color:
+                          isDark ? Colors.amberAccent : Colors.amber.shade900,
                       size: 22,
                     ),
                     const SizedBox(width: 12),
@@ -322,7 +361,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
               ),
             );
           }),
-
           Positioned(
             top: 24,
             child: Text(

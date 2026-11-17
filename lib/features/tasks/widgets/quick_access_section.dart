@@ -1,240 +1,303 @@
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
-import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
-import 'package:religious_tasks_app/core/widgets/calendar_explorer_dialog.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import 'package:religious_tasks_app/features/athkar/screens/duaa_safar_screen.dart';
-import 'package:religious_tasks_app/features/athkar/screens/halqat_dhikr_screen.dart';
-import 'package:religious_tasks_app/features/qibla/screens/qibla_screen.dart';
-import 'package:religious_tasks_app/features/quran/screens/khatmah_screen.dart';
-import 'package:religious_tasks_app/features/tasbeeh/screens/custom_tasbeeh_screen.dart';
-import 'package:religious_tasks_app/features/radio/screens/radio_screen.dart';
 import 'package:religious_tasks_app/features/names_of_allah/screens/names_of_allah_screen.dart';
+import 'package:religious_tasks_app/features/qibla/screens/qibla_screen.dart';
+import 'package:religious_tasks_app/features/quran/screens/quran_index_screen.dart';
+import 'package:religious_tasks_app/features/radio/screens/radio_screen.dart';
 import 'package:religious_tasks_app/features/ruqyah/screens/ruqyah_screen.dart';
+import 'package:religious_tasks_app/features/tasbeeh/screens/custom_tasbeeh_screen.dart';
+import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
+import 'package:religious_tasks_app/features/tasks/screens/all_features_screen.dart';
 
 class QuickAccessSection extends StatelessWidget {
   final TasksViewModel vm;
   final bool isDark;
 
-  const QuickAccessSection({super.key, required this.vm, required this.isDark});
+  const QuickAccessSection({
+    super.key,
+    required this.vm,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildQuickAccessItem(
+    final coords =
+        vm.prayerTimes?.coordinates ?? Coordinates(21.4225, 39.8262);
+
+    final List<Widget> itemsRow1 = [
+      _buildQuickAccessItem(
+        context,
+        "القرآن الكريم",
+        Icons.menu_book_rounded,
+        () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const QuranIndexScreen())),
+        isDark,
+        const Color(0xFF6A1B9A),
+      ),
+      _buildQuickAccessItem(
+        context,
+        "الرقية الشرعية",
+        Icons.record_voice_over_rounded,
+        () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const RuqyahScreen())),
+        isDark,
+        const Color(0xFF0F766E),
+      ),
+      _buildQuickAccessItem(
+        context,
+        "أسماء الله",
+        Icons.stars_rounded,
+        () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const NamesOfAllahScreen())),
+        isDark,
+        const Color(0xFFD97706),
+      ),
+      _buildQuickAccessItem(
+        context,
+        "التسبيح",
+        Icons.fingerprint_rounded,
+        () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const CustomTasbeehScreen())),
+        isDark,
+        const Color(0xFF1565C0),
+      ),
+    ];
+
+    final List<Widget> itemsRow2 = [
+      _buildQuickAccessItem(
+        context,
+        "القبلة",
+        Icons.explore_rounded,
+        () => Navigator.push(
             context,
-            "القرآن الكريم",
-            Icons.menu_book_rounded,
-            () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("قريباً إن شاء الله"),
-                  duration: Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            isDark,
-            const Color(0xFF6A1B9A), // Deep Purple
-            isLocked: true,
+            MaterialPageRoute(
+                builder: (_) => QiblaScreen(coordinates: coords))),
+        isDark,
+        const Color(0xFF00695C),
+      ),
+      _buildQuickAccessItem(
+        context,
+        "دعاء السفر",
+        Icons.flight_takeoff_rounded,
+        () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const DuaaSafarScreen())),
+        isDark,
+        const Color(0xFF0288D1),
+      ),
+      _buildQuickAccessItem(
+        context,
+        "راديو القرآن",
+        Icons.radio_rounded,
+        () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const RadioScreen())),
+        isDark,
+        const Color(0xFFE53935),
+      ),
+      _buildShowMoreItem(context),
+    ];
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: itemsRow1.map((w) => Expanded(child: w)).toList(),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: itemsRow2.map((w) => Expanded(child: w)).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildShowMoreItem(BuildContext context) {
+    const baseColor = Color(0xFF0F766E); // Deep Emerald Teal Accent
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AllFeaturesScreen(vm: vm),
           ),
-          const SizedBox(width: 8),
-          _buildQuickAccessItem(
-            context,
-            "الرقية الشرعية",
-            Icons.record_voice_over_rounded,
-            () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const RuqyahScreen())),
-            isDark,
-            const Color(0xFF0F766E), // Teal Ruqyah
-          ),
-          const SizedBox(width: 8),
-          _buildQuickAccessItem(
-            context,
-            "أسماء الله",
-            Icons.stars_rounded,
-            () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const NamesOfAllahScreen())),
-            isDark,
-            const Color(0xFFD97706), // Amber Gold
-          ),
-          const SizedBox(width: 8),
-          _buildQuickAccessItem(
-            context,
-            "التسبيح",
-            Icons.fingerprint,
-            () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const CustomTasbeehScreen())),
-            isDark,
-            const Color(0xFF1565C0), // Rich Blue
-          ),
-          const SizedBox(width: 8),
-          _buildQuickAccessItem(
-            context,
-            "القبلة",
-            Icons.explore,
-            () {
-              final coords = vm.prayerTimes?.coordinates ??
-                  Coordinates(21.4225, 39.8262); // Fallback to Makkah
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => QiblaScreen(coordinates: coords)));
-            },
-            isDark,
-            const Color(0xFF00695C), // Dark Teal
-          ),
-          const SizedBox(width: 8),
-          _buildQuickAccessItem(
-            context,
-            "دعاء السفر",
-            Icons.flight_takeoff_rounded,
-            () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const DuaaSafarScreen())),
-            isDark,
-            const Color(0xFF0288D1), // Azure Blue
-          ),
-          const SizedBox(width: 8),
-          _buildQuickAccessItem(
-            context,
-            "راديو القرآن",
-            Icons.radio,
-            () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const RadioScreen())),
-            isDark,
-            const Color(0xFFE53935), // Red
-          ),
-          const SizedBox(width: 8),
-          _buildQuickAccessItem(
-            context,
-            "متابع الختمة",
-            Icons.bookmark_added,
-            () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const KhatmahScreen())),
-            isDark,
-            const Color(0xFFD4AF37), // Metallic Gold
-          ),
-          const SizedBox(width: 8),
-          _buildQuickAccessItem(
-            context,
-            "حلقة الذكر",
-            Icons.groups,
-            () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const HalqatDhikrScreen())),
-            isDark,
-            const Color(0xFF66BB6A), // Softer Green
-          ),
-          const SizedBox(width: 8),
-          _buildQuickAccessItem(
-            context,
-            "التقويم",
-            Icons.calendar_month,
-            () => showDialog(
-              context: context,
-              builder: (context) => const CalendarExplorerDialog(initialTab: 0),
+        ),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 2),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF0D2826)
+                : const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark
+                  ? baseColor.withValues(alpha: 0.6)
+                  : const Color(0xFF0D9488).withValues(alpha: 0.35),
+              width: 1.2,
             ),
-            isDark,
-            const Color(0xFF00ACC1), // Cyan/Teal
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.3)
+                    : baseColor.withValues(alpha: 0.12),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? baseColor.withValues(alpha: 0.28)
+                      : const Color(0xFF0D9488).withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.grid_view_rounded,
+                  color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0D9488),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(height: 5),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  "عرض المزيد",
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  style: GoogleFonts.cairo(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildQuickAccessItem(BuildContext context, String label,
-      IconData icon, VoidCallback onTap, bool isDark, Color baseColor,
-      {bool isLocked = false}) {
+  Widget _buildQuickAccessItem(
+    BuildContext context,
+    String label,
+    IconData icon,
+    VoidCallback onTap,
+    bool isDark,
+    Color baseColor, {
+    bool isLocked = false,
+  }) {
     final itemContent = Container(
-      width: 82,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 2),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark
               ? baseColor.withValues(alpha: 0.4)
-              : baseColor.withValues(alpha: 0.22),
+              : baseColor.withValues(alpha: 0.25),
+          width: 1.2,
         ),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: baseColor.withValues(alpha: 0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.25)
+                : baseColor.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: baseColor.withValues(alpha: isDark ? 0.15 : 0.12),
+              color: baseColor.withValues(alpha: isDark ? 0.18 : 0.13),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon,
-                color: isDark ? baseColor.withValues(alpha: 0.9) : baseColor,
-                size: 26),
+            child: Icon(
+              icon,
+              color: isDark ? baseColor.withValues(alpha: 0.95) : baseColor,
+              size: 22,
+            ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
               label,
               textAlign: TextAlign.center,
-              maxLines: 2,
-              style: TextStyle(
+              maxLines: 1,
+              style: GoogleFonts.cairo(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white70 : const Color(0xFF1E293B),
+                color: isDark ? Colors.white70 : const Color(0xFF0F172A),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: isLocked
-          ? Stack(
-              children: [
-                itemContent,
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.lock_rounded,
-                          color: Colors.amberAccent,
-                          size: 22,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: isLocked
+            ? Stack(
+                children: [
+                  itemContent,
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.black.withValues(alpha: 0.72)
+                            : Colors.amber.shade50.withValues(alpha: 0.88),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.amber.withValues(alpha: 0.4)
+                              : Colors.amber.shade400.withValues(alpha: 0.6),
+                          width: 1.2,
                         ),
-                        SizedBox(height: 2),
-                        Text(
-                          "قريباً",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.lock_rounded,
+                            color: isDark ? Colors.amberAccent : Colors.amber.shade900,
+                            size: 18,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 2),
+                          Text(
+                            "قريباً",
+                            style: GoogleFonts.cairo(
+                              color: isDark ? Colors.white : Colors.amber.shade900,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            )
-          : itemContent,
+                ],
+              )
+            : itemContent,
+      ),
     );
   }
 }

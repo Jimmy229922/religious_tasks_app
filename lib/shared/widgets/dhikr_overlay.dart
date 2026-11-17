@@ -12,6 +12,7 @@ class DhikrOverlay extends StatefulWidget {
 class _DhikrOverlayState extends State<DhikrOverlay> {
   String _dhikr = "سبحان الله";
   Timer? _closeTimer;
+  StreamSubscription<dynamic>? _overlaySubscription;
 
   @override
   void initState() {
@@ -19,8 +20,8 @@ class _DhikrOverlayState extends State<DhikrOverlay> {
     _loadInitialData();
     _startAutoCloseTimer();
     // Listen for data updates if we want to change the text dynamically
-    FlutterOverlayWindow.overlayListener.listen((data) {
-      if (data != null && data is String) {
+    _overlaySubscription = FlutterOverlayWindow.overlayListener.listen((data) {
+      if (mounted && data is String) {
         setState(() {
           _dhikr = data;
         });
@@ -41,6 +42,7 @@ class _DhikrOverlayState extends State<DhikrOverlay> {
   @override
   void dispose() {
     _closeTimer?.cancel();
+    _overlaySubscription?.cancel();
     super.dispose();
   }
 

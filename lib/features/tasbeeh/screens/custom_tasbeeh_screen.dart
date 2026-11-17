@@ -98,7 +98,8 @@ class CustomTasbeehScreen extends StatelessWidget {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.teal.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -138,6 +139,21 @@ class CustomTasbeehScreen extends StatelessWidget {
               ),
             ],
           ),
+          if (vm.globalSyncFailed || vm.hasPendingGlobalSync) ...[
+            const SizedBox(height: 8),
+            Text(
+              vm.globalContributionRequiresAccount
+                  ? 'اربط حساب Google من الإعدادات للمشاركة في العداد العام. عدّك محفوظ محليًا.'
+                  : vm.globalSyncFailed
+                      ? 'تعذر إرسال مساهمتك الآن. عدّك محفوظ محليًا وستُعاد المحاولة.'
+                      : 'جاري إرسال مساهمتك المحفوظة إلى العداد العام.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: vm.globalSyncFailed ? Colors.orange : Colors.grey,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           if (vm.achievedMilestones.isNotEmpty)
             Align(
@@ -148,16 +164,19 @@ class CustomTasbeehScreen extends StatelessWidget {
                 alignment: WrapAlignment.end,
                 children: vm.achievedMilestones.reversed.map((milestone) {
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.amber.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                      border: Border.all(
+                          color: Colors.amber.withValues(alpha: 0.5)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.stars_rounded, color: Colors.amber, size: 14),
+                        const Icon(Icons.stars_rounded,
+                            color: Colors.amber, size: 14),
                         const SizedBox(width: 4),
                         Text(
                           milestone >= 1000000

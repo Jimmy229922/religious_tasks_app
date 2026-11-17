@@ -22,11 +22,11 @@ class HeaderSection extends StatelessWidget {
         intl.DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.now());
 
     final primaryTextColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final secondaryTextColor = isDark ? Colors.white70 : const Color(0xFF475569);
+    final secondaryTextColor =
+        isDark ? Colors.white70 : const Color(0xFF475569);
     final cardBg = isDark ? const Color(0xFF151515) : Colors.white;
-    final cardBorder = isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06);
-    final weatherBg = isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFF1F5F9);
-    final weatherBorder = isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.05);
+    final cardBorder =
+        isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
@@ -115,59 +115,11 @@ class HeaderSection extends StatelessWidget {
 
               const SizedBox(width: 16),
 
-              // Date & Weather Info
+              // Date information
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // Weather Info Widget
-                    if (vm.weatherInfo['temp'] != null &&
-                        vm.weatherInfo['temp']!.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: weatherBg,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: weatherBorder),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  vm.weatherInfo['temp']!,
-                                  style: GoogleFonts.ibmPlexMono(
-                                    color: primaryTextColor,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Icon(Icons.cloud_outlined,
-                                    color: secondaryTextColor, size: 16),
-                              ],
-                            ),
-                            if (vm.weatherInfo['advice'] != null &&
-                                vm.weatherInfo['advice']!.isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                vm.weatherInfo['advice']!,
-                                textAlign: TextAlign.end,
-                                style: TextStyle(
-                                  color: secondaryTextColor,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-
                     InkWell(
                       onTap: () {
                         // Open Calendar

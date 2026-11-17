@@ -35,7 +35,7 @@ class NotificationPreferences {
     return const NotificationPreferences(
       adhanEnabled: {
         'fajr': true,
-        'sunrise': true,
+        'sunrise': false,
         'dhuhr': true,
         'asr': true,
         'maghrib': true,
@@ -55,7 +55,7 @@ class NotificationPreferences {
       hourlyDhikrEnabled: true,
       hourlyDhikrIntervalMinutes: 10,
       floatingDhikrEnabled: false,
-      selectedMoazzenId: 'default',
+      selectedMoazzenId: 'system',
       salawatReminderEnabled: true,
       salawatIntervalMinutes: 15,
     );
@@ -78,10 +78,10 @@ class NotificationPreferences {
       adhanEnabled: adhanEnabled ?? this.adhanEnabled,
       prayerOffsets: prayerOffsets ?? this.prayerOffsets,
       adhanSoundType: adhanSoundType ?? this.adhanSoundType,
-      morningAthkarReminderEnabled: morningAthkarReminderEnabled ??
-          this.morningAthkarReminderEnabled,
-      eveningAthkarReminderEnabled: eveningAthkarReminderEnabled ??
-          this.eveningAthkarReminderEnabled,
+      morningAthkarReminderEnabled:
+          morningAthkarReminderEnabled ?? this.morningAthkarReminderEnabled,
+      eveningAthkarReminderEnabled:
+          eveningAthkarReminderEnabled ?? this.eveningAthkarReminderEnabled,
       hourlyDhikrEnabled: hourlyDhikrEnabled ?? this.hourlyDhikrEnabled,
       hourlyDhikrIntervalMinutes:
           hourlyDhikrIntervalMinutes ?? this.hourlyDhikrIntervalMinutes,

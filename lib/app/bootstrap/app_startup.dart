@@ -35,7 +35,7 @@ class AppStartup {
   }
 
   static Future<void> _configureFramework() async {
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     await initializeDateFormatting('ar', null);
     HijriCalendar.setLocal('ar');
   }

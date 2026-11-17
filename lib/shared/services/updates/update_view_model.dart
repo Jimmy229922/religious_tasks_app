@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:ota_update/ota_update.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'app_update_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class UpdateViewModel extends ChangeNotifier {
-  bool _isDownloading = false;
-  double _downloadProgress = 0;
-  bool _isDownloadFinished = false;
+  static final Uri _playStoreAppUri =
+      Uri.parse('market://details?id=com.jimmy.religiousapp');
+  static final Uri _playStoreWebUri = Uri.parse(
+    'https://play.google.com/store/apps/details?id=com.jimmy.religiousapp',
+  );
+
   Map<String, dynamic>? _updateInfo;
 
-  bool get isDownloading => _isDownloading;
-  double get downloadProgress => _downloadProgress;
-  bool get isDownloadFinished => _isDownloadFinished;
   Map<String, dynamic>? get updateInfo => _updateInfo;
 
   void setUpdateInfo(Map<String, dynamic> info) {
@@ -20,45 +18,20 @@ class UpdateViewModel extends ChangeNotifier {
   }
 
   Future<void> startUpdate() async {
-    if (_updateInfo == null || _isDownloading) return;
+    if (_updateInfo == null) return;
 
-    if (await Permission.requestInstallPackages.request().isGranted) {
-      _isDownloading = true;
-      _isDownloadFinished = false;
-      _downloadProgress = 0;
-      notifyListeners();
-
-      AppUpdateService.downloadAndInstall(
-        _updateInfo!['downloadUrl'],
-        _updateInfo!['version'].toString().replaceAll('.', '_'),
-      ).listen(
-        (event) {
-          if (event.status == OtaStatus.DOWNLOADING) {
-            _downloadProgress = double.tryParse(event.value ?? "0") ?? 0;
-            notifyListeners();
-          } else if (event.status == OtaStatus.INSTALLING) {
-            _isDownloading = false;
-            _isDownloadFinished = true;
-            _downloadProgress = 100;
-            notifyListeners();
-          } else if (event.status.toString().contains('ERROR')) {
-            _isDownloading = false;
-            notifyListeners();
-            // You can handle error message here
-          }
-        },
-        onError: (e) {
-          _isDownloading = false;
-          notifyListeners();
-        },
-      );
+    try {
+      if (await canLaunchUrl(_playStoreAppUri)) {
+        final opened = await launchUrl(
+          _playStoreAppUri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (opened) return;
+      }
+    } catch (_) {
+      // Fall back to the HTTPS Play Store page below.
     }
-  }
 
-  void resetStatus() {
-    _isDownloading = false;
-    _isDownloadFinished = false;
-    _downloadProgress = 0;
-    notifyListeners();
+    await launchUrl(_playStoreWebUri, mode: LaunchMode.externalApplication);
   }
 }

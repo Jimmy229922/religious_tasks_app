@@ -82,6 +82,13 @@ class MainActivity : AudioServiceActivity() {
                         NativeAdhanScheduler.cancel(this@MainActivity, requestCode)
                         result.success(null)
                     }
+                    "stopPlayback" -> {
+                        val intent = Intent(this@MainActivity, AdhanPlaybackService::class.java).apply {
+                            action = AdhanPlaybackService.ACTION_STOP_ADHAN
+                        }
+                        this@MainActivity.startService(intent)
+                        result.success(null)
+                    }
                     "playNow" -> {
                         val prayerKey = call.argument<String>("prayerKey") ?: "fajr"
                         val prayerName = call.argument<String>("prayerName") ?: "الصلاة"

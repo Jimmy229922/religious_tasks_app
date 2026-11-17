@@ -1,6 +1,5 @@
 class AppStrings {
-  static const String appName =
-      'تطبيق العبادات'; // Assuming this is kAppName's value
+  static const String appName = 'رفيق المسلم';
   static const String fajr = 'الفجر';
   static const String sunrise = 'الشروق';
   static const String dhuhr = 'الظهر';
@@ -28,7 +27,7 @@ class AppStrings {
   static const String retryLocation = 'تحديث الموقع';
 
   static const String settings = 'الإعدادات';
-  static const String dailyProgress = 'إنجازاليوم';
+  static const String dailyProgress = 'إنجاز اليوم';
   static const String completedOf = 'مكتمل: ';
   static const String of = ' من ';
 
@@ -50,7 +49,7 @@ class AppStrings {
   static const String today = 'اليوم: ';
   static const String hijriDate = 'التاريخ الهجري: ';
   static const String nextPrayer = 'الصلاة القادمة';
-  static const String gregorianDate = 'التاريخ الميلاد: ';
+  static const String gregorianDate = 'التاريخ الميلادي: ';
 
   // Notifications
   static const String notificationPrayerChannelName = 'تَنْبِيهَاتُ الصَّلَاةِ';

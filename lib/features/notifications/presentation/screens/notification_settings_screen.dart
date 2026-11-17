@@ -29,6 +29,7 @@ class _NotificationSettingsScreenState
 
   final List<Map<String, String>> _availableMoazzens = [
     {'id': 'default', 'name': 'الافتراضي'},
+    {'id': 'system', 'name': 'صوت النظام (نغمة المنبه الافتراضية)'},
     {'id': 'afasy', 'name': 'الشيخ مشاري العفاسي'},
     {'id': 'basit', 'name': 'الشيخ عبد الباسط عبد الصمد'},
     {'id': 'minshawi', 'name': 'الشيخ محمد صديق المنشاوي'},

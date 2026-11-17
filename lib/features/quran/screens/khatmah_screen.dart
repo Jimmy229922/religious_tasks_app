@@ -183,6 +183,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
 
   void _showPlannerDialog() {
     double targetDays = (_plan?.targetDays ?? 30).toDouble();
+    final messenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
@@ -203,7 +204,6 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                     style: TextStyle(fontSize: 13),
                   ),
                   const SizedBox(height: 20),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -218,7 +218,6 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                       ),
                     ],
                   ),
-
                   Slider(
                     value: targetDays,
                     min: 5,
@@ -232,9 +231,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                       });
                     },
                   ),
-
                   const SizedBox(height: 16),
-
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -252,8 +249,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                               child: Text(
                                 "الورد اليومي المطلوب: $dailyPages صفحة / يومياً",
                                 style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13),
+                                    fontWeight: FontWeight.bold, fontSize: 13),
                               ),
                             ),
                           ],
@@ -289,7 +285,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                   await _loadPlan();
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(ctx).showSnackBar(
+                    messenger.showSnackBar(
                       const SnackBar(
                           content: Text("تم حفظ خطة الختمة الذكية بنجاح 🎉")),
                     );
@@ -366,7 +362,9 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.white : Colors.teal.shade900,
+                                    color: isDark
+                                        ? Colors.white
+                                        : Colors.teal.shade900,
                                   ),
                                 ),
                               ],
@@ -385,7 +383,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                         if (_plan != null) ...[
                           const Divider(height: 20),
                           Text(
-                            _plan!.getTodayRequirement(vm.lastAyah),
+                            _plan!.getTodayRequirement(),
                             style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -429,8 +427,8 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                   decoration: BoxDecoration(
                     color: isDark ? Colors.white10 : Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: Colors.teal.withValues(alpha: 0.5)),
+                    border:
+                        Border.all(color: Colors.teal.withValues(alpha: 0.5)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -488,7 +486,8 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                 // Save Button
                 ElevatedButton.icon(
                   onPressed: () => _saveProgress(vm),
-                  icon: const Icon(Icons.bookmark_added_rounded, color: Colors.white),
+                  icon: const Icon(Icons.bookmark_added_rounded,
+                      color: Colors.white),
                   label: const Text(
                     "حفظ التقدم",
                     style: TextStyle(
@@ -527,7 +526,8 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                               style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : Colors.black87),
+                                  color:
+                                      isDark ? Colors.white : Colors.black87),
                             ),
                           ),
                         ],

@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 class QuranTextFormatter {
@@ -13,18 +14,34 @@ class QuranTextFormatter {
     return input;
   }
 
-  /// Builds a [Text.rich] widget with custom golden Quranic verse badge ornaments
+  /// Removes Arabic diacritics and normalizes letter forms for reliable comparison
+  static String normalizeArabic(String input) {
+    return input
+        .replaceAll(RegExp(r'[\u064B-\u0652\u0670\u0671\u06D6-\u06ED]'), '')
+        .replaceAll('أ', 'ا')
+        .replaceAll('إ', 'ا')
+        .replaceAll('آ', 'ا')
+        .replaceAll('ٱ', 'ا')
+        .replaceAll('ى', 'ي')
+        .trim();
+  }
+
+  /// Builds a [Text.rich] widget with custom golden Quranic verse badge ornaments and Ayah-level highlighting & tapping
   static Widget buildFormattedQuranText(
     String text, {
     required TextStyle baseStyle,
     TextAlign textAlign = TextAlign.center,
     Color? badgeColor,
+    String? bookmarkedVerse,
+    void Function(String verseNumber)? onTapVerse,
   }) {
     final spans = buildSpans(
       text,
       baseFontSize: baseStyle.fontSize ?? 18.0,
       badgeColor: badgeColor ?? baseStyle.color ?? defaultGold,
       baseStyle: baseStyle,
+      bookmarkedVerse: bookmarkedVerse,
+      onTapVerse: onTapVerse,
     );
 
     final fontSize = baseStyle.fontSize ?? 18.0;
@@ -41,12 +58,14 @@ class QuranTextFormatter {
     );
   }
 
-  /// Parses string and splits into TextSpan and WidgetSpan for verse numbers
+  /// Parses string and splits into TextSpan and WidgetSpan for verse numbers and Ayah-level tapping
   static List<InlineSpan> buildSpans(
     String text, {
     required double baseFontSize,
     required Color badgeColor,
     required TextStyle baseStyle,
+    String? bookmarkedVerse,
+    void Function(String verseNumber)? onTapVerse,
   }) {
     final spans = <InlineSpan>[];
 
@@ -59,30 +78,49 @@ class QuranTextFormatter {
     final matches = pattern.allMatches(text);
 
     for (final match in matches) {
-      // Add text preceding the match
-      if (match.start > currentPosition) {
-        _addTextSpansWithOrnaments(
-          spans,
-          text.substring(currentPosition, match.start),
-          baseStyle: baseStyle,
-          badgeColor: badgeColor,
-        );
-      }
-
-      // Extract the verse number string (from group 1, 2, or 3)
       final rawNum = match.group(1) ?? match.group(2) ?? match.group(3) ?? '';
       final arabicNum = toArabicDigits(rawNum);
+
+      final isBookmarked = bookmarkedVerse != null &&
+          (bookmarkedVerse == rawNum || bookmarkedVerse == arabicNum);
+
+      // Add text preceding the match (the Ayah text)
+      if (match.start > currentPosition) {
+        final ayahSegment = text.substring(currentPosition, match.start);
+        final ayahStyle = isBookmarked
+            ? baseStyle.copyWith(
+                color: const Color(0xFFD97706),
+                backgroundColor: const Color(0x44FDE68A),
+                fontWeight: FontWeight.bold,
+              )
+            : baseStyle;
+
+        if (onTapVerse != null) {
+          spans.add(
+            TextSpan(
+              text: ayahSegment,
+              style: ayahStyle,
+              recognizer: TapGestureRecognizer()
+                ..onTap = () => onTapVerse(rawNum),
+            ),
+          );
+        } else {
+          spans.add(TextSpan(text: ayahSegment, style: ayahStyle));
+        }
+      }
 
       // Create the custom Quran Ayah symbol badge widget
       spans.add(
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 2.0),
+            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
             child: QuranAyahSymbolWidget(
               number: arabicNum,
               fontSize: baseFontSize,
               color: badgeColor,
+              isBookmarked: isBookmarked,
+              onTap: onTapVerse != null ? () => onTapVerse(rawNum) : null,
             ),
           ),
         ),
@@ -93,66 +131,20 @@ class QuranTextFormatter {
 
     // Add remaining text after last match
     if (currentPosition < text.length) {
-      _addTextSpansWithOrnaments(
-        spans,
-        text.substring(currentPosition),
-        baseStyle: baseStyle,
-        badgeColor: badgeColor,
-      );
+      final remaining = text.substring(currentPosition);
+      if (onTapVerse != null) {
+        spans.add(
+          TextSpan(
+            text: remaining,
+            style: baseStyle,
+          ),
+        );
+      } else {
+        spans.add(TextSpan(text: remaining, style: baseStyle));
+      }
     }
 
     return spans;
-  }
-
-  static void _addTextSpansWithOrnaments(
-    List<InlineSpan> spans,
-    String segment, {
-    required TextStyle baseStyle,
-    required Color badgeColor,
-  }) {
-    // Replace any raw Unicode ornate parentheses \uFD3F (﴿) and \uFD3E (﴾) that don't enclose numbers
-    // with clean Arabic guillemet quotes « and » so fallback fonts are never invoked.
-    final sanitizedSegment = segment
-        .replaceAll('﴿', '«')
-        .replaceAll('﴾', '»');
-
-    // Split text segments around « and » to highlight Quranic quotes in golden color
-    final quotePattern = RegExp(r'«([^»]+)»');
-    int pos = 0;
-    final matches = quotePattern.allMatches(sanitizedSegment);
-
-    for (final m in matches) {
-      if (m.start > pos) {
-        spans.add(TextSpan(text: sanitizedSegment.substring(pos, m.start), style: baseStyle));
-      }
-
-      // Opening quote
-      spans.add(TextSpan(
-        text: '«',
-        style: baseStyle.copyWith(color: badgeColor, fontWeight: FontWeight.bold),
-      ));
-
-      // Quoted verse content
-      spans.add(TextSpan(
-        text: m.group(1),
-        style: baseStyle.copyWith(
-          color: baseStyle.color,
-          fontWeight: FontWeight.w600,
-        ),
-      ));
-
-      // Closing quote
-      spans.add(TextSpan(
-        text: '»',
-        style: baseStyle.copyWith(color: badgeColor, fontWeight: FontWeight.bold),
-      ));
-
-      pos = m.end;
-    }
-
-    if (pos < sanitizedSegment.length) {
-      spans.add(TextSpan(text: sanitizedSegment.substring(pos), style: baseStyle));
-    }
   }
 }
 
@@ -161,12 +153,16 @@ class QuranAyahSymbolWidget extends StatelessWidget {
   final String number;
   final double fontSize;
   final Color color;
+  final bool isBookmarked;
+  final VoidCallback? onTap;
 
   const QuranAyahSymbolWidget({
     super.key,
     required this.number,
     required this.fontSize,
     required this.color,
+    this.isBookmarked = false,
+    this.onTap,
   });
 
   @override
@@ -175,11 +171,16 @@ class QuranAyahSymbolWidget extends StatelessWidget {
     final height = (fontSize * 1.45).clamp(28.0, 40.0);
     final numFontSize = (fontSize * 0.58).clamp(11.0, 16.0);
 
-    return SizedBox(
+    final badgeColor = isBookmarked ? const Color(0xFFD97706) : color;
+
+    final childWidget = SizedBox(
       width: width,
       height: height,
       child: CustomPaint(
-        painter: QuranAyahSymbolPainter(color: color),
+        painter: QuranAyahSymbolPainter(
+          color: badgeColor,
+          isBookmarked: isBookmarked,
+        ),
         child: Center(
           child: Padding(
             padding: const EdgeInsets.only(top: 0.5),
@@ -189,7 +190,7 @@ class QuranAyahSymbolWidget extends StatelessWidget {
               style: TextStyle(
                 fontSize: numFontSize,
                 fontWeight: FontWeight.bold,
-                color: color,
+                color: isBookmarked ? const Color(0xFFD97706) : color,
                 height: 1.0,
                 fontFamily: 'Cairo',
               ),
@@ -198,29 +199,45 @@ class QuranAyahSymbolWidget extends StatelessWidget {
         ),
       ),
     );
+
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: childWidget,
+      );
+    }
+
+    return childWidget;
   }
 }
 
 /// CustomPainter drawing the exact Quran End-Of-Ayah ۝ frame (rounded frame with top and bottom decorative arches)
 class QuranAyahSymbolPainter extends CustomPainter {
   final Color color;
+  final bool isBookmarked;
 
-  const QuranAyahSymbolPainter({required this.color});
+  const QuranAyahSymbolPainter({
+    required this.color,
+    this.isBookmarked = false,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final width = size.width;
     final height = size.height;
 
+    final strokeW = isBookmarked ? 2.0 : 1.4;
+
     final framePaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
+      ..strokeWidth = strokeW
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     final fillPaint = Paint()
-      ..color = color.withValues(alpha: 0.08)
+      ..color = color.withValues(alpha: isBookmarked ? 0.25 : 0.08)
       ..style = PaintingStyle.fill;
 
     // 1. Main outer oval/rounded frame
@@ -247,6 +264,6 @@ class QuranAyahSymbolPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant QuranAyahSymbolPainter oldDelegate) {
-    return oldDelegate.color != color;
+    return oldDelegate.color != color || oldDelegate.isBookmarked != isBookmarked;
   }
 }

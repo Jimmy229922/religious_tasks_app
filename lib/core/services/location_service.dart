@@ -12,19 +12,25 @@ class LocationService {
 
   /// Returns the current position or null if failed/denied.
   /// Also returns a status message.
-  Future<({Position? position, String message})> getCurrentPosition() async {
+  Future<({Position? position, String message})> getCurrentPosition({
+    bool requestPermission = false,
+  }) async {
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      var serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        // Prompt user to enable location services
-        await Geolocator.openLocationSettings();
-        // Check again
-        if (!await Geolocator.isLocationServiceEnabled()) {
+        if (requestPermission) {
+          await Geolocator.openLocationSettings();
+          serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        }
+        if (!serviceEnabled) {
           return (position: null, message: AppStrings.enableLocationService);
         }
       }
 
-      final status = await Permission.location.request();
+      var status = await Permission.location.status;
+      if (status.isDenied && requestPermission) {
+        status = await Permission.location.request();
+      }
       if (status.isDenied) {
         return (position: null, message: AppStrings.locationDenied);
       }
@@ -35,15 +41,13 @@ class LocationService {
       // Try cached first
       final cached = await Geolocator.getLastKnownPosition();
 
-      // If cached is available, check if it is recent enough (e.g. within 24 hours)
-      // or just return it immediately to speed up the app significantly.
-      // For Prayer App, city-level accuracy is fine, so 500 meters or even a few km is okay.
-      if (cached != null) {
-        // Return cached immediately if we have it, then we can update quietly if needed.
+      final cachedIsRecent = cached != null &&
+          DateTime.now().difference(cached.timestamp).abs() <=
+              const Duration(hours: 24);
+      if (cachedIsRecent) {
         return (position: cached, message: '');
       }
 
-      // If no cached location, we MUST fetch fresh.
       try {
         final position = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(

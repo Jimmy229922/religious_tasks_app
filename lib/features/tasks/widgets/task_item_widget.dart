@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 
@@ -220,44 +221,11 @@ class TaskItemWidget extends StatelessWidget {
           }
         }
 
-        Duration diff = target.difference(now);
-        if (diff.isNegative) diff = Duration.zero;
-
-        final hours = diff.inHours.toString().padLeft(2, '0');
-        final minutes = (diff.inMinutes % 60).toString().padLeft(2, '0');
-        final seconds = (diff.inSeconds % 60).toString().padLeft(2, '0');
-        final countdownColor =
-            isDark ? const Color(0xFFFFD54F) : const Color(0xFFF57C00);
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(task.description,
-                style: TextStyle(
-                  color: accent,
-                  fontWeight: FontWeight.bold,
-                )),
-            const SizedBox(height: 6),
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 4,
-              runSpacing: 2,
-              children: [
-                Icon(Icons.access_time_filled, size: 14, color: countdownColor),
-                Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: Text("$hours:$minutes:$seconds",
-                      style: TextStyle(
-                          color: countdownColor,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Roboto')),
-                ),
-                Text(AppStrings.remaining,
-                    style: TextStyle(color: countdownColor, fontSize: 10)),
-              ],
-            ),
-          ],
+        return _PrayerItemCountdownWidget(
+          target: target,
+          description: task.description,
+          accent: accent,
+          isDark: isDark,
         );
       }
     }
@@ -331,5 +299,97 @@ class TaskItemWidget extends StatelessWidget {
       return isDark ? const Color(0xFF4DD0E1) : const Color(0xFF006064);
     }
     return isDark ? const Color(0xFFA5D6A7) : const Color(0xFF2E7D32);
+  }
+}
+
+class _PrayerItemCountdownWidget extends StatefulWidget {
+  final DateTime target;
+  final String description;
+  final Color accent;
+  final bool isDark;
+
+  const _PrayerItemCountdownWidget({
+    required this.target,
+    required this.description,
+    required this.accent,
+    required this.isDark,
+  });
+
+  @override
+  State<_PrayerItemCountdownWidget> createState() =>
+      __PrayerItemCountdownWidgetState();
+}
+
+class __PrayerItemCountdownWidgetState
+    extends State<_PrayerItemCountdownWidget> {
+  late Timer _timer;
+  DateTime _currentTime = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          _currentTime = DateTime.now();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Duration diff = widget.target.difference(_currentTime);
+    if (diff.isNegative) diff = Duration.zero;
+
+    final hours = diff.inHours.toString().padLeft(2, '0');
+    final minutes = (diff.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (diff.inSeconds % 60).toString().padLeft(2, '0');
+    final countdownColor =
+        widget.isDark ? const Color(0xFFFFD54F) : const Color(0xFFF57C00);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.description,
+          style: TextStyle(
+            color: widget.accent,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 4,
+          runSpacing: 2,
+          children: [
+            Icon(Icons.access_time_filled, size: 14, color: countdownColor),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: Text(
+                "$hours:$minutes:$seconds",
+                style: TextStyle(
+                  color: countdownColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+            Text(
+              AppStrings.remaining,
+              style: TextStyle(color: countdownColor, fontSize: 10),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }

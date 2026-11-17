@@ -6,7 +6,10 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
+import android.media.RingtoneManager
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -18,9 +21,20 @@ class AdhanPlaybackService : Service() {
     private var adhanPlayer: MediaPlayer? = null
     private var salawatWasPausedForAdhan: Boolean = false
     private var salawatPendingAfterAdhan: Boolean = false
+    private lateinit var audioManager: AudioManager
+    private var audioFocusRequest: AudioFocusRequest? = null
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { change ->
+        if (change == AudioManager.AUDIOFOCUS_LOSS ||
+            change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
+        ) {
+            stopAll()
+            stopSelf()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         createChannel()
     }
 
@@ -38,13 +52,22 @@ class AdhanPlaybackService : Service() {
 
         startForeground(NOTIFICATION_ID, buildNotification(prayerName, prayerKey))
 
-        if (soundType != 0) {
-            val isSalawat = (soundType == 99 || prayerKey.lowercase() == "salawat")
-            if (isSalawat) {
-                playSalawat()
-            } else {
-                playAdhan(prayerKey, soundType, moazzenId)
-            }
+        if (soundType == 0) {
+            // Keep the prayer notification visible, but do not leave an idle
+            // foreground service running when the user selected silent mode.
+            stopForeground(STOP_FOREGROUND_DETACH)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        // Request audio focus, but never cancel playback if focus request is delayed or rejected
+        requestAudioFocus()
+
+        val isSalawat = (soundType == 99 || prayerKey.lowercase() == "salawat")
+        if (isSalawat) {
+            playSalawat()
+        } else {
+            playAdhan(prayerKey, soundType, moazzenId)
         }
 
         return START_NOT_STICKY
@@ -74,6 +97,42 @@ class AdhanPlaybackService : Service() {
             } catch (_: Exception) {}
         }
         adhanPlayer = null
+        abandonAudioFocus()
+    }
+
+    private fun requestAudioFocus(): Boolean {
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                .build()
+            audioFocusRequest = request
+            audioManager.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                audioFocusChangeListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+            )
+        }
+        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+
+    private fun abandonAudioFocus() {
+        if (!::audioManager.isInitialized) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            audioFocusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(audioFocusChangeListener)
+        }
     }
 
     override fun onDestroy() {
@@ -100,11 +159,15 @@ class AdhanPlaybackService : Service() {
         }
 
         try {
-            val descriptor = resources.openRawResourceFd(R.raw.salawat_sound) ?: return
+            val descriptor = resources.openRawResourceFd(R.raw.salawat_sound)
+            if (descriptor == null) {
+                playSystemSalawatSound()
+                return
+            }
             salawatPlayer?.release()
             salawatPlayer = MediaPlayer().apply {
                 val attributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build()
                 setAudioAttributes(attributes)
@@ -119,15 +182,57 @@ class AdhanPlaybackService : Service() {
                         stopSelf()
                     }
                 }
-                setOnErrorListener { _, _, _ ->
+                setOnErrorListener { player, _, _ ->
+                    player.release()
                     salawatPlayer = null
+                    playSystemSalawatSound()
                     true
                 }
                 prepare()
                 start()
             }
         } catch (_: Exception) {
-            Log.e("AdhanService", "Error playing salawat audio")
+            Log.e("AdhanService", "Error playing salawat audio, falling back to system notification sound")
+            playSystemSalawatSound()
+        }
+    }
+
+    private fun playSystemSalawatSound() {
+        try {
+            val systemUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            if (systemUri == null) {
+                stopSelf()
+                return
+            }
+            salawatPlayer?.release()
+            salawatPlayer = MediaPlayer().apply {
+                val attributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+                setAudioAttributes(attributes)
+                setDataSource(applicationContext, systemUri)
+                setOnCompletionListener {
+                    salawatPlayer?.release()
+                    salawatPlayer = null
+                    val activeAdhan: MediaPlayer? = adhanPlayer
+                    if (activeAdhan == null || !activeAdhan.isPlaying) {
+                        stopSelf()
+                    }
+                }
+                setOnErrorListener { player, _, _ ->
+                    player.release()
+                    salawatPlayer = null
+                    stopSelf()
+                    true
+                }
+                prepare()
+                start()
+            }
+        } catch (e: Exception) {
+            Log.e("AdhanService", "Error playing system salawat audio: ${e.message}")
+            stopSelf()
         }
     }
 
@@ -144,6 +249,11 @@ class AdhanPlaybackService : Service() {
             }
         }
 
+        if (moazzenId == "system") {
+            playSystemAdhanSound()
+            return
+        }
+
         val soundResId = if (soundType == 1) {
             R.raw.prayer_reminder
         } else {
@@ -151,24 +261,16 @@ class AdhanPlaybackService : Service() {
         }
 
         if (soundResId == 0) {
-            if (salawatWasPausedForAdhan) {
-                val salawat: MediaPlayer? = salawatPlayer
-                if (salawat != null) {
-                    try {
-                        salawat.start()
-                        salawatWasPausedForAdhan = false
-                    } catch (_: Exception) {}
-                } else {
-                    stopSelf()
-                }
-            } else {
-                stopSelf()
-            }
+            playSystemAdhanSound()
             return
         }
 
         try {
-            val descriptor = resources.openRawResourceFd(soundResId) ?: return
+            val descriptor = resources.openRawResourceFd(soundResId)
+            if (descriptor == null) {
+                playSystemAdhanSound()
+                return
+            }
             adhanPlayer?.release()
             adhanPlayer = MediaPlayer().apply {
                 val attributes = AudioAttributes.Builder()
@@ -183,46 +285,85 @@ class AdhanPlaybackService : Service() {
                 setOnCompletionListener {
                     adhanPlayer?.release()
                     adhanPlayer = null
-                    
-                    // 1. If Salawat was paused for Adhan, RESUME Salawat!
-                    if (salawatWasPausedForAdhan) {
-                        val salawat: MediaPlayer? = salawatPlayer
-                        if (salawat != null) {
-                            try {
-                                salawat.start()
-                                salawatWasPausedForAdhan = false
-                                Log.d("AdhanService", "Salawat resumed after Adhan finished.")
-                            } catch (_: Exception) {
-                                Log.e("AdhanService", "Failed to resume salawat after Adhan")
-                                stopSelf()
-                            }
-                        } else {
-                            stopSelf()
-                        }
-                    } else if (salawatPendingAfterAdhan) {
-                        // 2. If Salawat triggered DURING Adhan, start Salawat NOW after Adhan completes!
-                        salawatPendingAfterAdhan = false
-                        Log.d("AdhanService", "Adhan completed, starting pending Salawat.")
-                        playSalawat()
-                    } else {
-                        stopSelf()
-                    }
+                    onAdhanAudioFinished()
                 }
                 setOnErrorListener { _, _, _ ->
                     adhanPlayer = null
-                    stopSelf()
+                    playSystemAdhanSound()
                     true
                 }
                 prepare()
                 start()
             }
         } catch (_: Exception) {
-            Log.e("AdhanService", "Error playing adhan audio")
+            Log.e("AdhanService", "Error playing adhan raw audio, falling back to system sound")
+            playSystemAdhanSound()
+        }
+    }
+
+    private fun playSystemAdhanSound() {
+        try {
+            val systemUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            if (systemUri == null) {
+                onAdhanAudioFinished()
+                return
+            }
+            adhanPlayer?.release()
+            adhanPlayer = MediaPlayer().apply {
+                val attributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+                setAudioAttributes(attributes)
+                setDataSource(applicationContext, systemUri)
+                setOnCompletionListener {
+                    adhanPlayer?.release()
+                    adhanPlayer = null
+                    onAdhanAudioFinished()
+                }
+                setOnErrorListener { _, _, _ ->
+                    adhanPlayer = null
+                    onAdhanAudioFinished()
+                    true
+                }
+                prepare()
+                start()
+            }
+        } catch (e: Exception) {
+            Log.e("AdhanService", "Error playing system audio: ${e.message}")
+            onAdhanAudioFinished()
+        }
+    }
+
+    private fun onAdhanAudioFinished() {
+        // 1. If Salawat was paused for Adhan, RESUME Salawat!
+        if (salawatWasPausedForAdhan) {
+            val salawat: MediaPlayer? = salawatPlayer
+            if (salawat != null) {
+                try {
+                    salawat.start()
+                    salawatWasPausedForAdhan = false
+                    Log.d("AdhanService", "Salawat resumed after Adhan finished.")
+                } catch (_: Exception) {
+                    Log.e("AdhanService", "Failed to resume salawat after Adhan")
+                    stopSelf()
+                }
+            } else {
+                stopSelf()
+            }
+        } else if (salawatPendingAfterAdhan) {
+            // 2. If Salawat triggered DURING Adhan, start Salawat NOW after Adhan completes!
+            salawatPendingAfterAdhan = false
+            Log.d("AdhanService", "Adhan completed, starting pending Salawat.")
+            playSalawat()
+        } else {
             stopSelf()
         }
     }
 
     private fun getAdhanResource(prayerKey: String, moazzenId: String): Int {
+        if (moazzenId == "system") return 0
         val isFajr = prayerKey.lowercase() == "fajr"
         return when (moazzenId) {
             "afasy" -> if (isFajr) R.raw.afasy_fajr else R.raw.afasy_others

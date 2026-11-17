@@ -34,15 +34,17 @@ class NotificationPreferencesService {
     final prayerOffsets = <String, int>{};
     final storedInterval = prefs.getInt(hourlyDhikrIntervalKey);
     final storedSalawatInterval = prefs.getInt(salawatIntervalKey);
-    final soundTypeIndex = prefs.getInt(adhanSoundTypeKey) ?? 
-        AdhanSoundType.full.index;
-    final adhanSoundType = AdhanSoundType.values[soundTypeIndex.clamp(0, AdhanSoundType.values.length - 1)];
+    final soundTypeIndex =
+        prefs.getInt(adhanSoundTypeKey) ?? AdhanSoundType.full.index;
+    final adhanSoundType = AdhanSoundType
+        .values[soundTypeIndex.clamp(0, AdhanSoundType.values.length - 1)];
 
     for (final prayerKey in prayerKeys) {
-      adhanEnabled[prayerKey] =
-          prefs.getBool('adhan_enabled_$prayerKey') ?? true;
+      adhanEnabled[prayerKey] = prayerKey == 'sunrise'
+          ? false
+          : (prefs.getBool('adhan_enabled_$prayerKey') ?? true);
       prayerOffsets[prayerKey] =
-          prefs.getInt('prayer_offset_$prayerKey') ?? 0;
+          (prefs.getInt('prayer_offset_$prayerKey') ?? 0).clamp(-60, 60);
     }
 
     return defaults.copyWith(
@@ -57,16 +59,15 @@ class NotificationPreferencesService {
               defaults.eveningAthkarReminderEnabled,
       hourlyDhikrEnabled:
           prefs.getBool(hourlyDhikrEnabledKey) ?? defaults.hourlyDhikrEnabled,
-      hourlyDhikrIntervalMinutes:
-          dhikrIntervalOptions.contains(storedInterval)
-              ? storedInterval!
-              : defaults.hourlyDhikrIntervalMinutes,
-      floatingDhikrEnabled:
-          prefs.getBool(floatingDhikrEnabledKey) ?? defaults.floatingDhikrEnabled,
+      hourlyDhikrIntervalMinutes: dhikrIntervalOptions.contains(storedInterval)
+          ? storedInterval!
+          : defaults.hourlyDhikrIntervalMinutes,
+      floatingDhikrEnabled: prefs.getBool(floatingDhikrEnabledKey) ??
+          defaults.floatingDhikrEnabled,
       selectedMoazzenId:
           prefs.getString(selectedMoazzenIdKey) ?? defaults.selectedMoazzenId,
-      salawatReminderEnabled:
-          prefs.getBool(salawatReminderEnabledKey) ?? defaults.salawatReminderEnabled,
+      salawatReminderEnabled: prefs.getBool(salawatReminderEnabledKey) ??
+          defaults.salawatReminderEnabled,
       salawatIntervalMinutes:
           salawatIntervalOptions.contains(storedSalawatInterval)
               ? storedSalawatInterval!
@@ -81,7 +82,7 @@ class NotificationPreferencesService {
 
   Future<void> setPrayerOffset(String prayerKey, int value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('prayer_offset_$prayerKey', value);
+    await prefs.setInt('prayer_offset_$prayerKey', value.clamp(-60, 60));
   }
 
   Future<void> setAdhanSoundType(AdhanSoundType type) async {
