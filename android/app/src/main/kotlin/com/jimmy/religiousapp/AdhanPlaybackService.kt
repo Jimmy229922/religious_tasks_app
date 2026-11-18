@@ -11,7 +11,9 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import android.util.Log
 
@@ -21,6 +23,8 @@ class AdhanPlaybackService : Service() {
     private var adhanPlayer: MediaPlayer? = null
     private var salawatWasPausedForAdhan: Boolean = false
     private var salawatPendingAfterAdhan: Boolean = false
+    private val fadeHandler = Handler(Looper.getMainLooper())
+    private var salawatFadeRunnable: Runnable? = null
     private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { change ->
@@ -74,6 +78,7 @@ class AdhanPlaybackService : Service() {
     }
 
     private fun stopAll() {
+        cancelSalawatFadeIn()
         salawatWasPausedForAdhan = false
         salawatPendingAfterAdhan = false
         val sPlayer: MediaPlayer? = salawatPlayer
@@ -142,6 +147,43 @@ class AdhanPlaybackService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private fun cancelSalawatFadeIn() {
+        salawatFadeRunnable?.let { fadeHandler.removeCallbacks(it) }
+        salawatFadeRunnable = null
+    }
+
+    private fun startSalawatFadeIn(player: MediaPlayer) {
+        cancelSalawatFadeIn()
+        val totalSteps = 30
+        val stepDelayMs = 100L
+        var currentStep = 0
+
+        val runnable = object : Runnable {
+            override fun run() {
+                if (salawatPlayer !== player) {
+                    salawatFadeRunnable = null
+                    return
+                }
+                currentStep++
+                val progress = (currentStep.toFloat() / totalSteps).coerceIn(0f, 1f)
+                val volume = 0.05f + 0.95f * (progress * progress)
+                try {
+                    player.setVolume(volume, volume)
+                } catch (_: Exception) {
+                    salawatFadeRunnable = null
+                    return
+                }
+                if (currentStep < totalSteps) {
+                    fadeHandler.postDelayed(this, stepDelayMs)
+                } else {
+                    salawatFadeRunnable = null
+                }
+            }
+        }
+        salawatFadeRunnable = runnable
+        fadeHandler.postDelayed(runnable, stepDelayMs)
+    }
+
     private fun playSalawat() {
         // 1. If Adhan is CURRENTLY playing, DO NOT start Salawat now! Mark it pending to play right after Adhan completes.
         val aPlayer: MediaPlayer? = adhanPlayer
@@ -164,17 +206,20 @@ class AdhanPlaybackService : Service() {
                 playSystemSalawatSound()
                 return
             }
+            cancelSalawatFadeIn()
             salawatPlayer?.release()
             salawatPlayer = MediaPlayer().apply {
                 val attributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build()
                 setAudioAttributes(attributes)
+                setVolume(0.05f, 0.05f)
 
                 setDataSource(descriptor.fileDescriptor, descriptor.startOffset, descriptor.length)
                 descriptor.close()
                 setOnCompletionListener {
+                    cancelSalawatFadeIn()
                     salawatPlayer?.release()
                     salawatPlayer = null
                     val activeAdhan: MediaPlayer? = adhanPlayer
@@ -183,6 +228,7 @@ class AdhanPlaybackService : Service() {
                     }
                 }
                 setOnErrorListener { player, _, _ ->
+                    cancelSalawatFadeIn()
                     player.release()
                     salawatPlayer = null
                     playSystemSalawatSound()
@@ -190,6 +236,7 @@ class AdhanPlaybackService : Service() {
                 }
                 prepare()
                 start()
+                startSalawatFadeIn(this)
             }
         } catch (_: Exception) {
             Log.e("AdhanService", "Error playing salawat audio, falling back to system notification sound")
@@ -205,15 +252,18 @@ class AdhanPlaybackService : Service() {
                 stopSelf()
                 return
             }
+            cancelSalawatFadeIn()
             salawatPlayer?.release()
             salawatPlayer = MediaPlayer().apply {
                 val attributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build()
                 setAudioAttributes(attributes)
+                setVolume(0.05f, 0.05f)
                 setDataSource(applicationContext, systemUri)
                 setOnCompletionListener {
+                    cancelSalawatFadeIn()
                     salawatPlayer?.release()
                     salawatPlayer = null
                     val activeAdhan: MediaPlayer? = adhanPlayer
@@ -222,6 +272,7 @@ class AdhanPlaybackService : Service() {
                     }
                 }
                 setOnErrorListener { player, _, _ ->
+                    cancelSalawatFadeIn()
                     player.release()
                     salawatPlayer = null
                     stopSelf()
@@ -229,6 +280,7 @@ class AdhanPlaybackService : Service() {
                 }
                 prepare()
                 start()
+                startSalawatFadeIn(this)
             }
         } catch (e: Exception) {
             Log.e("AdhanService", "Error playing system salawat audio: ${e.message}")
@@ -241,7 +293,9 @@ class AdhanPlaybackService : Service() {
         val sPlayer: MediaPlayer? = salawatPlayer
         if (sPlayer != null && sPlayer.isPlaying) {
             try {
+                cancelSalawatFadeIn()
                 sPlayer.pause()
+                sPlayer.setVolume(1.0f, 1.0f)
                 salawatWasPausedForAdhan = true
                 Log.d("AdhanService", "Salawat paused for Adhan.")
             } catch (_: Exception) {

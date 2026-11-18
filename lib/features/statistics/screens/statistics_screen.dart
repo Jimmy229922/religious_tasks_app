@@ -1,6 +1,8 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
+import 'package:religious_tasks_app/core/services/athkar_tracking_service.dart';
 import '../../tasbeeh/providers/tasbeeh_view_model.dart';
 
 class StatisticsScreen extends StatelessWidget {
@@ -19,6 +21,14 @@ class StatisticsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final tasbeehVM = Provider.of<TasbeehViewModel>(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final storedStreaks = AthkarTrackingService.loadStreaks();
+    final effectiveMorningStreak =
+        math.max(morningStreak, storedStreaks['morning'] ?? 0);
+    final effectiveEveningStreak =
+        math.max(eveningStreak, storedStreaks['evening'] ?? 0);
+    final effectiveSleepStreak =
+        math.max(sleepStreak, storedStreaks['sleep'] ?? 0);
+    final todayCounts = AthkarTrackingService.loadTodayAthkarReadCounts();
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -34,18 +44,111 @@ class StatisticsScreen extends StatelessWidget {
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            _buildChartSection(isDark),
+            _buildTodayReadChartSection(todayCounts, isDark),
+            const SizedBox(height: 20),
+            _buildStreakChartSection(
+              effectiveMorningStreak,
+              effectiveEveningStreak,
+              effectiveSleepStreak,
+              isDark,
+            ),
             const SizedBox(height: 24),
             _buildTotalTasbeehSection(tasbeehVM.totalCounter, isDark),
             const SizedBox(height: 24),
-            _buildBadgesSection(tasbeehVM.totalCounter, isDark),
+            _buildBadgesSection(
+              tasbeehVM.totalCounter,
+              effectiveMorningStreak,
+              effectiveEveningStreak,
+              effectiveSleepStreak,
+              isDark,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildChartSection(bool isDark) {
+  Widget _buildTodayReadChartSection(Map<String, int> counts, bool isDark) {
+    final mCount = counts['morning'] ?? 0;
+    final eCount = counts['evening'] ?? 0;
+    final sCount = counts['sleep'] ?? 0;
+    final maxVal = math.max(mCount, math.max(eCount, sCount));
+    final maxY = (maxVal < 10 ? 10 : maxVal + (maxVal * 0.2).ceil()).toDouble();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "أذكار اليوم المقروءة (مباشر)",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 190,
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxY,
+                barTouchData: const BarTouchData(enabled: true),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 38,
+                      getTitlesWidget: (value, meta) {
+                        const style = TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 11.5);
+                        switch (value.toInt()) {
+                          case 0:
+                            return Text('صباح ($mCount)', style: style);
+                          case 1:
+                            return Text('مساء ($eCount)', style: style);
+                          case 2:
+                            return Text('نوم ($sCount)', style: style);
+                          default:
+                            return const Text('');
+                        }
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                barGroups: [
+                  _makeBarGroup(0, mCount.toDouble(), Colors.teal, maxY),
+                  _makeBarGroup(1, eCount.toDouble(), Colors.indigo, maxY),
+                  _makeBarGroup(2, sCount.toDouble(), Colors.deepPurple, maxY),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStreakChartSection(
+    int mStreak,
+    int eStreak,
+    int sStreak,
+    bool isDark,
+  ) {
+    final maxVal = math.max(mStreak, math.max(eStreak, sStreak));
+    final maxY = (maxVal + 5).toDouble();
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -57,26 +160,32 @@ class StatisticsScreen extends StatelessWidget {
         children: [
           const Text("نشاطك في الأذكار (أيام متتالية)",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 30),
+          const SizedBox(height: 24),
           SizedBox(
-            height: 200,
+            height: 190,
             child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
-                maxY: (morningStreak > eveningStreak ? (morningStreak > sleepStreak ? morningStreak : sleepStreak) : (eveningStreak > sleepStreak ? eveningStreak : sleepStreak)).toDouble() + 5,
+                maxY: maxY,
                 barTouchData: const BarTouchData(enabled: true),
                 titlesData: FlTitlesData(
                   show: true,
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
+                      reservedSize: 38,
                       getTitlesWidget: (value, meta) {
-                        const style = TextStyle(fontWeight: FontWeight.bold, fontSize: 12);
+                        const style = TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 11.5);
                         switch (value.toInt()) {
-                          case 0: return const Text('صباح', style: style);
-                          case 1: return const Text('مساء', style: style);
-                          case 2: return const Text('نوم', style: style);
-                          default: return const Text('');
+                          case 0:
+                            return Text('صباح ($mStreak)', style: style);
+                          case 1:
+                            return Text('مساء ($eStreak)', style: style);
+                          case 2:
+                            return Text('نوم ($sStreak)', style: style);
+                          default:
+                            return const Text('');
                         }
                       },
                     ),
@@ -88,9 +197,9 @@ class StatisticsScreen extends StatelessWidget {
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
                 barGroups: [
-                  _makeBarGroup(0, morningStreak.toDouble(), Colors.orange),
-                  _makeBarGroup(1, eveningStreak.toDouble(), Colors.indigo),
-                  _makeBarGroup(2, sleepStreak.toDouble(), Colors.deepPurple),
+                  _makeBarGroup(0, mStreak.toDouble(), Colors.orange, maxY),
+                  _makeBarGroup(1, eStreak.toDouble(), Colors.indigo, maxY),
+                  _makeBarGroup(2, sStreak.toDouble(), Colors.deepPurple, maxY),
                 ],
               ),
             ),
@@ -100,18 +209,23 @@ class StatisticsScreen extends StatelessWidget {
     );
   }
 
-  BarChartGroupData _makeBarGroup(int x, double y, Color color) {
+  BarChartGroupData _makeBarGroup(
+    int x,
+    double y,
+    Color color,
+    double maxY,
+  ) {
     return BarChartGroupData(
       x: x,
       barRods: [
         BarChartRodData(
           toY: y,
           color: color,
-          width: 25,
+          width: 26,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
           backDrawRodData: BackgroundBarChartRodData(
             show: true,
-            toY: 0,
+            toY: maxY,
             color: color.withValues(alpha: 0.1),
           ),
         ),
@@ -151,7 +265,13 @@ class StatisticsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBadgesSection(int totalTasbeeh, bool isDark) {
+  Widget _buildBadgesSection(
+    int totalTasbeeh,
+    int effectiveMorningStreak,
+    int effectiveEveningStreak,
+    int effectiveSleepStreak,
+    bool isDark,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -171,7 +291,7 @@ class StatisticsScreen extends StatelessWidget {
             _buildBadge(
               "المحافظ",
               "7 أيام فجر",
-              morningStreak >= 7,
+              effectiveMorningStreak >= 7,
               Icons.wb_twilight_rounded,
               Colors.orange,
               isDark,
@@ -187,7 +307,7 @@ class StatisticsScreen extends StatelessWidget {
             _buildBadge(
               "المثابر",
               "3 أيام مساء",
-              eveningStreak >= 3,
+              effectiveEveningStreak >= 3,
               Icons.nightlight_round,
               Colors.indigo,
               isDark,
@@ -195,7 +315,7 @@ class StatisticsScreen extends StatelessWidget {
             _buildBadge(
               "نور الليل",
               "10 أيام نوم",
-              sleepStreak >= 10,
+              effectiveSleepStreak >= 10,
               Icons.bed_rounded,
               Colors.deepPurple,
               isDark,
@@ -211,7 +331,7 @@ class StatisticsScreen extends StatelessWidget {
             _buildBadge(
               "المخلص",
               "30 يوم فجر",
-              morningStreak >= 30,
+              effectiveMorningStreak >= 30,
               Icons.mosque_rounded,
               Colors.teal,
               isDark,

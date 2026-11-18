@@ -48,4 +48,90 @@ class AthkarTrackingService {
     final sorted = dates.toList()..sort();
     await StorageService.instance.setString(key, jsonEncode(sorted));
   }
+
+  static const String _streaksKey = 'athkar_streaks_v1';
+  static const String _tasksLastDatePrefix = 'saved_tasks_v2_last_date_';
+
+  static Map<String, int> loadStreaks() {
+    final raw = StorageService.instance.getString(_streaksKey);
+    if (raw == null || raw.isEmpty) {
+      return {'morning': 0, 'evening': 0, 'sleep': 0};
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return {
+          'morning': decoded['morning'] is int ? decoded['morning'] as int : 0,
+          'evening': decoded['evening'] is int ? decoded['evening'] as int : 0,
+          'sleep': decoded['sleep'] is int ? decoded['sleep'] as int : 0,
+        };
+      }
+    } catch (_) {}
+    return {'morning': 0, 'evening': 0, 'sleep': 0};
+  }
+
+  static Future<void> syncStreakWithStorage(String type) async {
+    final now = DateTime.now();
+    final todayStr = formatDay(now);
+    final yesterdayStr = formatDay(now.subtract(const Duration(days: 1)));
+    final lastDateKey = '$_tasksLastDatePrefix$type';
+    final lastDate = StorageService.instance.getString(lastDateKey);
+
+    if (lastDate == todayStr) return;
+
+    final streaks = loadStreaks();
+    int currentStreak = streaks[type] ?? 0;
+    if (lastDate == yesterdayStr) {
+      currentStreak++;
+    } else {
+      currentStreak = 1;
+    }
+
+    streaks[type] = currentStreak;
+    await StorageService.instance.setString(lastDateKey, todayStr);
+    await StorageService.instance.setString(_streaksKey, jsonEncode(streaks));
+  }
+
+  static Map<String, int> loadTodayAthkarReadCounts() {
+    final todayStr = formatDay(DateTime.now());
+    return {
+      'morning': _sumProgressForDate(
+        'athkar_morning_date',
+        'athkar_morning_progress',
+        todayStr,
+      ),
+      'evening': _sumProgressForDate(
+        'athkar_evening_date',
+        'athkar_evening_progress',
+        todayStr,
+      ),
+      'sleep': _sumProgressForDate(
+        'athkar_sleep_date',
+        'athkar_sleep_progress',
+        todayStr,
+      ),
+    };
+  }
+
+  static int _sumProgressForDate(
+    String dateKey,
+    String progressKey,
+    String todayStr,
+  ) {
+    final prefs = StorageService.instance.prefs;
+    if (prefs.getString(dateKey) != todayStr) return 0;
+    final raw = prefs.getString(progressKey);
+    if (raw == null || raw.isEmpty) return 0;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return 0;
+      int total = 0;
+      for (final val in decoded) {
+        if (val is int && val > 0) total += val;
+      }
+      return total;
+    } catch (_) {
+      return 0;
+    }
+  }
 }

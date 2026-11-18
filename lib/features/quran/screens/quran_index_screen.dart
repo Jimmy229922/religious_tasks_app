@@ -22,6 +22,7 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
   int? _lastReadSurahNum;
   String? _lastReadSurahName;
   String? _lastReadVerseNum;
+  int? _lastReadPageNum;
 
   @override
   void initState() {
@@ -33,16 +34,17 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
 
   void _loadLastReadBookmark() {
     final prefs = StorageService.instance.prefs;
-    final lastNum = prefs.getInt('last_read_surah_number');
-    final lastName = prefs.getString('last_read_surah_name');
-    if (lastNum != null) {
-      final lastVerse = prefs.getString('quran_bookmark_verse_$lastNum');
-      setState(() {
-        _lastReadSurahNum = lastNum;
-        _lastReadSurahName = lastName;
-        _lastReadVerseNum = lastVerse;
-      });
-    }
+    final globalSurahNum = prefs.getInt('quran_global_bookmark_surah_number') ?? prefs.getInt('last_read_surah_number');
+    final globalSurahName = prefs.getString('quran_global_bookmark_surah_name') ?? prefs.getString('last_read_surah_name');
+    final globalVerse = prefs.getString('quran_global_bookmark_verse');
+    final globalPage = prefs.getInt('quran_global_bookmark_page');
+
+    setState(() {
+      _lastReadSurahNum = globalSurahNum;
+      _lastReadSurahName = globalSurahName;
+      _lastReadVerseNum = globalVerse;
+      _lastReadPageNum = globalPage;
+    });
   }
 
   @override
@@ -91,7 +93,7 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
           ),
           child: Column(
             children: [
-              // Last Read Resume Banner
+              // Single Unified Global Reading Bookmark Banner
               if (_lastReadSurahNum != null && _lastReadSurahName != null)
                 GestureDetector(
                   onTap: () {
@@ -102,7 +104,10 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => QuranSurahReaderScreen(surah: surah),
+                        builder: (_) => QuranSurahReaderScreen(
+                          surah: surah,
+                          initialPage: _lastReadPageNum,
+                        ),
                       ),
                     ).then((_) => _loadLastReadBookmark());
                   },
@@ -143,7 +148,7 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                "📌 موقف القراءة الحالي",
+                                "📌 موقف القراءة الحالي لجميع المصحف",
                                 style: GoogleFonts.cairo(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.bold,
@@ -151,9 +156,9 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
                                 ),
                               ),
                               Text(
-                                "سورة $_lastReadSurahName ${_lastReadVerseNum != null ? '• الآية (${QuranTextFormatter.toArabicDigits(_lastReadVerseNum!)})' : ''}",
+                                "سورة $_lastReadSurahName ${_lastReadPageNum != null ? '• ص (${QuranTextFormatter.toArabicDigits(_lastReadPageNum!.toString())})' : ''} ${_lastReadVerseNum != null ? '• الآية (${QuranTextFormatter.toArabicDigits(_lastReadVerseNum!)})' : ''}",
                                 style: GoogleFonts.cairo(
-                                  fontSize: 13.5,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                   color: isDark ? Colors.white : const Color(0xFF0F172A),
                                 ),
@@ -327,7 +332,10 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => QuranSurahReaderScreen(surah: surah),
+              builder: (_) => QuranSurahReaderScreen(
+                surah: surah,
+                initialPage: isCurrentSurah ? _lastReadPageNum : null,
+              ),
             ),
           ).then((_) => _loadLastReadBookmark());
         },
@@ -388,7 +396,7 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              "موقف السورة 📌",
+                              "موقفك الحالي 📌",
                               style: GoogleFonts.cairo(
                                 color: Colors.white,
                                 fontSize: 9.5,

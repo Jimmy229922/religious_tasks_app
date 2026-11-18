@@ -1,7 +1,7 @@
 name: religious_tasks_app
 description: A religious daily tasks tracking application.
 publish_to: 'none'
-version: 3.8.9+41
+version: 3.9.3+45
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -84,3 +84,4 @@ flutter:
     - assets/images/
     - assets/icon/
     - assets/data/quran.json
+    - assets/data/quran_pages_mapping.json

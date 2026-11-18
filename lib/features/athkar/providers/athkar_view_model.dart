@@ -84,7 +84,9 @@ class AthkarViewModel extends ChangeNotifier {
         break;
     }
 
-    final total = items.fold<int>(0, (sum, item) => sum + item.count);
+    final total = items
+        .where((item) => !item.isOptional)
+        .fold<int>(0, (sum, item) => sum + item.count);
 
     if (getString(dateKey) != todayKey && type != AthkarType.sleep) {
       // Sleep athkar might be done at night (next day logic?) or same day.
@@ -107,6 +109,7 @@ class AthkarViewModel extends ChangeNotifier {
       final decoded = jsonDecode(raw);
       if (decoded is List) {
         for (int i = 0; i < items.length && i < decoded.length; i++) {
+          if (items[i].isOptional) continue;
           final value = decoded[i];
           if (value is int) {
             final capped = value.clamp(0, items[i].count);

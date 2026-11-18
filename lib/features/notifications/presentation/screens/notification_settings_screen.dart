@@ -554,9 +554,10 @@ class _NotificationSettingsScreenState
                     onChanged: _updateEveningReminder,
                   ),
                   _buildReminderTile(
-                    title: 'التذكير الدوري بالصلاة على النبي',
-                    subtitle:
-                        'تنبيه صوتي وإشعار دوري بالصلاة والسلام على النبي ﷺ',
+                    title: 'التذكير بالصلاة على النبي ﷺ',
+                    subtitle: _preferences.salawatReminderEnabled
+                        ? 'مُفعّل - التذكير والتنبيه الصوتي يعمل كل ${_intervalLabel(_preferences.salawatIntervalMinutes)}'
+                        : 'مُعطّل - التذكير والصوت متوقفان نهائياً 🛑',
                     value: _preferences.salawatReminderEnabled,
                     onChanged: _updateSalawatReminderEnabled,
                   ),
@@ -565,7 +566,7 @@ class _NotificationSettingsScreenState
                       elevation: 2,
                       margin: const EdgeInsets.only(top: 8, bottom: 8),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -595,6 +596,50 @@ class _NotificationSettingsScreenState
                                         _updateSalawatInterval(value);
                                       }
                                     },
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.red.shade700,
+                                      side: BorderSide(color: Colors.red.shade300),
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                                    label: const Text(
+                                      'إيقاف الصوت نهائياً 🛑',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                    ),
+                                    onPressed: _isApplying
+                                        ? null
+                                        : () => _updateSalawatReminderEnabled(false),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.teal,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.volume_up_rounded, size: 18),
+                                    label: const Text(
+                                      'تجربة الصوت 🔊',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                    ),
+                                    onPressed: _isApplying ? null : _testSalawatNotification,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

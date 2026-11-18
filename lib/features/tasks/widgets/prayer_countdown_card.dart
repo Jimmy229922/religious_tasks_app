@@ -3,6 +3,7 @@ import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/tasks_view_model.dart';
+import '../../prayers/screens/prayer_details_screen.dart';
 
 class PrayerCountdownCard extends StatefulWidget {
   final TasksViewModel vm;
@@ -111,27 +112,48 @@ class _PrayerCountdownCardState extends State<PrayerCountdownCard> {
         timeIcon = Icons.access_time_rounded;
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradientColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return GestureDetector(
+      onTap: () {
+        final pName = widget.vm.nextPrayerName;
+        if (pName.isNotEmpty) {
+          final taskIndex = widget.vm.tasks.indexWhere((t) => t.name.contains(pName));
+          final isDone = taskIndex != -1 ? widget.vm.tasks[taskIndex].isCompleted : false;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PrayerDetailsScreen(
+                prayerName: "صلاة $pName",
+                prayerTime: widget.vm.nextPrayerTime,
+                isCompleted: isDone,
+                onToggleCompletion: taskIndex != -1
+                    ? () => widget.vm.toggleTask(taskIndex)
+                    : null,
+              ),
+            ),
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: gradientColors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: widget.isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: gradientColors.first.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
         ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: widget.isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: gradientColors.first.withValues(alpha: 0.25),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-      ),
-      child: Column(
+        child: Column(
         children: [
           Row(
             children: [
@@ -191,8 +213,9 @@ class _PrayerCountdownCardState extends State<PrayerCountdownCard> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSeparator() {
     return Padding(

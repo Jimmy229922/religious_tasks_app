@@ -153,6 +153,48 @@ class DhikrCard extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        if (item.isOptional) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.amber.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: Text(
+                              "إضافي",
+                              style: GoogleFonts.cairo(
+                                color: isDark
+                                    ? Colors.amber.shade200
+                                    : Colors.amber.shade900,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ] else if (item.isCustom) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              "ذكري",
+                              style: GoogleFonts.cairo(
+                                color: accent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ],
                   ),

@@ -17,6 +17,7 @@ import '../widgets/daily_inspiration_card.dart';
 import '../widgets/prayer_countdown_card.dart';
 
 import '../../athkar/screens/athkar_details_screen.dart';
+import '../../prayers/screens/prayer_details_screen.dart';
 import '../../tasbeeh/screens/custom_tasbeeh_screen.dart';
 import '../../athkar/screens/prophet_prayers_screen.dart';
 import '../../athkar/screens/qiyam_layl_screen.dart';
@@ -543,6 +544,12 @@ class _TasksScreenState extends State<TasksScreen> {
                   _handleTaskTap(context, vm, globalIndex, task);
                 }
               },
+              onToggle: () {
+                final globalIndex = vm.tasks.indexOf(task);
+                if (globalIndex != -1) {
+                  vm.toggleTask(globalIndex);
+                }
+              },
               onIncrement: () {
                 final globalIndex = vm.tasks.indexOf(task);
                 if (globalIndex != -1) {
@@ -559,7 +566,43 @@ class _TasksScreenState extends State<TasksScreen> {
 
   void _handleTaskTap(
       BuildContext context, TasksViewModel vm, int index, dynamic task) {
-    if (task.name == kQuranWird) {
+    if (task.name == kPrayerFajr ||
+        task.name == kPrayerDhuhr ||
+        task.name == kPrayerAsr ||
+        task.name == kPrayerMaghrib ||
+        task.name == kPrayerIsha ||
+        task.name.contains('الفجر') ||
+        task.name.contains('الظهر') ||
+        task.name.contains('العصر') ||
+        task.name.contains('المغرب') ||
+        task.name.contains('العشاء')) {
+      DateTime? pTime;
+      if (vm.prayerTimes != null) {
+        if (task.name.contains(kPrayerFajr)) {
+          pTime = vm.prayerTimes!.fajr;
+        } else if (task.name.contains(kPrayerDhuhr)) {
+          pTime = vm.prayerTimes!.dhuhr;
+        } else if (task.name.contains(kPrayerAsr)) {
+          pTime = vm.prayerTimes!.asr;
+        } else if (task.name.contains(kPrayerMaghrib)) {
+          pTime = vm.prayerTimes!.maghrib;
+        } else if (task.name.contains(kPrayerIsha)) {
+          pTime = vm.prayerTimes!.isha;
+        }
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PrayerDetailsScreen(
+            prayerName: task.name,
+            prayerTime: pTime,
+            isCompleted: task.isCompleted,
+            onToggleCompletion: () => vm.toggleTask(index),
+          ),
+        ),
+      );
+    } else if (task.name == kQuranWird) {
       vm.toggleTask(index);
     } else if (task.name.contains(kAthkarLabel)) {
       final isMorning = task.name.contains(kAthkarMorning);

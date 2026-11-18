@@ -1,8 +1,25 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class MushafTypographyResult {
+  final double fontSize;
+  final double lineHeight;
+
+  const MushafTypographyResult({
+    required this.fontSize,
+    required this.lineHeight,
+  });
+}
 
 class QuranTextFormatter {
   static const Color defaultGold = Color(0xFFD4AF37);
+
+  static final RegExp _verseMarkerPattern = RegExp(
+    r'﴿\s*([0-9\u0660-\u0669]+)\s*﴾|۝\s*([0-9\u0660-\u0669]+)|(?:^|\s)[(（]([0-9\u0660-\u0669]+)[)）]',
+  );
+
+  static final Map<String, MushafTypographyResult> _typographyCache = {};
 
   /// Converts English/ASCII digits to Eastern Arabic Indic digits (١, ٢, ٣...)
   static String toArabicDigits(String input) {
@@ -26,6 +43,113 @@ class QuranTextFormatter {
         .trim();
   }
 
+  static bool shouldJustifyText(String text, {int? pageNumber}) {
+    if (pageNumber == 1) return false;
+    return text.trim().length >= 210;
+  }
+
+  static MushafTypographyResult computeMushafTypography({
+    required String cacheKey,
+    required List<String> sectionTexts,
+    required double maxWidth,
+    required double maxHeight,
+    required double userScaleFactor,
+    required double headerOverheadHeight,
+    required TextStyle baseTextStyle,
+  }) {
+    final combinedRaw = sectionTexts
+        .where((s) => s.trim().isNotEmpty)
+        .join('\n');
+    if (maxWidth <= 40 || maxHeight <= 40 || combinedRaw.isEmpty) {
+      return MushafTypographyResult(
+        fontSize: 20.0 * userScaleFactor,
+        lineHeight: 2.0,
+      );
+    }
+
+    final fullCacheKey =
+        '$cacheKey|${maxWidth.round()}|${maxHeight.round()}|${userScaleFactor.toStringAsFixed(2)}|${headerOverheadHeight.round()}';
+    final cached = _typographyCache[fullCacheKey];
+    if (cached != null) return cached;
+
+    if (_typographyCache.length > 120) {
+      _typographyCache.clear();
+    }
+
+    final availableTextHeight =
+        (maxHeight - headerOverheadHeight - 6.0).clamp(90.0, maxHeight);
+    final measurementText =
+        combinedRaw.replaceAll(_verseMarkerPattern, '  ۝٠٠  ');
+
+    const double minLineHeight = 1.88;
+    double low = 17.0;
+    double high = 27.5;
+    double bestFontSize = 18.5;
+
+    for (int i = 0; i < 7; i++) {
+      final mid = (low + high) / 2.0;
+      final painter = TextPainter(
+        text: TextSpan(
+          text: measurementText,
+          style: baseTextStyle.copyWith(fontSize: mid, height: minLineHeight),
+        ),
+        textDirection: TextDirection.rtl,
+        textAlign: TextAlign.justify,
+        strutStyle: StrutStyle(
+          fontSize: mid,
+          height: minLineHeight,
+          forceStrutHeight: true,
+        ),
+      )..layout(maxWidth: maxWidth);
+
+      final measuredHeight = painter.height;
+      painter.dispose();
+
+      if (measuredHeight <= availableTextHeight * 0.95) {
+        bestFontSize = mid;
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+
+    final basePainter = TextPainter(
+      text: TextSpan(
+        text: measurementText,
+        style: baseTextStyle.copyWith(
+          fontSize: bestFontSize,
+          height: minLineHeight,
+        ),
+      ),
+      textDirection: TextDirection.rtl,
+      textAlign: TextAlign.justify,
+      strutStyle: StrutStyle(
+        fontSize: bestFontSize,
+        height: minLineHeight,
+        forceStrutHeight: true,
+      ),
+    )..layout(maxWidth: maxWidth);
+
+    final baseMeasuredHeight = basePainter.height;
+    basePainter.dispose();
+
+    final lineCount =
+        (baseMeasuredHeight / (bestFontSize * minLineHeight)).round().clamp(1, 45);
+    final idealLineHeight =
+        ((availableTextHeight * 0.96) / (lineCount * bestFontSize))
+            .clamp(1.85, 2.55);
+
+    final result = MushafTypographyResult(
+      fontSize: bestFontSize * userScaleFactor,
+      lineHeight: userScaleFactor > 1.0
+          ? idealLineHeight.clamp(1.85, 2.25)
+          : idealLineHeight,
+    );
+
+    _typographyCache[fullCacheKey] = result;
+    return result;
+  }
+
   /// Builds a [Text.rich] widget with custom golden Quranic verse badge ornaments and Ayah-level highlighting & tapping
   static Widget buildFormattedQuranText(
     String text, {
@@ -33,15 +157,32 @@ class QuranTextFormatter {
     TextAlign textAlign = TextAlign.center,
     Color? badgeColor,
     String? bookmarkedVerse,
+    bool? isDark,
     void Function(String verseNumber)? onTapVerse,
   }) {
+    final effectiveDark =
+        isDark ?? ((baseStyle.color?.computeLuminance() ?? 0.0) > 0.5);
+    final effectiveBadgeColor = badgeColor ?? baseStyle.color ?? defaultGold;
+
+    if (onTapVerse != null) {
+      return _InteractiveQuranRichText(
+        text: text,
+        baseStyle: baseStyle,
+        textAlign: textAlign,
+        badgeColor: effectiveBadgeColor,
+        bookmarkedVerse: bookmarkedVerse,
+        isDark: effectiveDark,
+        onTapVerse: onTapVerse,
+      );
+    }
+
     final spans = buildSpans(
       text,
       baseFontSize: baseStyle.fontSize ?? 18.0,
-      badgeColor: badgeColor ?? baseStyle.color ?? defaultGold,
+      badgeColor: effectiveBadgeColor,
       baseStyle: baseStyle,
       bookmarkedVerse: bookmarkedVerse,
-      onTapVerse: onTapVerse,
+      isDark: effectiveDark,
     );
 
     final fontSize = baseStyle.fontSize ?? 18.0;
@@ -58,24 +199,65 @@ class QuranTextFormatter {
     );
   }
 
-  /// Parses string and splits into TextSpan and WidgetSpan for verse numbers and Ayah-level tapping
+  static String extractVerseSnippet(
+    String sectionText,
+    String verseNumber, {
+    int maxWords = 7,
+  }) {
+    final arabicTarget = toArabicDigits(verseNumber);
+    int currentPos = 0;
+    for (final match in _verseMarkerPattern.allMatches(sectionText)) {
+      final rawNum = match.group(1) ?? match.group(2) ?? match.group(3) ?? '';
+      final arabicNum = toArabicDigits(rawNum);
+      if (rawNum == verseNumber || arabicNum == arabicTarget) {
+        final segment = sectionText.substring(currentPos, match.start).trim();
+        if (segment.isEmpty) return '';
+        final words = segment.split(RegExp(r'\s+'));
+        if (words.length <= maxWords) return segment;
+        return '${words.take(maxWords).join(' ')} ...';
+      }
+      currentPos = match.end;
+    }
+    return '';
+  }
+
+  static double getVerseScrollRatio(String pageText, String verseNumber) {
+    if (pageText.isEmpty) return 0.0;
+    final arabicTarget = toArabicDigits(verseNumber);
+    int currentPos = 0;
+    for (final match in _verseMarkerPattern.allMatches(pageText)) {
+      final rawNum = match.group(1) ?? match.group(2) ?? match.group(3) ?? '';
+      final arabicNum = toArabicDigits(rawNum);
+      if (rawNum == verseNumber || arabicNum == arabicTarget) {
+        return (currentPos / pageText.length).clamp(0.0, 1.0);
+      }
+      currentPos = match.end;
+    }
+    return 0.0;
+  }
+
+  /// Parses string and splits into TextSpan for verse numbers and Ayah-level tapping
   static List<InlineSpan> buildSpans(
     String text, {
     required double baseFontSize,
     required Color badgeColor,
     required TextStyle baseStyle,
     String? bookmarkedVerse,
+    bool isDark = false,
     void Function(String verseNumber)? onTapVerse,
+    List<TapGestureRecognizer>? recognizerCollector,
   }) {
     final spans = <InlineSpan>[];
 
-    // RegExp to match verse markers: ﴿١﴾, ﴿1﴾, ۝١, (١), etc.
-    final pattern = RegExp(
-      r'﴿\s*([0-9\u0660-\u0669]+)\s*﴾|۝\s*([0-9\u0660-\u0669]+)|(?:^|\s)[(（]([0-9\u0660-\u0669]+)[)）]',
-    );
-
     int currentPosition = 0;
-    final matches = pattern.allMatches(text);
+    final matches = _verseMarkerPattern.allMatches(text);
+
+    final highlightTextColor =
+        isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
+    final highlightBgColor =
+        isDark ? const Color(0x38F59E0B) : const Color(0x55FDE68A);
+    final activeBadgeColor =
+        isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
 
     for (final match in matches) {
       final rawNum = match.group(1) ?? match.group(2) ?? match.group(3) ?? '';
@@ -84,45 +266,47 @@ class QuranTextFormatter {
       final isBookmarked = bookmarkedVerse != null &&
           (bookmarkedVerse == rawNum || bookmarkedVerse == arabicNum);
 
-      // Add text preceding the match (the Ayah text)
-      if (match.start > currentPosition) {
-        final ayahSegment = text.substring(currentPosition, match.start);
-        final ayahStyle = isBookmarked
-            ? baseStyle.copyWith(
-                color: const Color(0xFFD97706),
-                backgroundColor: const Color(0x44FDE68A),
-                fontWeight: FontWeight.bold,
-              )
-            : baseStyle;
+      final ayahSegment = match.start > currentPosition
+          ? text.substring(currentPosition, match.start).trimRight()
+          : '';
+      final markerText = '\u00A0﴿$arabicNum﴾ ';
 
-        if (onTapVerse != null) {
-          spans.add(
-            TextSpan(
-              text: ayahSegment,
-              style: ayahStyle,
-              recognizer: TapGestureRecognizer()
-                ..onTap = () => onTapVerse(rawNum),
-            ),
-          );
-        } else {
-          spans.add(TextSpan(text: ayahSegment, style: ayahStyle));
-        }
+      final ayahStyle = isBookmarked
+          ? baseStyle.copyWith(
+              color: highlightTextColor,
+              backgroundColor: highlightBgColor,
+              fontWeight: FontWeight.bold,
+            )
+          : baseStyle;
+
+      final markerStyle = baseStyle.copyWith(
+        color: isBookmarked ? activeBadgeColor : badgeColor,
+        backgroundColor: isBookmarked ? highlightBgColor : null,
+        fontWeight: FontWeight.bold,
+        fontSize: baseFontSize * 0.96,
+      );
+
+      TapGestureRecognizer? recognizer;
+      if (onTapVerse != null) {
+        recognizer = TapGestureRecognizer()..onTap = () => onTapVerse(rawNum);
+        recognizerCollector?.add(recognizer);
       }
 
-      // Create the custom Quran Ayah symbol badge widget
-      spans.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
-            child: QuranAyahSymbolWidget(
-              number: arabicNum,
-              fontSize: baseFontSize,
-              color: badgeColor,
-              isBookmarked: isBookmarked,
-              onTap: onTapVerse != null ? () => onTapVerse(rawNum) : null,
-            ),
+      if (ayahSegment.isNotEmpty) {
+        spans.add(
+          TextSpan(
+            text: ayahSegment,
+            style: ayahStyle,
+            recognizer: recognizer,
           ),
+        );
+      }
+
+      spans.add(
+        TextSpan(
+          text: markerText,
+          style: markerStyle,
+          recognizer: recognizer,
         ),
       );
 
@@ -132,19 +316,102 @@ class QuranTextFormatter {
     // Add remaining text after last match
     if (currentPosition < text.length) {
       final remaining = text.substring(currentPosition);
-      if (onTapVerse != null) {
-        spans.add(
-          TextSpan(
-            text: remaining,
-            style: baseStyle,
-          ),
-        );
-      } else {
-        spans.add(TextSpan(text: remaining, style: baseStyle));
-      }
+      spans.add(TextSpan(text: remaining, style: baseStyle));
     }
 
     return spans;
+  }
+}
+
+class _InteractiveQuranRichText extends StatefulWidget {
+  final String text;
+  final TextStyle baseStyle;
+  final TextAlign textAlign;
+  final Color badgeColor;
+  final String? bookmarkedVerse;
+  final bool isDark;
+  final void Function(String verseNumber) onTapVerse;
+
+  const _InteractiveQuranRichText({
+    required this.text,
+    required this.baseStyle,
+    required this.textAlign,
+    required this.badgeColor,
+    required this.bookmarkedVerse,
+    required this.isDark,
+    required this.onTapVerse,
+  });
+
+  @override
+  State<_InteractiveQuranRichText> createState() =>
+      _InteractiveQuranRichTextState();
+}
+
+class _InteractiveQuranRichTextState extends State<_InteractiveQuranRichText> {
+  final List<TapGestureRecognizer> _recognizers = [];
+  late List<InlineSpan> _spans;
+
+  @override
+  void initState() {
+    super.initState();
+    _rebuildSpans();
+  }
+
+  @override
+  void didUpdateWidget(covariant _InteractiveQuranRichText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text ||
+        oldWidget.baseStyle != widget.baseStyle ||
+        oldWidget.textAlign != widget.textAlign ||
+        oldWidget.badgeColor != widget.badgeColor ||
+        oldWidget.bookmarkedVerse != widget.bookmarkedVerse ||
+        oldWidget.isDark != widget.isDark ||
+        oldWidget.onTapVerse != widget.onTapVerse) {
+      _disposeRecognizers();
+      _rebuildSpans();
+    }
+  }
+
+  void _rebuildSpans() {
+    _spans = QuranTextFormatter.buildSpans(
+      widget.text,
+      baseFontSize: widget.baseStyle.fontSize ?? 18.0,
+      badgeColor: widget.badgeColor,
+      baseStyle: widget.baseStyle,
+      bookmarkedVerse: widget.bookmarkedVerse,
+      isDark: widget.isDark,
+      onTapVerse: widget.onTapVerse,
+      recognizerCollector: _recognizers,
+    );
+  }
+
+  void _disposeRecognizers() {
+    for (final recognizer in _recognizers) {
+      recognizer.dispose();
+    }
+    _recognizers.clear();
+  }
+
+  @override
+  void dispose() {
+    _disposeRecognizers();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fontSize = widget.baseStyle.fontSize ?? 18.0;
+    final lineHeight = widget.baseStyle.height ?? 1.5;
+
+    return Text.rich(
+      TextSpan(style: widget.baseStyle, children: _spans),
+      textAlign: widget.textAlign,
+      strutStyle: StrutStyle(
+        fontSize: fontSize,
+        height: lineHeight,
+        forceStrutHeight: true,
+      ),
+    );
   }
 }
 
@@ -154,6 +421,7 @@ class QuranAyahSymbolWidget extends StatelessWidget {
   final double fontSize;
   final Color color;
   final bool isBookmarked;
+  final bool isDark;
   final VoidCallback? onTap;
 
   const QuranAyahSymbolWidget({
@@ -162,6 +430,7 @@ class QuranAyahSymbolWidget extends StatelessWidget {
     required this.fontSize,
     required this.color,
     this.isBookmarked = false,
+    this.isDark = false,
     this.onTap,
   });
 
@@ -171,7 +440,9 @@ class QuranAyahSymbolWidget extends StatelessWidget {
     final height = (fontSize * 1.45).clamp(28.0, 40.0);
     final numFontSize = (fontSize * 0.58).clamp(11.0, 16.0);
 
-    final badgeColor = isBookmarked ? const Color(0xFFD97706) : color;
+    final activeBookmarkColor =
+        isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
+    final badgeColor = isBookmarked ? activeBookmarkColor : color;
 
     final childWidget = SizedBox(
       width: width,
@@ -190,7 +461,7 @@ class QuranAyahSymbolWidget extends StatelessWidget {
               style: TextStyle(
                 fontSize: numFontSize,
                 fontWeight: FontWeight.bold,
-                color: isBookmarked ? const Color(0xFFD97706) : color,
+                color: badgeColor,
                 height: 1.0,
                 fontFamily: 'Cairo',
               ),
@@ -265,5 +536,151 @@ class QuranAyahSymbolPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant QuranAyahSymbolPainter oldDelegate) {
     return oldDelegate.color != color || oldDelegate.isBookmarked != isBookmarked;
+  }
+}
+
+class MushafSurahHeaderBanner extends StatelessWidget {
+  final String surahName;
+  final double fontSize;
+  final Color accentColor;
+  final bool isDark;
+
+  const MushafSurahHeaderBanner({
+    super.key,
+    required this.surahName,
+    required this.fontSize,
+    required this.accentColor,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const goldColor = QuranTextFormatter.defaultGold;
+    final titleColor = isDark ? const Color(0xFFFDE68A) : const Color(0xFF0F172A);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 11),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [
+                  const Color(0xFF13222E),
+                  const Color(0xFF1B3139),
+                  const Color(0xFF13222E),
+                ]
+              : [
+                  const Color(0xFFFEF9E7),
+                  const Color(0xFFFDF3D0),
+                  const Color(0xFFFEF9E7),
+                ],
+          begin: Alignment.centerRight,
+          end: Alignment.centerLeft,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: goldColor.withValues(alpha: isDark ? 0.65 : 0.8),
+          width: 1.4,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: goldColor.withValues(alpha: isDark ? 0.12 : 0.16),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: CustomPaint(
+        painter: _MushafBannerOrnamentPainter(
+          goldColor: goldColor,
+          accentColor: accentColor,
+          isDark: isDark,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 6),
+          child: Center(
+            child: Text(
+              "سُورَةُ $surahName",
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.amiri(
+                fontSize: fontSize,
+                fontWeight: FontWeight.bold,
+                color: titleColor,
+                height: 1.25,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MushafBannerOrnamentPainter extends CustomPainter {
+  final Color goldColor;
+  final Color accentColor;
+  final bool isDark;
+
+  const _MushafBannerOrnamentPainter({
+    required this.goldColor,
+    required this.accentColor,
+    required this.isDark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final innerPaint = Paint()
+      ..color = goldColor.withValues(alpha: isDark ? 0.45 : 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.9;
+
+    final innerRect = RRect.fromRectAndRadius(
+      Rect.fromLTRB(3.5, 3.5, size.width - 3.5, size.height - 3.5),
+      const Radius.circular(9),
+    );
+    canvas.drawRRect(innerRect, innerPaint);
+
+    final ornamentFill = Paint()
+      ..color = goldColor.withValues(alpha: isDark ? 0.35 : 0.45)
+      ..style = PaintingStyle.fill;
+    final ornamentStroke = Paint()
+      ..color = goldColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1;
+
+    final centerY = size.height / 2;
+    _drawSideMedallion(canvas, Offset(15, centerY), ornamentFill, ornamentStroke);
+    _drawSideMedallion(
+      canvas,
+      Offset(size.width - 15, centerY),
+      ornamentFill,
+      ornamentStroke,
+    );
+  }
+
+  void _drawSideMedallion(
+    Canvas canvas,
+    Offset center,
+    Paint fill,
+    Paint stroke,
+  ) {
+    final diamond = Path()
+      ..moveTo(center.dx, center.dy - 6.5)
+      ..lineTo(center.dx + 6.5, center.dy)
+      ..lineTo(center.dx, center.dy + 6.5)
+      ..lineTo(center.dx - 6.5, center.dy)
+      ..close();
+    canvas.drawPath(diamond, fill);
+    canvas.drawPath(diamond, stroke);
+    canvas.drawCircle(center, 2.0, stroke);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MushafBannerOrnamentPainter oldDelegate) {
+    return oldDelegate.goldColor != goldColor ||
+        oldDelegate.accentColor != accentColor ||
+        oldDelegate.isDark != isDark;
   }
 }

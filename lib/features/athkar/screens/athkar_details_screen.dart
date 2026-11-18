@@ -250,6 +250,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   void _checkCelebration() {
     if (_allDone && !_hasCelebrated) {
       _hasCelebrated = true;
+      final streakType =
+          _isSleepAthkar ? 'sleep' : (widget.isMorning ? 'morning' : 'evening');
+      AthkarTrackingService.syncStreakWithStorage(streakType);
       if (!_isSleepAthkar) {
         AthkarTrackingService.markCompleted(isMorning: widget.isMorning);
       }
@@ -365,14 +368,20 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
     _maybeScrollToTop();
   }
 
-  bool get _allDone =>
-      _allAthkar.isNotEmpty &&
-      _allAthkar.every((item) => item.current >= item.count);
+  bool get _allDone {
+    final mandatory = _allAthkar.where((item) => !item.isOptional).toList();
+    final targetList = mandatory.isNotEmpty ? mandatory : _allAthkar;
+    return targetList.isNotEmpty &&
+        targetList.every((item) => item.current >= item.count);
+  }
 
-  int get _totalTarget => _allAthkar.fold(0, (sum, item) => sum + item.count);
+  int get _totalTarget => _allAthkar
+      .where((item) => !item.isOptional)
+      .fold(0, (sum, item) => sum + item.count);
 
-  int get _totalCurrent =>
-      _allAthkar.fold(0, (sum, item) => sum + item.current);
+  int get _totalCurrent => _allAthkar
+      .where((item) => !item.isOptional)
+      .fold(0, (sum, item) => sum + item.current.clamp(0, item.count));
 
   double get _overallProgress {
     final total = _totalTarget;
@@ -387,8 +396,13 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
           : 'ذكر عظيم من أذكار المساء';
 
   Future<void> _exitScreen() async {
-    if (_allDone && !_isSleepAthkar) {
-      await AthkarTrackingService.markCompleted(isMorning: widget.isMorning);
+    if (_allDone) {
+      final streakType =
+          _isSleepAthkar ? 'sleep' : (widget.isMorning ? 'morning' : 'evening');
+      await AthkarTrackingService.syncStreakWithStorage(streakType);
+      if (!_isSleepAthkar) {
+        await AthkarTrackingService.markCompleted(isMorning: widget.isMorning);
+      }
     }
     if (!mounted) return;
     Navigator.of(context).pop(_allDone);

@@ -1,15 +1,116 @@
+import 'dart:convert';
+
+import 'package:religious_tasks_app/core/services/storage_service.dart';
 import '../models/dhikr_item.dart';
 
 class DhikrSeed {
   final String text;
   final String reward;
   final int count;
+  final bool isOptional;
 
   const DhikrSeed({
     required this.text,
     required this.reward,
     required this.count,
+    this.isOptional = false,
   });
+}
+
+enum CustomDhikrTarget { morning, evening, both }
+
+class CustomDhikrModel {
+  final String id;
+  final String text;
+  final String reward;
+  final int count;
+  final CustomDhikrTarget target;
+
+  const CustomDhikrModel({
+    required this.id,
+    required this.text,
+    required this.reward,
+    required this.count,
+    required this.target,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'text': text,
+        'reward': reward,
+        'count': count,
+        'target': target.name,
+      };
+
+  factory CustomDhikrModel.fromJson(Map<String, dynamic> json) {
+    final rawTarget = json['target'] as String? ?? 'both';
+    final target = CustomDhikrTarget.values.firstWhere(
+      (e) => e.name == rawTarget,
+      orElse: () => CustomDhikrTarget.both,
+    );
+    return CustomDhikrModel(
+      id: json['id']?.toString() ?? '',
+      text: json['text']?.toString() ?? '',
+      reward: json['reward']?.toString() ?? '',
+      count: (json['count'] is int)
+          ? (json['count'] as int).clamp(1, 10000)
+          : int.tryParse(json['count']?.toString() ?? '')?.clamp(1, 10000) ?? 1,
+      target: target,
+    );
+  }
+}
+
+class CustomAthkarRepository {
+  static const String _storageKey = 'custom_user_athkar_v1';
+
+  static List<CustomDhikrModel> loadAll() {
+    try {
+      final raw = StorageService.instance.prefs.getString(_storageKey);
+      if (raw == null || raw.isEmpty) return [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      return decoded
+          .whereType<Map>()
+          .map((e) => CustomDhikrModel.fromJson(Map<String, dynamic>.from(e)))
+          .where((e) => e.text.trim().isNotEmpty)
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> saveAll(List<CustomDhikrModel> items) async {
+    final encoded = jsonEncode(items.map((e) => e.toJson()).toList());
+    await StorageService.instance.prefs.setString(_storageKey, encoded);
+  }
+
+  static List<DhikrItem> getForMorning() {
+    return loadAll()
+        .where((e) =>
+            e.target == CustomDhikrTarget.morning ||
+            e.target == CustomDhikrTarget.both)
+        .map((e) => DhikrItem(
+              text: e.text,
+              reward: e.reward.isNotEmpty ? e.reward : 'ذكر خاص مضاف',
+              count: e.count,
+              isCustom: true,
+            ))
+        .toList();
+  }
+
+  static List<DhikrItem> getForEvening() {
+    return loadAll()
+        .where((e) =>
+            e.target == CustomDhikrTarget.evening ||
+            e.target == CustomDhikrTarget.both)
+        .map((e) => DhikrItem(
+              text: e.text,
+              reward: e.reward.isNotEmpty ? e.reward : 'ذكر خاص مضاف',
+              count: e.count,
+              isCustom: true,
+            ))
+        .toList();
+  }
 }
 
 const String _ayatKursiText =
@@ -111,10 +212,17 @@ const DhikrSeed _bismillahSeed = DhikrSeed(
   reward: 'حفظ من كل سوء',
   count: 3,
 );
+const DhikrSeed _tahlilOptionalSeed = DhikrSeed(
+  text: _tahlilText,
+  reward: 'توحيد وتجديد الإيمان وذكر عظيم (ذكر إضافي)',
+  count: 100,
+  isOptional: true,
+);
 const DhikrSeed _subhanAllahSeed = DhikrSeed(
   text: _subhanAllahText,
-  reward: 'غفران الذنوب وإن كانت مثل زبد البحر',
+  reward: 'غفران الذنوب وإن كانت مثل زبد البحر (ذكر إضافي)',
   count: 100,
+  isOptional: true,
 );
 const DhikrSeed _salawatSeed = DhikrSeed(
   text: _salawatText,
@@ -201,12 +309,6 @@ const List<DhikrSeed> _morningSeeds = [
     reward: 'تفويض الأمر لله والاستعاذة من النفس والشيطان',
     count: 1,
   ),
-  DhikrSeed(
-    text: _tahlilText,
-    reward: 'توحيد وتجديد الإيمان وذكر عظيم',
-    count: 100,
-  ),
-  _subhanAllahSeed,
   DhikrSeed(
     text: _subhanAllah3Text,
     reward: 'تسبيح وتعظيم لله بألفاظ جامعة',
@@ -327,12 +429,6 @@ const List<DhikrSeed> _eveningSeeds = [
     count: 1,
   ),
   DhikrSeed(
-    text: _tahlilText,
-    reward: 'توحيد وتجديد الإيمان وذكر عظيم',
-    count: 100,
-  ),
-  _subhanAllahSeed,
-  DhikrSeed(
     text: _subhanAllah3Text,
     reward: 'تسبيح وتعظيم لله بألفاظ جامعة',
     count: 3,
@@ -440,13 +536,27 @@ const List<DhikrSeed> _sleepSeeds = [
   ),
 ];
 
-List<DhikrItem> buildMorningAthkar() => _buildAthkar(_morningSeeds);
-List<DhikrItem> buildEveningAthkar() => _buildAthkar(_eveningSeeds);
+List<DhikrItem> buildMorningAthkar() => [
+      ..._buildAthkar(_morningSeeds),
+      ...CustomAthkarRepository.getForMorning(),
+      ..._buildAthkar(const [_tahlilOptionalSeed, _subhanAllahSeed]),
+    ];
+
+List<DhikrItem> buildEveningAthkar() => [
+      ..._buildAthkar(_eveningSeeds),
+      ...CustomAthkarRepository.getForEvening(),
+      ..._buildAthkar(const [_tahlilOptionalSeed, _subhanAllahSeed]),
+    ];
+
 List<DhikrItem> buildSleepAthkar() => _buildAthkar(_sleepSeeds);
 
 List<DhikrItem> _buildAthkar(List<DhikrSeed> seeds) {
   return seeds
-      .map((seed) =>
-          DhikrItem(text: seed.text, reward: seed.reward, count: seed.count))
+      .map((seed) => DhikrItem(
+            text: seed.text,
+            reward: seed.reward,
+            count: seed.count,
+            isOptional: seed.isOptional,
+          ))
       .toList(growable: false);
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:religious_tasks_app/core/widgets/calendar_explorer_dialog.dart';
+import 'package:religious_tasks_app/features/athkar/screens/custom_athkar_manager_screen.dart';
 import 'package:religious_tasks_app/features/athkar/screens/duaa_safar_screen.dart';
 import 'package:religious_tasks_app/features/athkar/screens/halqat_dhikr_screen.dart';
 import 'package:religious_tasks_app/features/athkar/screens/prophet_prayers_screen.dart';
@@ -120,13 +121,21 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
         icon: Icons.favorite_rounded,
         features: [
           AppFeatureItem(
-            title: "أذكار متنوعة وحصن المسلم",
+            title: "حصن المسلم",
             description: "أذكار الخروج والدخول، لبس الثوب، المرآة، المسجد، الطعام والشفاء",
-            icon: Icons.auto_stories_rounded,
+            icon: Icons.menu_book_rounded,
             color: const Color(0xFF7C3AED),
-            badge: "جديد",
             onTap: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => const VariousAthkarScreen())),
+          ),
+          AppFeatureItem(
+            title: "أذكاري الخاصة",
+            description: "إضافة وتعديل وحذف أذكارك الخاصة في الصباح والمساء",
+            icon: Icons.edit_note_rounded,
+            color: const Color(0xFF0D9488),
+            badge: "جديد",
+            onTap: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const CustomAthkarManagerScreen())),
           ),
           AppFeatureItem(
             title: "الرقية الشرعية",

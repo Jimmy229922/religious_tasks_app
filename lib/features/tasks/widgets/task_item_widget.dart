@@ -14,6 +14,7 @@ class TaskItemWidget extends StatelessWidget {
   final PrayerTimes? prayerTimes;
   final PrayerTimes? prayerTimesTomorrow;
   final VoidCallback onTap;
+  final VoidCallback? onToggle;
   final VoidCallback? onIncrement;
 
   const TaskItemWidget({
@@ -23,6 +24,7 @@ class TaskItemWidget extends StatelessWidget {
     required this.isDark,
     required this.now,
     required this.onTap,
+    this.onToggle,
     this.onIncrement, // if null, means it's a toggle task
     this.prayerTimes,
     this.prayerTimesTomorrow,
@@ -111,11 +113,12 @@ class TaskItemWidget extends StatelessWidget {
                 Column(
                   children: [
                     GestureDetector(
-                      onTap: onTap,
+                      onTap: onToggle ?? onTap,
+                      behavior: HitTestBehavior.opaque,
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 250),
-                        width: 28,
-                        height: 28,
+                        width: 32,
+                        height: 32,
                         decoration: BoxDecoration(
                           color: task.isCompleted ? accent : Colors.transparent,
                           borderRadius: BorderRadius.circular(999),
