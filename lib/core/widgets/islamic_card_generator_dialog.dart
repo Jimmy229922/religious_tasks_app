@@ -227,7 +227,7 @@ class _IslamicCardGeneratorDialogState
                   child: Column(
                     children: [
                       Icon(
-                        Icons.auto_awesome_rounded,
+                        Icons.mosque_rounded,
                         color: accentColor,
                         size: 32,
                       ),
@@ -429,37 +429,47 @@ class _IslamicCardGeneratorDialogState
   }
 
   Widget _buildThemeChip(CardThemePreset preset, String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isSelected = _selectedTheme == preset;
     return ChoiceChip(
       label: Text(
         label,
         style: TextStyle(
-          color: isSelected ? Colors.white : Colors.teal.shade900,
+          color: isSelected
+              ? Colors.white
+              : (isDark ? Colors.tealAccent.shade100 : Colors.teal.shade900),
           fontWeight: FontWeight.bold,
           fontSize: 12,
         ),
       ),
       selected: isSelected,
       selectedColor: Colors.teal,
-      backgroundColor: Colors.teal.withValues(alpha: 0.1),
+      backgroundColor: isDark
+          ? Colors.teal.withValues(alpha: 0.16)
+          : Colors.teal.withValues(alpha: 0.1),
       onSelected: (_) => setState(() => _selectedTheme = preset),
     );
   }
 
   Widget _buildFontChip(String fontKey, String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isSelected = _selectedFont == fontKey;
     return ChoiceChip(
       label: Text(
         label,
         style: TextStyle(
-          color: isSelected ? Colors.white : Colors.teal.shade900,
+          color: isSelected
+              ? Colors.white
+              : (isDark ? Colors.tealAccent.shade100 : Colors.teal.shade900),
           fontWeight: FontWeight.bold,
           fontSize: 11,
         ),
       ),
       selected: isSelected,
       selectedColor: Colors.teal,
-      backgroundColor: Colors.teal.withValues(alpha: 0.1),
+      backgroundColor: isDark
+          ? Colors.teal.withValues(alpha: 0.16)
+          : Colors.teal.withValues(alpha: 0.1),
       onSelected: (_) => setState(() => _selectedFont = fontKey),
     );
   }

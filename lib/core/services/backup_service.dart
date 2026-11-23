@@ -20,6 +20,9 @@ class BackupService {
   static const Set<String> _allowedBackupKeys = {
     'app_theme_mode_v1',
     'app_theme_mode',
+    'app_accent_color_v1',
+    'app_text_scale_v1',
+    'app_oled_black_v1',
     'hijri_date_offset_v1',
     'khatmah_target_days',
     'khatmah_start_page',
@@ -54,6 +57,12 @@ class BackupService {
     'selected_moazzen_id_v1',
     'salawat_reminder_enabled_v1',
     'salawat_interval_minutes_v1',
+    'stop_adhan_on_volume_btn_v1',
+    'stop_salawat_on_volume_btn_v1',
+    'happiness_jar_enabled_v1',
+    'happiness_jar_hour_v1',
+    'happiness_jar_minute_v1',
+    'happiness_jar_favorites_v1',
     'user_custom_dhikrs_v1',
   };
 

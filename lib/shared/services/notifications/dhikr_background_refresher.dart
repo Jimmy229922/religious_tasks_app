@@ -22,6 +22,7 @@ class DhikrBackgroundRefresher {
       await notificationService.scheduleSalawatNotifications(
         forceReschedule: false,
       );
+      await notificationService.scheduleHappinessJarNotifications();
       await notificationService
           .reschedulePrayerNotificationsFromSavedLocation();
 

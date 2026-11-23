@@ -81,12 +81,18 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
                             style: GoogleFonts.cairo(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
-                              color: isSelected ? Colors.white : Colors.teal.shade900,
+                              color: isSelected
+                                  ? Colors.white
+                                  : (isDark
+                                      ? Colors.tealAccent.shade100
+                                      : Colors.teal.shade900),
                             ),
                           ),
                           selected: isSelected,
                           selectedColor: Colors.teal,
-                          backgroundColor: Colors.teal.withValues(alpha: 0.1),
+                          backgroundColor: isDark
+                              ? Colors.teal.withValues(alpha: 0.15)
+                              : Colors.teal.withValues(alpha: 0.1),
                           onSelected: (_) => _onCategoryChanged(cat),
                         ),
                       );
@@ -138,8 +144,15 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
                     return Card(
                       margin: const EdgeInsets.only(bottom: 14),
                       elevation: 2,
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18)),
+                        borderRadius: BorderRadius.circular(18),
+                        side: BorderSide(
+                          color: isDark
+                              ? Colors.white10
+                              : Colors.teal.withValues(alpha: 0.18),
+                        ),
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
@@ -151,7 +164,7 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
                                 Expanded(
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.auto_awesome_rounded,
+                                      const Icon(Icons.shield_rounded,
                                           color: Colors.teal, size: 18),
                                       const SizedBox(width: 8),
                                       Expanded(

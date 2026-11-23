@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart' as intl;
 import '../providers/tasks_view_model.dart';
 import '../../prayers/screens/prayer_details_screen.dart';
 
@@ -9,8 +10,11 @@ class PrayerCountdownCard extends StatefulWidget {
   final TasksViewModel vm;
   final bool isDark;
 
-  const PrayerCountdownCard(
-      {super.key, required this.vm, required this.isDark});
+  const PrayerCountdownCard({
+    super.key,
+    required this.vm,
+    required this.isDark,
+  });
 
   @override
   State<PrayerCountdownCard> createState() => _PrayerCountdownCardState();
@@ -23,7 +27,6 @@ class _PrayerCountdownCardState extends State<PrayerCountdownCard> {
   @override
   void initState() {
     super.initState();
-    // Update only this widget every second
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
@@ -45,15 +48,15 @@ class _PrayerCountdownCardState extends State<PrayerCountdownCard> {
       return const SizedBox.shrink();
     }
 
-    // Use local _now for calculation to enable smooth countdown
     final diff = widget.vm.nextPrayerTime!.difference(_now);
     final duration = diff.isNegative ? Duration.zero : diff;
 
     final hours = duration.inHours.toString().padLeft(2, '0');
     final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
     final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    final formattedTime =
+        intl.DateFormat('hh:mm a', 'ar').format(widget.vm.nextPrayerTime!);
 
-    // Dynamic Gradient & Icon based on Next Prayer
     var nextPrayer = widget.vm.prayerTimes!.nextPrayer();
     if (nextPrayer == Prayer.none) nextPrayer = Prayer.fajr;
 
@@ -112,144 +115,262 @@ class _PrayerCountdownCardState extends State<PrayerCountdownCard> {
         timeIcon = Icons.access_time_rounded;
     }
 
-    return GestureDetector(
-      onTap: () {
-        final pName = widget.vm.nextPrayerName;
-        if (pName.isNotEmpty) {
-          final taskIndex = widget.vm.tasks.indexWhere((t) => t.name.contains(pName));
-          final isDone = taskIndex != -1 ? widget.vm.tasks[taskIndex].isCompleted : false;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PrayerDetailsScreen(
-                prayerName: "صلاة $pName",
-                prayerTime: widget.vm.nextPrayerTime,
-                isCompleted: isDone,
-                onToggleCompletion: taskIndex != -1
-                    ? () => widget.vm.toggleTask(taskIndex)
-                    : null,
-              ),
-            ),
-          );
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: gradientColors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: widget.isDark
-              ? null
-              : [
-                  BoxShadow(
-                    color: gradientColors.first.withValues(alpha: 0.25),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 350;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: () {
+              final pName = widget.vm.nextPrayerName;
+              if (pName.isNotEmpty) {
+                final taskIndex =
+                    widget.vm.tasks.indexWhere((t) => t.name.contains(pName));
+                final isDone = taskIndex != -1
+                    ? widget.vm.tasks[taskIndex].isCompleted
+                    : false;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PrayerDetailsScreen(
+                      prayerName: "صلاة $pName",
+                      prayerTime: widget.vm.nextPrayerTime,
+                      isCompleted: isDone,
+                      onToggleCompletion: taskIndex != -1
+                          ? () => widget.vm.toggleTask(taskIndex)
+                          : null,
+                    ),
                   ),
-                ],
-        ),
-        child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "الصلاة القادمة",
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      widget.vm.nextPrayerName,
-                      style: GoogleFonts.arefRuqaa(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                );
+              }
+            },
+            child: Container(
+              padding: EdgeInsets.all(isCompact ? 16 : 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: gradientColors,
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.14),
                 ),
-                child: Icon(timeIcon, color: Colors.white, size: 32),
+                boxShadow: widget.isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: gradientColors.first.withValues(alpha: 0.25),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
               ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildTimeBlock(seconds, "ثانية"),
-                  _buildSeparator(),
-                  _buildTimeBlock(minutes, "دقيقة"),
-                  _buildSeparator(),
-                  _buildTimeBlock(hours, "ساعة"),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.16),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    "الصلاة القادمة",
+                                    style: GoogleFonts.cairo(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.black.withValues(alpha: 0.22),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.schedule_rounded,
+                                        color: Colors.white70,
+                                        size: 12,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        formattedTime,
+                                        style: GoogleFonts.cairo(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              widget.vm.nextPrayerName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.arefRuqaa(
+                                color: Colors.white,
+                                fontSize: isCompact ? 24 : 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    "اضغط لعرض التفاصيل وأذكار بعد الصلاة",
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.cairo(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.8),
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 10,
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: EdgeInsets.all(isCompact ? 10 : 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.14),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          timeIcon,
+                          color: Colors.white,
+                          size: isCompact ? 26 : 30,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isCompact ? 10 : 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildTimeBlock(hours, "ساعة", isCompact),
+                            _buildSeparator(isCompact),
+                            _buildTimeBlock(minutes, "دقيقة", isCompact),
+                            _buildSeparator(isCompact),
+                            _buildTimeBlock(seconds, "ثانية", isCompact),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-        ],
-      ),
-    ),
-  );
-}
+        );
+      },
+    );
+  }
 
-  Widget _buildSeparator() {
+  Widget _buildSeparator(bool isCompact) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 6 : 8),
       child: Text(
         ":",
         style: GoogleFonts.ibmPlexMono(
-          color: Colors.white54,
-          fontSize: 24,
+          color: Colors.white60,
+          fontSize: isCompact ? 20 : 24,
           fontWeight: FontWeight.bold,
         ),
       ),
     );
   }
 
-  Widget _buildTimeBlock(String value, String label) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: GoogleFonts.ibmPlexMono(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+  Widget _buildTimeBlock(String value, String label, bool isCompact) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 10 : 14,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: GoogleFonts.ibmPlexMono(
+              color: Colors.white,
+              fontSize: isCompact ? 21 : 24,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        Text(
-          label,
-          style: GoogleFonts.cairo(
-            color: Colors.white70,
-            fontSize: 10,
+          Text(
+            label,
+            style: GoogleFonts.cairo(
+              color: Colors.white70,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

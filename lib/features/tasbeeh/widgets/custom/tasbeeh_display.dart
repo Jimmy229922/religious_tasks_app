@@ -27,7 +27,7 @@ class TasbeehDisplay extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.auto_awesome, color: accentSoft),
+          Icon(Icons.spa_rounded, color: accentSoft),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

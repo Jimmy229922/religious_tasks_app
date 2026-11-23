@@ -40,6 +40,7 @@ class StatisticsScreen extends StatelessWidget {
           centerTitle: true,
           elevation: 0,
           backgroundColor: Colors.transparent,
+          foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
         ),
         body: ListView(
           padding: const EdgeInsets.all(20),
@@ -80,6 +81,18 @@ class StatisticsScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: isDark
+            ? null
+            : Border.all(color: Colors.black.withValues(alpha: 0.06)),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,8 +116,13 @@ class StatisticsScreen extends StatelessWidget {
                       showTitles: true,
                       reservedSize: 38,
                       getTitlesWidget: (value, meta) {
-                        const style = TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 11.5);
+                        final style = TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11.5,
+                          color: isDark
+                              ? Colors.white70
+                              : const Color(0xFF334155),
+                        );
                         switch (value.toInt()) {
                           case 0:
                             return Text('صباح ($mCount)', style: style);
@@ -154,6 +172,18 @@ class StatisticsScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: isDark
+            ? null
+            : Border.all(color: Colors.black.withValues(alpha: 0.06)),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,8 +205,13 @@ class StatisticsScreen extends StatelessWidget {
                       showTitles: true,
                       reservedSize: 38,
                       getTitlesWidget: (value, meta) {
-                        const style = TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 11.5);
+                        final style = TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11.5,
+                          color: isDark
+                              ? Colors.white70
+                              : const Color(0xFF334155),
+                        );
                         switch (value.toInt()) {
                           case 0:
                             return Text('صباح ($mStreak)', style: style);
@@ -246,7 +281,7 @@ class StatisticsScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Icon(Icons.auto_awesome_rounded, color: Colors.amber, size: 40),
+          const Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 40),
           const SizedBox(height: 12),
           const Text("إجمالي التسبيحات",
               style: TextStyle(color: Colors.white70, fontSize: 16)),

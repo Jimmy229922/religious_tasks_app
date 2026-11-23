@@ -13,10 +13,13 @@ class DhikrCard extends StatelessWidget {
   final int totalCount;
   final bool isFocus;
   final bool isMorning;
+  final bool isSleep;
   final bool trueBlackMode;
   final double fontScale;
   final String fallbackReward;
   final Function(int) onIncrement;
+  final VoidCallback? onOpenAction;
+  final String? actionLabel;
 
   const DhikrCard({
     super.key,
@@ -25,10 +28,13 @@ class DhikrCard extends StatelessWidget {
     required this.totalCount,
     required this.isFocus,
     required this.isMorning,
+    this.isSleep = false,
     required this.trueBlackMode,
     required this.fontScale,
     required this.fallbackReward,
     required this.onIncrement,
+    this.onOpenAction,
+    this.actionLabel,
   });
 
   double _scaled(double size) => size * fontScale;
@@ -66,6 +72,11 @@ class DhikrCard extends StatelessWidget {
 
     return InkWell(
       onTap: () {
+        if (onOpenAction != null) {
+          HapticFeedback.selectionClick();
+          onOpenAction!();
+          return;
+        }
         if (!isDone) {
           HapticFeedback.lightImpact();
           onIncrement(index);
@@ -114,7 +125,11 @@ class DhikrCard extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        Icons.auto_awesome_rounded,
+                        isSleep
+                            ? Icons.bedtime_rounded
+                            : (isMorning
+                                ? Icons.wb_sunny_rounded
+                                : Icons.nights_stay_rounded),
                         color: accent,
                         size: 18,
                       ),
@@ -207,7 +222,11 @@ class DhikrCard extends StatelessWidget {
                       showDialog(
                         context: context,
                         builder: (_) => IslamicCardGeneratorDialog(
-                          title: isMorning ? "أذكار الصباح 🌅" : "أذكار المساء 🌌",
+                          title: isSleep
+                              ? "أذكار النوم 🌙"
+                              : (isMorning
+                                  ? "أذكار الصباح 🌅"
+                                  : "أذكار المساء 🌌"),
                           content: item.text,
                           subtitle: item.reward,
                         ),
@@ -265,77 +284,118 @@ class DhikrCard extends StatelessWidget {
                 const SizedBox(height: 16),
               ],
 
+              if (onOpenAction != null) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: onOpenAction,
+                    icon: const Icon(Icons.menu_book_rounded, size: 19),
+                    label: Text(
+                      actionLabel ?? 'فتح في المصحف 📖',
+                      style: GoogleFonts.cairo(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDone
+                          ? const Color(0xFF10B981)
+                          : accent,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+
               // Interactive Circular Tap Counter Button Section
               Center(
-                child: SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Smooth Circular Progress Indicator
-                      TweenAnimationBuilder<double>(
-                        tween: Tween<double>(begin: 0.0, end: progress),
-                        duration: const Duration(milliseconds: 250),
-                        builder: (context, val, child) {
-                          return SizedBox(
-                            width: 64,
-                            height: 64,
-                            child: CircularProgressIndicator(
-                              value: val,
-                              strokeWidth: 4.5,
-                              backgroundColor: trueBlackMode
-                                  ? Colors.white24
-                                  : (isDark
-                                      ? Colors.white12
-                                      : Colors.grey.shade200),
-                              color: isDone ? const Color(0xFF10B981) : accent,
-                            ),
-                          );
-                        },
-                      ),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    if (!isDone) {
+                      HapticFeedback.lightImpact();
+                      onIncrement(index);
+                    } else {
+                      HapticFeedback.mediumImpact();
+                    }
+                  },
+                  child: SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Smooth Circular Progress Indicator
+                        TweenAnimationBuilder<double>(
+                          tween: Tween<double>(begin: 0.0, end: progress),
+                          duration: const Duration(milliseconds: 250),
+                          builder: (context, val, child) {
+                            return SizedBox(
+                              width: 64,
+                              height: 64,
+                              child: CircularProgressIndicator(
+                                value: val,
+                                strokeWidth: 4.5,
+                                backgroundColor: trueBlackMode
+                                    ? Colors.white24
+                                    : (isDark
+                                        ? Colors.white12
+                                        : Colors.grey.shade200),
+                                color:
+                                    isDone ? const Color(0xFF10B981) : accent,
+                              ),
+                            );
+                          },
+                        ),
 
-                      // Center Counter Text / Done Checkmark
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isDone
-                              ? const Color(0xFF10B981)
-                              : accent.withValues(alpha: 0.12),
-                        ),
-                        child: Center(
-                          child: isDone
-                              ? const Icon(
-                                  Icons.check_rounded,
-                                  color: Colors.white,
-                                  size: 28,
-                                )
-                              : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      '${item.count - item.current}',
-                                      style: TextStyle(
-                                        color: accent,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 16,
+                        // Center Counter Text / Done Checkmark
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isDone
+                                ? const Color(0xFF10B981)
+                                : accent.withValues(alpha: 0.12),
+                          ),
+                          child: Center(
+                            child: isDone
+                                ? const Icon(
+                                    Icons.check_rounded,
+                                    color: Colors.white,
+                                    size: 28,
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '${item.count - item.current}',
+                                        style: TextStyle(
+                                          color: accent,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 16,
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      'متبقي',
-                                      style: TextStyle(
-                                        color: accent.withValues(alpha: 0.8),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 9,
+                                      Text(
+                                        'متبقي',
+                                        style: TextStyle(
+                                          color: accent.withValues(alpha: 0.8),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 9,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
+                                    ],
+                                  ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

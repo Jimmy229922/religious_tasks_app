@@ -473,7 +473,7 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
                 Expanded(
                   child: Row(
                     children: [
-                      const Icon(Icons.auto_awesome_rounded,
+                      const Icon(Icons.bookmark_rounded,
                           color: accent, size: 18),
                       const SizedBox(width: 8),
                       Expanded(

@@ -4,10 +4,32 @@ import 'package:religious_tasks_app/core/services/storage_service.dart';
 
 enum AppThemeMode { light, dark, system, dynamic }
 
+enum AppAccentColor {
+  royalBlue(Color(0xFF1565C0), 'الأزرق الملكي'),
+  emerald(Color(0xFF0F766E), 'الزمردي الإسلامي'),
+  deepTeal(Color(0xFF0E7490), 'البترولي الهادئ'),
+  indigo(Color(0xFF3730A3), 'النيلي الليلي'),
+  amberGold(Color(0xFFB45309), 'الذهبي الدافئ'),
+  burgundy(Color(0xFF881337), 'العنابي الوقور');
+
+  final Color color;
+  final String label;
+  const AppAccentColor(this.color, this.label);
+}
+
 class ThemeProvider extends ChangeNotifier {
   static const String _themeKey = 'app_theme_mode_v1';
   static const String _legacyThemeKey = 'app_theme_mode';
+  static const String _accentKey = 'app_accent_color_v1';
+  static const String _textScaleKey = 'app_text_scale_v1';
+  static const String _oledBlackKey = 'app_oled_black_v1';
+
+  static const List<double> supportedTextScales = [0.92, 1.0, 1.08, 1.16];
+
   AppThemeMode _appThemeMode = AppThemeMode.system;
+  AppAccentColor _accentColor = AppAccentColor.royalBlue;
+  double _textScaleFactor = 1.0;
+  bool _useOledBlack = true;
 
   ThemeProvider() {
     _loadThemeModeSync();
@@ -15,6 +37,9 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   AppThemeMode get appThemeMode => _appThemeMode;
+  AppAccentColor get accentColor => _accentColor;
+  double get textScaleFactor => _textScaleFactor;
+  bool get useOledBlack => _useOledBlack;
 
   ThemeMode get themeMode {
     switch (_appThemeMode) {
@@ -41,6 +66,24 @@ class ThemeProvider extends ChangeNotifier {
             orElse: () => AppThemeMode.system,
           );
         }
+
+        final savedAccentStr = StorageService.instance.getString(_accentKey);
+        if (savedAccentStr != null) {
+          _accentColor = AppAccentColor.values.firstWhere(
+            (e) => e.name == savedAccentStr,
+            orElse: () => AppAccentColor.royalBlue,
+          );
+        }
+
+        final savedScale = StorageService.instance.prefs.getDouble(_textScaleKey);
+        if (savedScale != null) {
+          _textScaleFactor = savedScale.clamp(0.88, 1.25);
+        }
+
+        final savedOled = StorageService.instance.prefs.getBool(_oledBlackKey);
+        if (savedOled != null) {
+          _useOledBlack = savedOled;
+        }
       }
     } catch (e) {
       debugPrint("Could not load stored theme mode sync: $e");
@@ -50,6 +93,8 @@ class ThemeProvider extends ChangeNotifier {
   Future<void> _loadThemeModeAsync() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      bool changed = false;
+
       final savedModeStr =
           prefs.getString(_themeKey) ?? prefs.getString(_legacyThemeKey);
       if (savedModeStr != null) {
@@ -59,8 +104,39 @@ class ThemeProvider extends ChangeNotifier {
         );
         if (_appThemeMode != loadedMode) {
           _appThemeMode = loadedMode;
-          notifyListeners();
+          changed = true;
         }
+      }
+
+      final savedAccentStr = prefs.getString(_accentKey);
+      if (savedAccentStr != null) {
+        final loadedAccent = AppAccentColor.values.firstWhere(
+          (e) => e.name == savedAccentStr,
+          orElse: () => AppAccentColor.royalBlue,
+        );
+        if (_accentColor != loadedAccent) {
+          _accentColor = loadedAccent;
+          changed = true;
+        }
+      }
+
+      final savedScale = prefs.getDouble(_textScaleKey);
+      if (savedScale != null) {
+        final clamped = savedScale.clamp(0.88, 1.25);
+        if (_textScaleFactor != clamped) {
+          _textScaleFactor = clamped;
+          changed = true;
+        }
+      }
+
+      final savedOled = prefs.getBool(_oledBlackKey);
+      if (savedOled != null && _useOledBlack != savedOled) {
+        _useOledBlack = savedOled;
+        changed = true;
+      }
+
+      if (changed) {
+        notifyListeners();
       }
     } catch (e) {
       debugPrint("Could not load stored theme mode async: $e");
@@ -83,12 +159,62 @@ class ThemeProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> setAccentColor(AppAccentColor accent) async {
+    _accentColor = accent;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_accentKey, accent.name);
+      if (StorageService.isInitialized) {
+        await StorageService.instance.setString(_accentKey, accent.name);
+      }
+    } catch (e) {
+      debugPrint("Could not save accent color: $e");
+    }
+  }
+
+  Future<void> setTextScaleFactor(double scale) async {
+    final safeScale = scale.clamp(0.88, 1.25);
+    _textScaleFactor = safeScale;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_textScaleKey, safeScale);
+      if (StorageService.isInitialized) {
+        await StorageService.instance.prefs.setDouble(_textScaleKey, safeScale);
+      }
+    } catch (e) {
+      debugPrint("Could not save text scale: $e");
+    }
+  }
+
+  Future<void> setUseOledBlack(bool value) async {
+    _useOledBlack = value;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_oledBlackKey, value);
+      if (StorageService.isInitialized) {
+        await StorageService.instance.prefs.setBool(_oledBlackKey, value);
+      }
+    } catch (e) {
+      debugPrint("Could not save OLED preference: $e");
+    }
+  }
+
+  Future<void> resetAppearanceDefaults() async {
+    await setThemeMode(AppThemeMode.system);
+    await setAccentColor(AppAccentColor.royalBlue);
+    await setTextScaleFactor(1.0);
+    await setUseOledBlack(true);
+  }
+
   Future<void> toggleTheme(bool isDark) async {
     await setThemeMode(isDark ? AppThemeMode.dark : AppThemeMode.light);
   }
 
   Color getDynamicSeedColor(int hour) {
-    if (_appThemeMode != AppThemeMode.dynamic) return const Color(0xFF1565C0);
+    if (_appThemeMode != AppThemeMode.dynamic) return _accentColor.color;
 
     // Fajr (Dawn)
     if (hour >= 4 && hour < 6) return Colors.indigo;
@@ -101,5 +227,12 @@ class ThemeProvider extends ChangeNotifier {
     // Night
     return Colors.blueGrey;
   }
-}
 
+  String getDynamicPhaseLabel(int hour) {
+    if (hour >= 4 && hour < 6) return 'أجواء الفجر الهادئة';
+    if (hour >= 6 && hour < 9) return 'إشراقة الصباح والضحى';
+    if (hour >= 9 && hour < 16) return 'ضوء النهار والظهر';
+    if (hour >= 16 && hour < 19) return 'أصيلاً ووقت الغروب';
+    return 'سكون الليل والقيام';
+  }
+}

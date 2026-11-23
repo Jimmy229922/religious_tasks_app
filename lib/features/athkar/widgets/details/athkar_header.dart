@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 class AthkarHeader extends StatelessWidget {
   final String title;
   final bool isMorning;
+  final bool isSleep;
   final int totalTarget;
   final int totalCurrent;
   final double progress;
@@ -12,6 +13,7 @@ class AthkarHeader extends StatelessWidget {
     super.key,
     required this.title,
     required this.isMorning,
+    this.isSleep = false,
     required this.totalTarget,
     required this.totalCurrent,
     required this.progress,
@@ -52,7 +54,9 @@ class AthkarHeader extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isMorning ? Icons.wb_sunny_rounded : Icons.nights_stay,
+                  isSleep
+                      ? Icons.bedtime_rounded
+                      : (isMorning ? Icons.wb_sunny_rounded : Icons.nights_stay),
                   color: Colors.white,
                 ),
               ),

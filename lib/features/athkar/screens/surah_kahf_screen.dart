@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:religious_tasks_app/core/services/storage_service.dart';
@@ -221,7 +222,7 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
           ),
           title: Row(
             children: [
-              const Icon(Icons.auto_awesome_rounded,
+              const Icon(Icons.menu_book_rounded,
                   color: Colors.amber, size: 22),
               const SizedBox(width: 8),
               Text(
@@ -440,6 +441,7 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
           elevation: 0,
           backgroundColor: isDark ? const Color(0xFF0B131E) : accent,
           foregroundColor: Colors.white,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
           actions: [
             if (_savedBookmarkedVerse != null && _savedBookmarkedPage != null)
               IconButton(
@@ -453,7 +455,7 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
               ),
             IconButton(
               visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.auto_awesome_rounded,
+              icon: const Icon(Icons.menu_book_rounded,
                   color: Colors.amberAccent),
               tooltip: "فضل سورة الكهف",
               onPressed: () => _showVirtueDialog(context, isDark),

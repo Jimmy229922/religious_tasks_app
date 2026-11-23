@@ -98,6 +98,7 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
           ),
           backgroundColor: isDark ? const Color(0xFF1E1E1E) : accentColor,
           foregroundColor: Colors.white,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
           elevation: 0,
         ),
         body: Container(

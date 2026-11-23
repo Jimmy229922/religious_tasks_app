@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:religious_tasks_app/features/athkar/data/athkar_data.dart';
 
@@ -352,6 +353,7 @@ class _CustomAthkarManagerScreenState extends State<CustomAthkarManagerScreen> {
           elevation: 0,
           backgroundColor: isDark ? const Color(0xFF0B131E) : accent,
           foregroundColor: Colors.white,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _showDhikrEditorDialog(),

@@ -1,15 +1,14 @@
 package com.jimmy.religiousapp
 
-import io.flutter.embedding.android.FlutterActivity
-import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.MethodChannel
-import android.app.Activity
 import android.accounts.AccountManager
-import android.content.Context
+import android.app.Activity
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import com.ryanheise.audioservice.AudioServiceActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
     private var pendingAccountResult: MethodChannel.Result? = null
@@ -23,6 +22,22 @@ class MainActivity : AudioServiceActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.decorView.isForceDarkAllowed = false
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN &&
+            (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
+                event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)
+        ) {
+            if (AdhanPlaybackService.shouldStopOnVolumeKey(this)) {
+                val intent = Intent(this, AdhanPlaybackService::class.java).apply {
+                    action = AdhanPlaybackService.ACTION_VOLUME_STOP
+                }
+                startService(intent)
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -55,6 +70,16 @@ class MainActivity : AudioServiceActivity() {
                         } catch (e: Exception) {
                             result.error("ACCOUNT_PICK_FAILED", e.message, null)
                         }
+                    }
+                    "setVolumeStopSettings" -> {
+                        val stopAdhan = call.argument<Boolean>("stopAdhanOnVolume")
+                        val stopSalawat = call.argument<Boolean>("stopSalawatOnVolume")
+                        AdhanPlaybackService.saveVolumeStopSettings(
+                            this@MainActivity,
+                            stopAdhan,
+                            stopSalawat
+                        )
+                        result.success(null)
                     }
                     "schedule" -> {
                         val requestCode = call.argument<Int>("requestCode")

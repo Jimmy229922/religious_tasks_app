@@ -31,6 +31,21 @@ class QuranTextFormatter {
     return input;
   }
 
+  /// Converts Eastern Arabic Indic digits (٠..٩) to English/ASCII digits (0..9)
+  static String toEnglishDigits(String input) {
+    const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    for (int i = 0; i < arabic.length; i++) {
+      input = input.replaceAll(arabic[i], english[i]);
+    }
+    return input;
+  }
+
+  /// Parses an ASCII or Arabic-Indic verse number string into an integer
+  static int? parseVerseNumber(String input) {
+    return int.tryParse(toEnglishDigits(input).trim());
+  }
+
   /// Removes Arabic diacritics and normalizes letter forms for reliable comparison
   static String normalizeArabic(String input) {
     return input
@@ -199,26 +214,33 @@ class QuranTextFormatter {
     );
   }
 
-  static String extractVerseSnippet(
+  static String extractFullVerseText(
     String sectionText,
-    String verseNumber, {
-    int maxWords = 7,
-  }) {
+    String verseNumber,
+  ) {
     final arabicTarget = toArabicDigits(verseNumber);
     int currentPos = 0;
     for (final match in _verseMarkerPattern.allMatches(sectionText)) {
       final rawNum = match.group(1) ?? match.group(2) ?? match.group(3) ?? '';
       final arabicNum = toArabicDigits(rawNum);
       if (rawNum == verseNumber || arabicNum == arabicTarget) {
-        final segment = sectionText.substring(currentPos, match.start).trim();
-        if (segment.isEmpty) return '';
-        final words = segment.split(RegExp(r'\s+'));
-        if (words.length <= maxWords) return segment;
-        return '${words.take(maxWords).join(' ')} ...';
+        return sectionText.substring(currentPos, match.start).trim();
       }
       currentPos = match.end;
     }
     return '';
+  }
+
+  static String extractVerseSnippet(
+    String sectionText,
+    String verseNumber, {
+    int maxWords = 7,
+  }) {
+    final segment = extractFullVerseText(sectionText, verseNumber);
+    if (segment.isEmpty) return '';
+    final words = segment.split(RegExp(r'\s+'));
+    if (words.length <= maxWords) return segment;
+    return '${words.take(maxWords).join(' ')} ...';
   }
 
   static double getVerseScrollRatio(String pageText, String verseNumber) {

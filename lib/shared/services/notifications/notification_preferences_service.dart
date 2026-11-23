@@ -1,8 +1,12 @@
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'notification_preferences.dart';
 
 class NotificationPreferencesService {
+  static const MethodChannel _nativeAdhanChannel =
+      MethodChannel('religious_tasks_app/native_adhan');
+
   static const List<String> prayerKeys = [
     'fajr',
     'sunrise',
@@ -26,6 +30,13 @@ class NotificationPreferencesService {
   static const String selectedMoazzenIdKey = 'selected_moazzen_id_v1';
   static const String salawatReminderEnabledKey = 'salawat_reminder_enabled_v1';
   static const String salawatIntervalKey = 'salawat_interval_minutes_v1';
+  static const String stopAdhanOnVolumeButtonKey =
+      'stop_adhan_on_volume_btn_v1';
+  static const String stopSalawatOnVolumeButtonKey =
+      'stop_salawat_on_volume_btn_v1';
+  static const String happinessJarEnabledKey = 'happiness_jar_enabled_v1';
+  static const String happinessJarHourKey = 'happiness_jar_hour_v1';
+  static const String happinessJarMinuteKey = 'happiness_jar_minute_v1';
 
   Future<NotificationPreferences> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -46,6 +57,19 @@ class NotificationPreferencesService {
       prayerOffsets[prayerKey] =
           (prefs.getInt('prayer_offset_$prayerKey') ?? 0).clamp(-60, 60);
     }
+
+    final stopAdhanOnVolume =
+        prefs.getBool(stopAdhanOnVolumeButtonKey) ??
+            defaults.stopAdhanOnVolumeButton;
+    final stopSalawatOnVolume =
+        prefs.getBool(stopSalawatOnVolumeButtonKey) ??
+            defaults.stopSalawatOnVolumeButton;
+
+    // Ensure Android native service preferences stay synced
+    _syncVolumeStopSettingsToNative(
+      stopAdhan: stopAdhanOnVolume,
+      stopSalawat: stopSalawatOnVolume,
+    );
 
     return defaults.copyWith(
       adhanEnabled: adhanEnabled,
@@ -72,6 +96,16 @@ class NotificationPreferencesService {
           salawatIntervalOptions.contains(storedSalawatInterval)
               ? storedSalawatInterval!
               : defaults.salawatIntervalMinutes,
+      stopAdhanOnVolumeButton: stopAdhanOnVolume,
+      stopSalawatOnVolumeButton: stopSalawatOnVolume,
+      happinessJarEnabled:
+          prefs.getBool(happinessJarEnabledKey) ?? defaults.happinessJarEnabled,
+      happinessJarHour:
+          (prefs.getInt(happinessJarHourKey) ?? defaults.happinessJarHour)
+              .clamp(0, 23),
+      happinessJarMinute:
+          (prefs.getInt(happinessJarMinuteKey) ?? defaults.happinessJarMinute)
+              .clamp(0, 59),
     );
   }
 
@@ -128,5 +162,45 @@ class NotificationPreferencesService {
   Future<void> setSalawatIntervalMinutes(int minutes) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(salawatIntervalKey, minutes);
+  }
+
+  Future<void> setStopAdhanOnVolumeButton(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(stopAdhanOnVolumeButtonKey, value);
+    await _syncVolumeStopSettingsToNative(stopAdhan: value);
+  }
+
+  Future<void> setStopSalawatOnVolumeButton(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(stopSalawatOnVolumeButtonKey, value);
+    await _syncVolumeStopSettingsToNative(stopSalawat: value);
+  }
+
+  Future<void> setHappinessJarEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(happinessJarEnabledKey, value);
+  }
+
+  Future<void> setHappinessJarTime(int hour, int minute) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(happinessJarHourKey, hour.clamp(0, 23));
+    await prefs.setInt(happinessJarMinuteKey, minute.clamp(0, 59));
+  }
+
+  Future<void> _syncVolumeStopSettingsToNative({
+    bool? stopAdhan,
+    bool? stopSalawat,
+  }) async {
+    try {
+      await _nativeAdhanChannel.invokeMethod<void>(
+        'setVolumeStopSettings',
+        {
+          if (stopAdhan != null) 'stopAdhanOnVolume': stopAdhan,
+          if (stopSalawat != null) 'stopSalawatOnVolume': stopSalawat,
+        },
+      );
+    } catch (_) {
+      // Safe no-op on non-Android platforms or in unit tests
+    }
   }
 }

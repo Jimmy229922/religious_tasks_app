@@ -92,6 +92,38 @@ class _ReligiousAppState extends State<ReligiousApp> {
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
         ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+        ),
+        popupMenuTheme: const PopupMenuThemeData(
+          color: Colors.white,
+          surfaceTintColor: Colors.transparent,
+        ),
+        dividerTheme: const DividerThemeData(
+          color: Color(0xFFE2E8F0),
+          thickness: 1,
+        ),
+        chipTheme: ChipThemeData(
+          backgroundColor: const Color(0xFFF1F5F9),
+          selectedColor: seedColor,
+          labelStyle: GoogleFonts.cairo(
+            color: const Color(0xFF0F172A),
+            fontWeight: FontWeight.w600,
+          ),
+          secondaryLabelStyle: GoogleFonts.cairo(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+          side: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor: const Color(0xFF0F172A),
+          contentTextStyle: GoogleFonts.cairo(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           surfaceTintColor: Colors.transparent,
@@ -104,20 +136,28 @@ class _ReligiousAppState extends State<ReligiousApp> {
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF000000), // OLED Pure Black
+        scaffoldBackgroundColor: themeProvider.useOledBlack
+            ? const Color(0xFF000000)
+            : const Color(0xFF0B131E),
         colorScheme: ColorScheme.fromSeed(
           brightness: Brightness.dark,
           seedColor: seedColor,
           primary: seedColor,
           secondary: const Color(0xFFFFB74D),
-          surface: const Color(0xFF141414),
+          surface: themeProvider.useOledBlack
+              ? const Color(0xFF141414)
+              : const Color(0xFF131D2B),
         ),
-        cardTheme: const CardThemeData(
-          color: Color(0xFF161616),
+        cardTheme: CardThemeData(
+          color: themeProvider.useOledBlack
+              ? const Color(0xFF161616)
+              : const Color(0xFF172231),
           surfaceTintColor: Colors.transparent,
         ),
-        dialogTheme: const DialogThemeData(
-          backgroundColor: Color(0xFF1E1E1E),
+        dialogTheme: DialogThemeData(
+          backgroundColor: themeProvider.useOledBlack
+              ? const Color(0xFF1E1E1E)
+              : const Color(0xFF1A2636),
           surfaceTintColor: Colors.transparent,
         ),
         appBarTheme: const AppBarTheme(
@@ -130,6 +170,15 @@ class _ReligiousAppState extends State<ReligiousApp> {
         textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
       ),
       themeMode: themeProvider.themeMode,
+      builder: (context, child) {
+        final mediaQuery = MediaQuery.of(context);
+        return MediaQuery(
+          data: mediaQuery.copyWith(
+            textScaler: TextScaler.linear(themeProvider.textScaleFactor),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: SplashScreen(themeProvider: themeProvider),
     );
   }

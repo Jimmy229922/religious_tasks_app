@@ -16,6 +16,11 @@ class NotificationPreferences {
   final String selectedMoazzenId;
   final bool salawatReminderEnabled;
   final int salawatIntervalMinutes;
+  final bool stopAdhanOnVolumeButton;
+  final bool stopSalawatOnVolumeButton;
+  final bool happinessJarEnabled;
+  final int happinessJarHour;
+  final int happinessJarMinute;
 
   const NotificationPreferences({
     required this.adhanEnabled,
@@ -29,6 +34,11 @@ class NotificationPreferences {
     required this.selectedMoazzenId,
     required this.salawatReminderEnabled,
     required this.salawatIntervalMinutes,
+    required this.stopAdhanOnVolumeButton,
+    required this.stopSalawatOnVolumeButton,
+    required this.happinessJarEnabled,
+    required this.happinessJarHour,
+    required this.happinessJarMinute,
   });
 
   factory NotificationPreferences.defaults() {
@@ -58,6 +68,11 @@ class NotificationPreferences {
       selectedMoazzenId: 'system',
       salawatReminderEnabled: true,
       salawatIntervalMinutes: 15,
+      stopAdhanOnVolumeButton: false,
+      stopSalawatOnVolumeButton: false,
+      happinessJarEnabled: true,
+      happinessJarHour: 17,
+      happinessJarMinute: 0,
     );
   }
 
@@ -73,6 +88,11 @@ class NotificationPreferences {
     String? selectedMoazzenId,
     bool? salawatReminderEnabled,
     int? salawatIntervalMinutes,
+    bool? stopAdhanOnVolumeButton,
+    bool? stopSalawatOnVolumeButton,
+    bool? happinessJarEnabled,
+    int? happinessJarHour,
+    int? happinessJarMinute,
   }) {
     return NotificationPreferences(
       adhanEnabled: adhanEnabled ?? this.adhanEnabled,
@@ -91,6 +111,13 @@ class NotificationPreferences {
           salawatReminderEnabled ?? this.salawatReminderEnabled,
       salawatIntervalMinutes:
           salawatIntervalMinutes ?? this.salawatIntervalMinutes,
+      stopAdhanOnVolumeButton:
+          stopAdhanOnVolumeButton ?? this.stopAdhanOnVolumeButton,
+      stopSalawatOnVolumeButton:
+          stopSalawatOnVolumeButton ?? this.stopSalawatOnVolumeButton,
+      happinessJarEnabled: happinessJarEnabled ?? this.happinessJarEnabled,
+      happinessJarHour: happinessJarHour ?? this.happinessJarHour,
+      happinessJarMinute: happinessJarMinute ?? this.happinessJarMinute,
     );
   }
 

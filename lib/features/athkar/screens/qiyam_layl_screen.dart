@@ -188,6 +188,8 @@ class _QiyamLaylScreenState extends State<QiyamLaylScreen>
       child: Scaffold(
         backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
         appBar: AppBar(
+          foregroundColor: Colors.white,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
           title: Text(
             'قيام الليل والتهجد',
             style: GoogleFonts.arefRuqaa(
@@ -386,7 +388,7 @@ class _QiyamLaylScreenState extends State<QiyamLaylScreen>
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.auto_awesome_rounded,
+                      const Icon(Icons.nights_stay_rounded,
                           size: 16, color: Colors.amber),
                       const SizedBox(width: 8),
                       Expanded(

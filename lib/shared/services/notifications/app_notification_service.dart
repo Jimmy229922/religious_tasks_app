@@ -11,6 +11,7 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../core/constants/strings.dart';
+import '../../../features/happiness_jar/data/happiness_jar_data.dart';
 import '../audio/radio_service.dart';
 import 'notification_preferences.dart';
 import 'notification_preferences_service.dart';
@@ -74,11 +75,14 @@ class AppNotificationService {
   static const String dhikrSound = 'dhikr_chime';
   static const String salawatChannelId = 'salawat_notifications_v2';
   static const String salawatSound = 'salawat_sound';
+  static const String happinessJarChannelId = 'happiness_jar_daily_v1';
   static const String notificationChannelVersionKey =
       'notification_channels_v19';
 
   static const int _dhikrNotificationStartId = 4000;
   static const int _salawatNotificationStartId = 6000;
+  static const int _happinessJarNotificationStartId = 7000;
+  static const int _happinessJarDaysAhead = 14;
   static const int _dhikrScheduleWindowMinutes = 48 * 60;
   static const int _morningAthkarNotificationId = 3001;
   static const int _eveningAthkarNotificationId = 3002;
@@ -152,6 +156,7 @@ class AppNotificationService {
         settings: preferences, forceReschedule: true);
     await scheduleSalawatNotifications(
         settings: preferences, forceReschedule: true);
+    await scheduleHappinessJarNotifications(settings: preferences);
   }
 
   Future<void> scheduleMorningEveningAthkar({
@@ -791,6 +796,30 @@ class AppNotificationService {
         ),
       );
     }
+
+    try {
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          happinessJarChannelId,
+          'برطمان السعادة اليومي',
+          description: 'رسالة يومية مبهجة تسعد قلبك من برطمان السعادة',
+          importance: Importance.max,
+          sound: RawResourceAndroidNotificationSound(dhikrSound),
+          playSound: true,
+        ),
+      );
+    } catch (e) {
+      if (!_isInvalidSoundError(e)) rethrow;
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          happinessJarChannelId,
+          'برطمان السعادة اليومي',
+          description: 'رسالة يومية مبهجة تسعد قلبك من برطمان السعادة',
+          importance: Importance.max,
+          playSound: true,
+        ),
+      );
+    }
   }
 
   Future<void> _configureLocalTimeZone() async {
@@ -915,6 +944,127 @@ class AppNotificationService {
   Future<void> _cancelNativeAdhan(int requestCode) async {
     await _nativeAdhanChannel
         .invokeMethod<void>('cancel', {'requestCode': requestCode});
+  }
+
+  Future<void> scheduleHappinessJarNotifications({
+    NotificationPreferences? settings,
+  }) async {
+    await _ensureInitialized();
+    final preferences = settings ?? await _preferencesService.load();
+
+    for (int i = 0; i <= 20; i++) {
+      await _plugin.cancel(_happinessJarNotificationStartId + i);
+    }
+
+    if (!preferences.happinessJarEnabled) return;
+
+    final now = tz.TZDateTime.now(tz.local);
+    int scheduledCount = 0;
+
+    for (int dayOffset = 0;
+        dayOffset <= _happinessJarDaysAhead &&
+            scheduledCount < _happinessJarDaysAhead;
+        dayOffset++) {
+      final candidate = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month,
+        now.day + dayOffset,
+        preferences.happinessJarHour,
+        preferences.happinessJarMinute,
+      );
+
+      if (candidate.isBefore(now.add(const Duration(seconds: 5)))) {
+        continue;
+      }
+
+      final msg = HappinessJarData.getMessageForDate(
+        DateTime(candidate.year, candidate.month, candidate.day),
+      );
+      final title = '💛 ${msg.title}';
+      final collapsedBody = msg.notificationPreview;
+      final expandedBody = msg.reflection != null
+          ? '${msg.body}\n\n✨ ${msg.reflection}'
+          : msg.body;
+
+      await _safeZonedSchedule(
+        _happinessJarNotificationStartId + scheduledCount,
+        title,
+        collapsedBody,
+        candidate,
+        _buildHappinessJarNotificationDetails(
+          title: title,
+          expandedBody: expandedBody,
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        invalidSoundFallback: _buildHappinessJarNotificationDetails(
+          title: title,
+          expandedBody: expandedBody,
+          useCustomSound: false,
+        ),
+      );
+      scheduledCount++;
+    }
+  }
+
+  Future<void> testHappinessJarNotification() async {
+    await _ensureInitialized();
+    final msg = HappinessJarData.getRandomMessage();
+    final title = '💛 ${msg.title}';
+    final collapsedBody = msg.notificationPreview;
+    final expandedBody = msg.reflection != null
+        ? '${msg.body}\n\n✨ ${msg.reflection}'
+        : msg.body;
+
+    try {
+      await _plugin.show(
+        891,
+        title,
+        collapsedBody,
+        _buildHappinessJarNotificationDetails(
+          title: title,
+          expandedBody: expandedBody,
+        ),
+      );
+    } catch (e) {
+      if (!_isInvalidSoundError(e)) rethrow;
+      await _plugin.show(
+        891,
+        title,
+        collapsedBody,
+        _buildHappinessJarNotificationDetails(
+          title: title,
+          expandedBody: expandedBody,
+          useCustomSound: false,
+        ),
+      );
+    }
+  }
+
+  NotificationDetails _buildHappinessJarNotificationDetails({
+    required String title,
+    required String expandedBody,
+    bool useCustomSound = true,
+  }) {
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        happinessJarChannelId,
+        'برطمان السعادة اليومي',
+        channelDescription: 'رسالة يومية مبهجة تسعد قلبك من برطمان السعادة',
+        importance: Importance.max,
+        priority: Priority.max,
+        sound: useCustomSound
+            ? const RawResourceAndroidNotificationSound(dhikrSound)
+            : null,
+        playSound: true,
+        styleInformation: BigTextStyleInformation(
+          expandedBody,
+          contentTitle: title,
+          summaryText: 'برطمان السعادة 💛',
+        ),
+        visibility: NotificationVisibility.public,
+      ),
+    );
   }
 
   Future<void> _playNativeAdhanNow(String prayerKey, String prayerName,

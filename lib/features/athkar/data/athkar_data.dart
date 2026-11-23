@@ -485,11 +485,6 @@ const List<DhikrSeed> _sleepSeeds = [
     count: 1,
   ),
   DhikrSeed(
-    text: _surahMulk,
-    reward: 'تنجي من عذاب القبر وتشفع لصاحبها',
-    count: 1,
-  ),
-  DhikrSeed(
     text: _sleepBismikaAllahumma,
     reward: 'ذكر الموت والحياة بالله',
     count: 1,
@@ -533,6 +528,11 @@ const List<DhikrSeed> _sleepSeeds = [
     text: 'الله أكبر',
     reward: 'خير من خادم (التكبير)',
     count: 34,
+  ),
+  DhikrSeed(
+    text: _surahMulk,
+    reward: 'تنجي من عذاب القبر وتشفع لصاحبها',
+    count: 1,
   ),
 ];
 

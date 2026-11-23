@@ -136,8 +136,10 @@ class _PrayerDetailsScreenState extends State<PrayerDetailsScreen>
     final gradient = _getHeaderGradient(isDark);
     final backgroundColor = isDark ? Colors.black : const Color(0xFFF8FAFC);
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: backgroundColor,
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: SafeArea(
@@ -317,6 +319,7 @@ class _PrayerDetailsScreenState extends State<PrayerDetailsScreen>
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -373,7 +376,7 @@ class _PrayerDetailsScreenState extends State<PrayerDetailsScreen>
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.auto_awesome, color: accent, size: 20),
+                      Icon(Icons.mosque_rounded, color: accent, size: 20),
                       const SizedBox(width: 8),
                       Text(
                         "إنجاز أذكار بعد الصلاة",

@@ -15,19 +15,33 @@ class KhatmahPlan {
   int get pagesPerDay => ((605 - startPage) / targetDays).ceil();
   int get pagesPerPrayer => (pagesPerDay / 5).ceil();
 
-  String getTodayRequirement({DateTime? now}) {
+  int elapsedDays({DateTime? now}) {
     final startDate = DateTime.fromMillisecondsSinceEpoch(startDateMillis);
     final today = now ?? DateTime.now();
     final startDay = DateTime(startDate.year, startDate.month, startDate.day);
     final currentDay = DateTime(today.year, today.month, today.day);
-    final elapsedDays = max(0, currentDay.difference(startDay).inDays);
-    final firstPage = startPage + (elapsedDays * pagesPerDay);
+    return max(0, currentDay.difference(startDay).inDays);
+  }
+
+  ({int firstPage, int lastPage, bool isCompleted}) getTodayRange({
+    DateTime? now,
+  }) {
+    final elapsed = elapsedDays(now: now);
+    final firstPage = startPage + (elapsed * pagesPerDay);
     if (firstPage > 604) {
-      return "اكتملت مدة خطة الختمة. يمكنك بدء خطة جديدة.";
+      return (firstPage: 604, lastPage: 604, isCompleted: true);
     }
     final lastPage = min(604, firstPage + pagesPerDay - 1);
-    final pageCount = lastPage - firstPage + 1;
-    return "وردك اليوم: من الصفحة $firstPage إلى $lastPage ($pageCount صفحة • نحو $pagesPerPrayer صفحات بعد كل صلاة)";
+    return (firstPage: firstPage, lastPage: lastPage, isCompleted: false);
+  }
+
+  String getTodayRequirement({DateTime? now}) {
+    final range = getTodayRange(now: now);
+    if (range.isCompleted) {
+      return "اكتملت مدة خطة الختمة. يمكنك بدء خطة جديدة.";
+    }
+    final pageCount = range.lastPage - range.firstPage + 1;
+    return "وردك اليوم: من الصفحة ${range.firstPage} إلى ${range.lastPage} ($pageCount صفحة • نحو $pagesPerPrayer صفحات بعد كل صلاة)";
   }
 }
 

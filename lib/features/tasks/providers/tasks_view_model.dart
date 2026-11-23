@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
@@ -13,9 +14,47 @@ import 'package:religious_tasks_app/core/constants/app_constants.dart';
 import 'package:religious_tasks_app/core/constants/strings.dart';
 import '../models/task_item.dart';
 import 'package:religious_tasks_app/core/services/location_service.dart';
+import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
+import 'package:religious_tasks_app/features/quran/data/quran_page_mapping.dart';
+import 'package:religious_tasks_app/features/quran/data/quran_repository.dart';
 import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
 import 'package:religious_tasks_app/shared/services/notifications/notification_preferences_service.dart';
 import 'package:religious_tasks_app/core/services/storage_service.dart';
+
+enum ContextSuggestionAction {
+  prayer,
+  morningAthkar,
+  eveningAthkar,
+  sleepAthkar,
+  qiyam,
+  surahKahf,
+  khatmah,
+  tasbeeh,
+  prophetPrayer,
+  happinessJar,
+}
+
+class ContextSuggestion {
+  final String title;
+  final String subtitle;
+  final String categoryLabel;
+  final IconData icon;
+  final Color accentColor;
+  final ContextSuggestionAction action;
+  final String? prayerName;
+  final DateTime? prayerTime;
+
+  const ContextSuggestion({
+    required this.title,
+    required this.subtitle,
+    required this.categoryLabel,
+    required this.icon,
+    required this.accentColor,
+    required this.action,
+    this.prayerName,
+    this.prayerTime,
+  });
+}
 
 class TasksViewModel extends ChangeNotifier {
   final StorageService _storage = StorageService.instance;
@@ -27,8 +66,12 @@ class TasksViewModel extends ChangeNotifier {
   static const String _athkarStreaksKey = 'athkar_streaks_v1';
   static const String _badgesKey = 'earned_badges_v1';
   static const String _totalDhikrCountKey = 'total_dhikr_count_v1';
+  static const String _gratitudeCountKey = 'gratitude_count_v1';
   static const String _quranSurahKey = 'quran_last_surah';
   static const String _quranAyahKey = 'quran_last_ayah';
+  static const String _quranSurahNumKey = 'quran_last_surah_number';
+  static const String _quranPageKey = 'quran_last_page';
+  static const String _quranVerseTextKey = 'quran_last_verse_text';
   static const String _latKey = 'last_latitude';
   static const String _lngKey = 'last_longitude';
   static const String _locNameKey = 'last_location_name';
@@ -43,16 +86,26 @@ class TasksViewModel extends ChangeNotifier {
   int _sleepStreak = 0;
   String _lastSurah = "الفاتحة";
   int _lastAyah = 1;
+  int _lastSurahNumber = 1;
+  int _lastPage = 1;
+  String _lastVerseText = "";
+  bool _hasQuranBookmark = false;
   List<String> _earnedBadges = [];
   int _totalDhikrCount = 0;
+  int _gratitudeCount = 0;
 
   int get morningStreak => _morningStreak;
   int get eveningStreak => _eveningStreak;
   int get sleepStreak => _sleepStreak;
   String get lastSurah => _lastSurah;
   int get lastAyah => _lastAyah;
+  int get lastSurahNumber => _lastSurahNumber;
+  int get lastPage => _lastPage;
+  String get lastVerseText => _lastVerseText;
+  bool get hasQuranBookmark => _hasQuranBookmark;
   List<String> get earnedBadges => _earnedBadges;
   int get totalDhikrCount => _totalDhikrCount;
+  int get gratitudeCount => _gratitudeCount;
 
   bool _isLoadingLocation = false;
   bool get isLoadingLocation => _isLoadingLocation;
@@ -133,84 +186,183 @@ class TasksViewModel extends ChangeNotifier {
     "أقرب ما يكون العبد من ربه وهو ساجد",
     "الكلمة الطيبة صدقة",
     "تبسمك في وجه أخيك صدقة",
-    "اتق الله حيثما كنت",
+    "اتق الله حيثما كنت، وأتبع السيئة الحسنة تمحها",
     "لا تغضب ولك الجنة",
     "خير الناس أنفعهم للناس",
-    "إنما الأعمال بالنيات",
+    "إنما الأعمال بالنيات وإنما لكل امرئ ما نوى",
     "من كان في حاجة أخيه كان الله في حاجته",
     "خيركم من تعلم القرآن وعلمه",
     "الدين النصيحة",
     "المسلم من سلم المسلمون من لسانه ويده",
     "إماطة الأذى عن الطريق صدقة",
-    "لا تحقرن من المعروف شيئاً",
-    "من لزم الاستغفار جعل الله له من كل هم فرجا",
+    "لا تحقرن من المعروف شيئاً ولو أن تلقى أخاك بوجه طلق",
+    "من لزم الاستغفار جعل الله له من كل هم فرجاً ومن كل ضيق مخرجاً",
+    "من صلى عليّ صلاةً صلى الله عليه بها عشراً",
+    "كلمتان خفيفتان على اللسان ثقيلتان في الميزان: سبحان الله وبحمده، سبحان الله العظيم",
+    "الطهور شطر الإيمان، والحمد لله تملأ الميزان",
+    "أحب الكلام إلى الله أربع: سبحان الله، والحمد لله، ولا إله إلا الله، والله أكبر",
+    "احفظ الله يحفظك، احفظ الله تجده تجاهك",
+    "إذا سألت فاسأل الله، وإذا استعنت فاستعن بالله",
+    "عجباً لأمر المؤمن، إن أمره كله خير",
+    "من قرأ حرفاً من كتاب الله فله به حسنة، والحسنة بعشر أمثالها",
+    "يسّروا ولا تعسّروا، وبشّروا ولا تنفّروا",
+    "ارحموا من في الأرض يرحمكم من في السماء",
+    "إن الله رفيق يحب الرفق في الأمر كله",
+    "أدّ الأمانة إلى من ائتمنك، ولا تخن من خانك",
+    "البر حسن الخلق",
+    "تفاءلوا بالخير تجدوه",
+    "ما نقصت صدقة من مال، وما زاد الله عبداً بعفو إلا عزاً",
+    "لا يؤمن أحدكم حتى يحب لأخيه ما يحب لنفسه",
+    "من أصبح منكم آمناً في سربه، معافى في جسده، عنده قوت يومه، فكأنما حيزت له الدنيا",
+    "قل آمنت بالله ثم استقم",
   ];
 
   final List<Map<String, String>> _quranVersesList = [
     {
       "text": "فَاذْكُرُونِي أَذْكُرْكُمْ وَاشْكُرُوا لِي وَلَا تَكْفُرُونِ",
-      "source": "سورة البقرة"
+      "source": "سورة البقرة • ١٥٢"
     },
-    {"text": "إِنَّ اللَّهَ مَعَ الصَّابِرِينَ", "source": "سورة البقرة"},
+    {"text": "إِنَّ اللَّهَ مَعَ الصَّابِرِينَ", "source": "سورة البقرة • ١٥٣"},
     {
       "text":
           "وَإِذَا سَأَلَكَ عِبَادِي عَنِّي فَإِنِّي قَرِيبٌ ۖ أُجِيبُ دَعْوَةَ الدَّاعِ إِذَا دَعَانِ",
-      "source": "سورة البقرة"
+      "source": "سورة البقرة • ١٨٦"
     },
     {
       "text": "أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ",
-      "source": "سورة الرعد"
+      "source": "سورة الرعد • ٢٨"
     },
     {
       "text":
-          "وَمَنْ يَتَّقِ اللَّهَ يَجْعَلْ لَهُ مَخْرَجًا * وَيَرْزُقْهُ مِنْ حَيْثُ لَا يَحْتَسِبُ",
-      "source": "سورة الطلاق"
+          "وَمَنْ يَتَّقِ اللَّهَ يَجْعَلْ لَهُ مَخْرَجًا ۝ وَيَرْزُقْهُ مِنْ حَيْثُ لَا يَحْتَسِبُ",
+      "source": "سورة الطلاق • ٢-٣"
     },
-    {"text": "وَرَحْمَتِي وَسِعَتْ كُلَّ شَيْءٍ", "source": "سورة الأعراف"},
+    {"text": "وَرَحْمَتِي وَسِعَتْ كُلَّ شَيْءٍ", "source": "سورة الأعراف • ١٥٦"},
     {
       "text": "لَا يُكَلِّفُ اللَّهُ نَفْسًا إِلَّا وُسْعَهَا",
-      "source": "سورة البقرة"
+      "source": "سورة البقرة • ٢٨٦"
     },
     {
       "text": "قُلْ لَنْ يُصِيبَنَا إِلَّا مَا كَتَبَ اللَّهُ لَنَا",
-      "source": "سورة التوبة"
+      "source": "سورة التوبة • ٥١"
     },
     {
-      "text": "وَعَسَى أَنْ تَكْرَهُوا شَيْئًا وَهُوَ خَيْرٌ لَكُمْ",
-      "source": "سورة البقرة"
+      "text": "وَعَسَىٰ أَنْ تَكْرَهُوا شَيْئًا وَهُوَ خَيْرٌ لَكُمْ",
+      "source": "سورة البقرة • ٢١٦"
     },
-    {"text": "وَكَفَى بِاللَّهِ وَكِيلًا", "source": "سورة النساء"},
+    {"text": "وَكَفَىٰ بِاللَّهِ وَكِيلًا", "source": "سورة النساء • ٨١"},
     {
-      "text": "رَبِّ اشْرَحْ لِي صَدْرِي * وَيَسِّرْ لِي أَمْرِي",
-      "source": "سورة طه"
+      "text": "رَبِّ اشْرَحْ لِي صَدْرِي ۝ وَيَسِّرْ لِي أَمْرِي",
+      "source": "سورة طه • ٢٥-٢٦"
     },
-    {"text": "إِنَّ مَعَ الْعُسْرِ يُسْرًا", "source": "سورة الشرح"},
+    {
+      "text": "فَإِنَّ مَعَ الْعُسْرِ يُسْرًا ۝ إِنَّ مَعَ الْعُسْرِ يُسْرًا",
+      "source": "سورة الشرح • ٥-٦"
+    },
+    {
+      "text": "وَلَسَوْفَ يُعْطِيكَ رَبُّكَ فَتَرْضَىٰ",
+      "source": "سورة الضحى • ٥"
+    },
+    {
+      "text": "لَئِن شَكَرْتُمْ لَأَزِيدَنَّكُمْ",
+      "source": "سورة إبراهيم • ٧"
+    },
+    {
+      "text": "لَا تَحْزَنْ إِنَّ اللَّهَ مَعَنَا",
+      "source": "سورة التوبة • ٤٠"
+    },
+    {
+      "text": "وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ",
+      "source": "سورة الطلاق • ٣"
+    },
+    {
+      "text": "لَعَلَّ اللَّهَ يُحْدِثُ بَعْدَ ذَٰلِكَ أَمْرًا",
+      "source": "سورة الطلاق • ١"
+    },
+    {
+      "text": "فَاصْبِرْ إِنَّ وَعْدَ اللَّهِ حَقٌّ",
+      "source": "سورة الروم • ٦٠"
+    },
+    {
+      "text": "وَأُفَوِّضُ أَمْرِي إِلَى اللَّهِ ۚ إِنَّ اللَّهَ بَصِيرٌ بِالْعِبَادِ",
+      "source": "سورة غافر • ٤٤"
+    },
+    {
+      "text": "ادْعُونِي أَسْتَجِبْ لَكُمْ",
+      "source": "سورة غافر • ٦٠"
+    },
+    {
+      "text": "إِنَّ رَبِّي لَسَمِيعُ الدُّعَاءِ",
+      "source": "سورة إبراهيم • ٣٩"
+    },
+    {
+      "text": "وَهُوَ مَعَكُمْ أَيْنَ مَا كُنتُمْ",
+      "source": "سورة الحديد • ٤"
+    },
+    {
+      "text": "إِنَّ اللَّهَ لَطِيفٌ خَبِيرٌ",
+      "source": "سورة لقمان • ١٦"
+    },
+    {
+      "text": "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ",
+      "source": "سورة البقرة • ٢٠١"
+    },
+    {
+      "text": "حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ",
+      "source": "سورة آل عمران • ١٧٣"
+    },
   ];
 
   final List<String> _blessingsList = [
-    "نعمة البصر",
-    "نعمة السمع",
-    "نعمة الإسلام",
-    "نعمة الصحة والعافية",
-    "نعمة الأهل والأحباب",
-    "نعمة الأمن والأمان",
-    "نعمة العقل والتفكير",
-    "نعمة النطق والبيان",
-    "نعمة الهداية للطريق المستقيم",
-    "نعمة الرزق والمأكل والمشرب",
-    "نعمة الستر",
-    "نعمة النوم والراحة",
+    "نعمة الإسلام والهداية",
+    "نعمة البصر وتأمل بديع خلقك",
+    "نعمة السمع وتلاوة كتابك",
+    "نعمة الصحة والعافية في البدن",
+    "نعمة الأهل والأحباب والصحبة الصالحة",
+    "نعمة الأمن والأمان في الأوطان والبيوت",
+    "نعمة العقل والفهم والتدبّر",
+    "نعمة النطق والبيان واللسان الذاكر",
+    "نعمة الستر واللطف الخفي",
+    "نعمة الرزق الطيب والمأكل والمشرب",
+    "نعمة النوم الهادئ والراحة بعد التعب",
+    "نعمة القرآن الكريم وتيسير تلاوته",
+    "نعمة الصلاة ومناجاتك في كل وقت",
+    "نعمة الدعاء وقربك من عبادك",
+    "نعمة التوبة وقبول الأوبة",
+    "نعمة الهواء النقي والشمس والماء",
+    "نعمة الصبر والسكينة عند الشدائد",
+    "نعمة العمل والسعي والبركة في الوقت",
+    "نعمة بر الوالدين ورضاهما",
+    "نعمة الأخوّة الصادقة وجبر الخواطر",
+    "نعمة القناعة والرضا بما قسمت",
+    "نعمة الخشوع والطمأنينة في القلب",
+    "نعمة السلامة من البلاء والمحن",
+    "نعمة الفرج بعد الضيق واليسر بعد العسر",
+    "نعمة القدرة على الحركة والمشي",
+    "نعمة القلب السليم النقي من الحقد",
+    "نعمة العلم والمعرفة والتعلّم",
+    "نعمة الصدقة ومساعدة المحتاجين",
+    "نعمة استشعار معيّتك في كل لحظة",
+    "نعمة تجدد الأمل وبشائر الصباح",
+    "نعمة الليل للسكينة والتهجد",
+    "نعمة الاستغفار ومحوه للذنوب",
+    "نعمة الصلاة على الحبيب محمد ﷺ",
+    "نعمة الضحك والابتسامة وإدخال السرور",
+    "نعمك الظاهرة والباطنة ما علمنا منها وما لم نعلم",
   ];
 
   final List<String> _generalEventsList = [
-    "كثرة الصلاة على النبي تكفيك همك",
+    "كثرة الصلاة على النبي ﷺ تكفيك همك",
     "تصدق ولو بشق تمرة",
     "بر الوالدين مفتاح الجنة",
     "حافظ على صلاة الضحى",
     "اقرأ وردك القرآني اليومي",
     "جدد نيتك في كل عمل",
     "اذكر الله يذكرك",
+    "استغفر الله العظيم وأتوب إليه",
   ];
+
+  final Random _random = Random();
 
   TasksViewModel() {
     _initTasks();
@@ -218,6 +370,7 @@ class TasksViewModel extends ChangeNotifier {
     _loadQuranProgress();
     _loadBadges();
     _loadTotalDhikr();
+    _loadGratitudeCount();
     _startClock();
     _initRandomContent();
   }
@@ -239,6 +392,26 @@ class TasksViewModel extends ChangeNotifier {
   void _loadTotalDhikr() {
     final count = _storage.getString(_totalDhikrCountKey);
     _totalDhikrCount = count == null ? 0 : (int.tryParse(count) ?? 0);
+  }
+
+  void _loadGratitudeCount() {
+    final count = _storage.getString(_gratitudeCountKey);
+    _gratitudeCount = count == null ? 0 : (int.tryParse(count) ?? 0);
+  }
+
+  Future<void> incrementGratitude() async {
+    _gratitudeCount++;
+    await _storage.setString(_gratitudeCountKey, _gratitudeCount.toString());
+    await addToTotalDhikr(1);
+  }
+
+  void cycleBlessing() {
+    if (_blessingsList.length <= 1) return;
+    final candidates = _blessingsList
+        .where((b) => b != _currentBlessing)
+        .toList(growable: false);
+    _currentBlessing = candidates[_random.nextInt(candidates.length)];
+    notifyListeners();
   }
 
   Future<void> _checkMilestones() async {
@@ -274,7 +447,6 @@ class TasksViewModel extends ChangeNotifier {
 
     // Toggle between Quran and Wisdom based on day parity for variation
     if (dayOfYear % 2 == 1) {
-      // Prefer Quran on odd days or just mix
       final index = dayOfYear % _quranVersesList.length;
       _currentInspiration = _quranVersesList[index]["text"]!;
       _currentInspirationSource = _quranVersesList[index]["source"]!;
@@ -294,34 +466,80 @@ class TasksViewModel extends ChangeNotifier {
   }
 
   void refreshRandomContent() {
-    // Pick random new values
-    final random = DateTime.now().millisecondsSinceEpoch;
-    final useQuran = random % 2 == 0; // 50/50 chance
+    final useQuran = _random.nextBool();
 
     if (useQuran) {
-      final index = random % _quranVersesList.length;
-      _currentInspiration = _quranVersesList[index]["text"]!;
-      _currentInspirationSource = _quranVersesList[index]["source"]!;
+      final candidates = _quranVersesList
+          .where((v) => v["text"] != _currentInspiration)
+          .toList(growable: false);
+      final picked = candidates.isNotEmpty
+          ? candidates[_random.nextInt(candidates.length)]
+          : _quranVersesList[_random.nextInt(_quranVersesList.length)];
+      _currentInspiration = picked["text"]!;
+      _currentInspirationSource = picked["source"]!;
       _isInspirationQuran = true;
     } else {
-      final index = random % _inspirationsList.length;
-      _currentInspiration = _inspirationsList[index];
+      final candidates = _inspirationsList
+          .where((item) => item != _currentInspiration)
+          .toList(growable: false);
+      _currentInspiration = candidates.isNotEmpty
+          ? candidates[_random.nextInt(candidates.length)]
+          : _inspirationsList[_random.nextInt(_inspirationsList.length)];
       _currentInspirationSource = "";
       _isInspirationQuran = false;
     }
 
-    // Simple shift for others to ensure variety
-    _currentBlessing = _blessingsList[(random + 5) % _blessingsList.length];
+    final blessingCandidates = _blessingsList
+        .where((b) => b != _currentBlessing)
+        .toList(growable: false);
+    _currentBlessing = blessingCandidates.isNotEmpty
+        ? blessingCandidates[_random.nextInt(blessingCandidates.length)]
+        : _blessingsList[_random.nextInt(_blessingsList.length)];
 
-    // For Event Banner
     final dateEvent = _getDateSpecificEvent();
-    if (dateEvent != null && (random % 3 == 0)) {
+    if (dateEvent != null) {
       _currentEventBanner = dateEvent;
     } else {
-      _currentEventBanner =
-          _generalEventsList[random % _generalEventsList.length];
+      final eventCandidates = _generalEventsList
+          .where((e) => e != _currentEventBanner)
+          .toList(growable: false);
+      _currentEventBanner = eventCandidates.isNotEmpty
+          ? eventCandidates[_random.nextInt(eventCandidates.length)]
+          : _generalEventsList[_random.nextInt(_generalEventsList.length)];
     }
 
+    notifyListeners();
+  }
+
+  Future<void> refreshAll() async {
+    final currentNow = DateTime.now();
+    _now = currentNow;
+    final today = intl.DateFormat('yyyy-MM-dd').format(currentNow);
+    if (today != _activeDate) {
+      _activeDate = today;
+      await _initTasks();
+    } else {
+      await _loadStreaks();
+      _loadBadges();
+      _loadTotalDhikr();
+      _loadGratitudeCount();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final prophetCount = prefs.getInt('prophet_prayer_counter') ?? 0;
+        final prophetIndex =
+            _tasks.indexWhere((t) => t.name.contains(kProphetPrayer));
+        if (prophetIndex != -1) {
+          _tasks[prophetIndex].currentCount = prophetCount;
+          _tasks[prophetIndex].isCompleted =
+              prophetCount >= _tasks[prophetIndex].targetCount;
+        }
+      } catch (_) {}
+    }
+
+    _loadQuranProgress();
+    refreshRandomContent();
+    await refreshLocation();
+    await _updateOtherWidgets();
     notifyListeners();
   }
 
@@ -342,10 +560,20 @@ class TasksViewModel extends ChangeNotifier {
     await _initLocationAndPrayers(requestPermission: true);
   }
 
+  bool _isDisposed = false;
+
   @override
   void dispose() {
+    _isDisposed = true;
     _clockTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
   }
 
   void _startClock() {
@@ -561,12 +789,6 @@ class TasksViewModel extends ChangeNotifier {
       await _storage.setString(_lngKey, result.position!.longitude.toString());
 
       await _calculatePrayers(result.position!);
-
-      _locationService.getLocationName(result.position!).then((name) {
-        _locationName = name;
-        _storage.setString(_locNameKey, name);
-        notifyListeners();
-      });
     } else if (parsedLat == null || parsedLng == null) {
       // Only show error if we don't even have a cached version
       _locationName = result.message.isNotEmpty
@@ -656,7 +878,15 @@ class TasksViewModel extends ChangeNotifier {
     _tomorrowPrayerTimes = tomorrowTimes;
     _isLoadingLocation = false;
 
-    _locationName = await _locationService.getLocationName(position);
+    try {
+      final resolvedName = await _locationService
+          .getLocationName(position)
+          .timeout(const Duration(seconds: 5));
+      if (resolvedName.trim().isNotEmpty) {
+        _locationName = resolvedName;
+        await _storage.setString(_locNameKey, resolvedName);
+      }
+    } catch (_) {}
 
     _updateTaskDescriptions();
     notifyListeners();
@@ -887,96 +1117,351 @@ class TasksViewModel extends ChangeNotifier {
 
   // 2. Quran Progress
   void _loadQuranProgress() {
+    final prefs = _storage.prefs;
+    final bookmarkSurah = prefs.getString('quran_global_bookmark_surah_name');
+    final bookmarkVerse = prefs.getString('quran_global_bookmark_verse');
+    final bookmarkSurahNum = prefs.getInt('quran_global_bookmark_surah_number');
+    final bookmarkPage = prefs.getInt('quran_global_bookmark_page');
+    final bookmarkFullText = prefs.getString('quran_global_bookmark_full_text');
+
+    if (bookmarkSurah != null && bookmarkVerse != null) {
+      final parsedAyah = QuranTextFormatter.parseVerseNumber(bookmarkVerse);
+      _lastSurah = bookmarkSurah;
+      _lastAyah = parsedAyah ?? 1;
+      _lastSurahNumber =
+          bookmarkSurahNum ?? QuranRepository.findSurahByName(bookmarkSurah).number;
+      _lastPage = bookmarkPage ??
+          (QuranPageMapping.surahStartPage[_lastSurahNumber] ?? 1);
+      _lastVerseText = bookmarkFullText ??
+          (prefs.getString('quran_global_bookmark_snippet') ?? '');
+      _hasQuranBookmark = true;
+      return;
+    }
+
     _lastSurah = _storage.getString(_quranSurahKey) ?? "الفاتحة";
-    // getInt might not be in your wrapper? If not, parse string.
-    // Assuming wrapper based on context has getString, let's use getString for safety or check wrapper.
-    // I'll assume standard SharedPreferences behavior but safer to store as int if wrapper supports it.
-    // If your StorageService only has getString and setString:
-    // _lastAyah = int.tryParse(_storage.getString(_quranAyahKey) ?? "1") ?? 1;
-    // But usually it supports others. Let's try to see if I can simply store as Json or String to be safe.
     final a = _storage.getString(_quranAyahKey);
     _lastAyah = a == null ? 1 : (int.tryParse(a) ?? 1);
+    final resolvedSurah = QuranRepository.findSurahByName(_lastSurah);
+    _lastSurahNumber = prefs.getInt(_quranSurahNumKey) ?? resolvedSurah.number;
+    _lastPage = prefs.getInt(_quranPageKey) ??
+        (QuranPageMapping.surahStartPage[_lastSurahNumber] ?? 1);
+    _lastVerseText = _storage.getString(_quranVerseTextKey) ?? "";
+    _hasQuranBookmark = false;
   }
 
-  Future<void> updateQuranProgress(String surah, int ayah) async {
+  void syncQuranBookmarkFromPrefs() {
+    _loadQuranProgress();
+    notifyListeners();
+  }
+
+  Future<void> updateQuranProgress(
+    String surah,
+    int ayah, {
+    int? surahNumber,
+    int? page,
+    String? verseText,
+    bool hasBookmark = true,
+  }) async {
+    final resolvedSurah = surahNumber != null
+        ? null
+        : QuranRepository.findSurahByName(surah);
+    final effectiveSurahNum = surahNumber ?? resolvedSurah!.number;
+    final effectivePage =
+        (page ?? QuranPageMapping.surahStartPage[effectiveSurahNum] ?? 1)
+            .clamp(1, 604);
+
     _lastSurah = surah;
     _lastAyah = ayah;
+    _lastSurahNumber = effectiveSurahNum;
+    _lastPage = effectivePage;
+    if (verseText != null) {
+      _lastVerseText = verseText;
+    }
+    _hasQuranBookmark = hasBookmark;
+
     await _storage.setString(_quranSurahKey, surah);
     await _storage.setString(_quranAyahKey, ayah.toString());
+    await _storage.prefs.setInt(_quranSurahNumKey, effectiveSurahNum);
+    await _storage.prefs.setInt(_quranPageKey, effectivePage);
+    if (verseText != null) {
+      await _storage.setString(_quranVerseTextKey, verseText);
+    }
+
     _updateOtherWidgets();
     notifyListeners();
   }
 
-  // 3. Context Aware Athkar
-  String get suggestedAthkar {
-    // 1. Precise logic based on Prayer Times (if available)
-    if (_prayerTimes != null) {
-      final next = _prayerTimes!.nextPrayer();
-      final current = _prayerTimes!.currentPrayer();
+  Future<void> clearQuranBookmark() async {
+    _hasQuranBookmark = false;
+    notifyListeners();
+  }
 
-      // Between Fajr and Sunrise -> Fajr Prayer / Morning Athkar
-      if (current == Prayer.fajr) return kPrayerFajr;
+  int _suggestionOffset = 0;
 
-      // Between Sunrise and Dhuhr -> Morning Athkar
-      if (current == Prayer.sunrise) return kAthkarMorning;
+  bool _isTaskDone(String taskName) =>
+      _tasks.any((t) => t.name == taskName && t.isCompleted);
 
-      // Between Dhuhr and Asr -> Dhuhr/Work
-      if (current == Prayer.dhuhr) return kPrayerDhuhr;
-
-      // Between Asr and Maghrib -> Evening Athkar
-      if (current == Prayer.asr) return kAthkarEvening;
-
-      // Between Maghrib and Isha -> Maghrib Prayer
-      if (current == Prayer.maghrib) return kPrayerMaghrib;
-
-      // Between Isha and Midnight -> Isha Prayer / Sleep
-      if (current == Prayer.isha) {
-        // If late (after 2 hours of Isha), suggest Sleep Athkar
-        final ishaTime = _prayerTimes!.isha;
-        if (_now.difference(ishaTime).inHours >= 1) {
-          return kAthkarSleep; // 'أذكار النوم'
-        }
-        return kPrayerIsha;
-      }
-
-      // Pre-Fajr (Next is Fajr) -> Qiyam (Night Prayer)
-      if (next == Prayer.fajr) {
-        // If very close to Fajr (e.g. 20 mins), maybe suggest "Istighfar" or "Witr"
-        return kPrayerQiyam; // 'قيام الليل'
-      }
-    }
-
-    // 2. Fallback Logic (Time based ranges) if Location failed
-    final hour = _now.hour;
-    // Morning Athkar: 5:00 AM to 11:00 AM
-    if (hour >= 5 && hour < 11) {
-      return kAthkarMorning;
-    }
-    // Fajr (Pre-Dawn): 4:00 AM to 5:00 AM (Hardcoded fallback - shortened range)
-    if (hour >= 4 && hour < 5) {
-      return kPrayerFajr;
-    }
-    // Evening Athkar: 3:00 PM (15:00) to 8:00 PM (20:00)
-    if (hour >= 15 && hour < 20) return kAthkarEvening;
-
-    // Sleep Athkar: 8:00 PM onwards or late night
-    if (hour >= 20 || hour < 4) {
-      // Check if Evening Athkar is done
-      final eveningTask = _tasks.firstWhere(
-        (t) => t.name == kAthkarEvening,
-        orElse: () => TaskItem(
-            name: kAthkarEvening,
-            description: AppStrings.afterAsr,
-            targetCount: 1),
+  List<ContextSuggestion> get contextSuggestions => buildContextSuggestions(
+        now: _now,
+        prayerTimes: _prayerTimes,
       );
 
-      if (!eveningTask.isCompleted && hour < 24 && hour >= 15) {
-        return kAthkarEvening;
-      }
-      return kAthkarSleep; // "أذكار النوم"
+  ContextSuggestion get activeContextSuggestion {
+    final list = contextSuggestions;
+    return list[_suggestionOffset % list.length];
+  }
+
+  void cycleContextSuggestion() {
+    final list = contextSuggestions;
+    if (list.isEmpty) return;
+    _suggestionOffset = (_suggestionOffset + 1) % list.length;
+    notifyListeners();
+  }
+
+  String get suggestedAthkar => activeContextSuggestion.title;
+
+  List<ContextSuggestion> buildContextSuggestions({
+    required DateTime now,
+    required PrayerTimes? prayerTimes,
+  }) {
+    final suggestions = <ContextSuggestion>[];
+
+    ContextSuggestion prayerSuggestion(String name, DateTime? time,
+        String subtitle, IconData icon, Color color) {
+      return ContextSuggestion(
+        title: name,
+        subtitle: subtitle,
+        categoryLabel: 'مواقيت الصلاة',
+        icon: icon,
+        accentColor: color,
+        action: ContextSuggestionAction.prayer,
+        prayerName: name,
+        prayerTime: time,
+      );
     }
 
-    return "استغفر الله";
+    // 1. Current Prayer Window (Highest Priority if not completed)
+    if (prayerTimes != null) {
+      final current = prayerTimes.currentPrayerByDateTime(now);
+      final next = prayerTimes.nextPrayerByDateTime(now);
+
+      if (current == Prayer.fajr && !_isTaskDone(kPrayerFajr)) {
+        suggestions.add(prayerSuggestion(
+          kPrayerFajr,
+          prayerTimes.fajr,
+          'أدِّ صلاة الفجر واقرأ أذكار ما بعد الصلاة وتفاصيلها 🌅',
+          Icons.wb_twilight_rounded,
+          const Color(0xFF0284C7),
+        ));
+      } else if (current == Prayer.dhuhr && !_isTaskDone(kPrayerDhuhr)) {
+        suggestions.add(prayerSuggestion(
+          kPrayerDhuhr,
+          prayerTimes.dhuhr,
+          'حافظ على صلاة الظهر في وقتها وتفقد أذكار بعد الصلاة ☀️',
+          Icons.wb_sunny_rounded,
+          const Color(0xFFD97706),
+        ));
+      } else if (current == Prayer.asr && !_isTaskDone(kPrayerAsr)) {
+        suggestions.add(prayerSuggestion(
+          kPrayerAsr,
+          prayerTimes.asr,
+          'الصلاة الوسطى — بادر بصلاة العصر وأذكار ما بعد الصلاة 🌤️',
+          Icons.light_mode_rounded,
+          const Color(0xFFEA580C),
+        ));
+      } else if (current == Prayer.maghrib && !_isTaskDone(kPrayerMaghrib)) {
+        suggestions.add(prayerSuggestion(
+          kPrayerMaghrib,
+          prayerTimes.maghrib,
+          'حان وقت صلاة المغرب — اضغط لعرض الأذكار والأحكام 🌇',
+          Icons.nights_stay_outlined,
+          const Color(0xFFDB2777),
+        ));
+      } else if (current == Prayer.isha && !_isTaskDone(kPrayerIsha)) {
+        suggestions.add(prayerSuggestion(
+          kPrayerIsha,
+          prayerTimes.isha,
+          'اختم يومك بصلاة العشاء وأذكار بعد الصلاة المباركة 🌙',
+          Icons.bedtime_rounded,
+          const Color(0xFF4F46E5),
+        ));
+      }
+
+      // Pre-Fajr -> Qiyam Al-Layl
+      if (next == Prayer.fajr && now.hour < 5) {
+        suggestions.add(const ContextSuggestion(
+          title: kPrayerQiyam,
+          subtitle: 'أجواء السحر ومناجاة الله في جوف الليل ✨',
+          categoryLabel: 'نافلة مباركة',
+          icon: Icons.nights_stay_rounded,
+          accentColor: Color(0xFF4338CA),
+          action: ContextSuggestionAction.qiyam,
+        ));
+      }
+    } else {
+      final hour = now.hour;
+      if (hour >= 4 && hour < 6 && !_isTaskDone(kPrayerFajr)) {
+        suggestions.add(prayerSuggestion(
+          kPrayerFajr,
+          null,
+          'أدِّ صلاة الفجر واطلع على أذكار ما بعد الصلاة 🌅',
+          Icons.wb_twilight_rounded,
+          const Color(0xFF0284C7),
+        ));
+      } else if (hour >= 12 && hour < 15 && !_isTaskDone(kPrayerDhuhr)) {
+        suggestions.add(prayerSuggestion(
+          kPrayerDhuhr,
+          null,
+          'حافظ على صلاة الظهر وتفقد أذكار بعد الصلاة ☀️',
+          Icons.wb_sunny_rounded,
+          const Color(0xFFD97706),
+        ));
+      } else if (hour >= 15 && hour < 18 && !_isTaskDone(kPrayerAsr)) {
+        suggestions.add(prayerSuggestion(
+          kPrayerAsr,
+          null,
+          'حافظ على صلاة العصر وأذكار ما بعد الصلاة 🌤️',
+          Icons.light_mode_rounded,
+          const Color(0xFFEA580C),
+        ));
+      } else if (hour >= 18 && hour < 19 && !_isTaskDone(kPrayerMaghrib)) {
+        suggestions.add(prayerSuggestion(
+          kPrayerMaghrib,
+          null,
+          'أدِّ صلاة المغرب وتفقد أذكار بعد الصلاة 🌇',
+          Icons.nights_stay_outlined,
+          const Color(0xFFDB2777),
+        ));
+      } else if (hour >= 19 && hour < 23 && !_isTaskDone(kPrayerIsha)) {
+        suggestions.add(prayerSuggestion(
+          kPrayerIsha,
+          null,
+          'أدِّ صلاة العشاء وأذكار بعد الصلاة 🌙',
+          Icons.bedtime_rounded,
+          const Color(0xFF4F46E5),
+        ));
+      } else if (hour >= 0 && hour < 4) {
+        suggestions.add(const ContextSuggestion(
+          title: kPrayerQiyam,
+          subtitle: 'أجواء السحر ومناجاة الله في جوف الليل ✨',
+          categoryLabel: 'نافلة مباركة',
+          icon: Icons.nights_stay_rounded,
+          accentColor: Color(0xFF4338CA),
+          action: ContextSuggestionAction.qiyam,
+        ));
+      }
+    }
+
+    // 2. Time-appropriate Athkar (prioritize incomplete)
+    final hour = now.hour;
+    final inMorningWindow = (prayerTimes != null &&
+            (prayerTimes.currentPrayerByDateTime(now) == Prayer.sunrise ||
+                prayerTimes.currentPrayerByDateTime(now) == Prayer.fajr)) ||
+        (hour >= 5 && hour < 12);
+    if (inMorningWindow && !_isTaskDone(kAthkarMorning)) {
+      suggestions.add(const ContextSuggestion(
+        title: kAthkarMorning,
+        subtitle: 'حصّن يومك بأذكار الصباح واجعله في حفظ الله ☀️',
+        categoryLabel: 'تحصين اليوم',
+        icon: Icons.wb_sunny_rounded,
+        accentColor: Color(0xFFD97706),
+        action: ContextSuggestionAction.morningAthkar,
+      ));
+    }
+
+    final inEveningWindow = (prayerTimes != null &&
+            (prayerTimes.currentPrayerByDateTime(now) == Prayer.asr ||
+                prayerTimes.currentPrayerByDateTime(now) == Prayer.maghrib)) ||
+        (hour >= 15 && hour < 21);
+    if (inEveningWindow && !_isTaskDone(kAthkarEvening)) {
+      suggestions.add(const ContextSuggestion(
+        title: kAthkarEvening,
+        subtitle: 'اقرأ أذكار المساء لطمأنينة قلبك وحفظك ليلاً 🌆',
+        categoryLabel: 'تحصين المساء',
+        icon: Icons.brightness_4_rounded,
+        accentColor: Color(0xFF7C3AED),
+        action: ContextSuggestionAction.eveningAthkar,
+      ));
+    }
+
+    if ((hour >= 20 || hour < 4) && !_isTaskDone(kAthkarSleep)) {
+      suggestions.add(const ContextSuggestion(
+        title: kAthkarSleep,
+        subtitle: 'اختم ليلتك بأذكار النوم لتبيت في أمان الله 🛌',
+        categoryLabel: 'قبل النوم',
+        icon: Icons.bedtime_outlined,
+        accentColor: Color(0xFF4F46E5),
+        action: ContextSuggestionAction.sleepAthkar,
+      ));
+    }
+
+    // 3. Friday Special Suggestions
+    if (now.weekday == DateTime.friday) {
+      suggestions.add(const ContextSuggestion(
+        title: 'سورة الكهف',
+        subtitle: 'نورٌ ما بين الجمعتين — تلاوة سورة الكهف المباركة 📖',
+        categoryLabel: 'سنن الجمعة',
+        icon: Icons.auto_stories_rounded,
+        accentColor: Color(0xFF15803D),
+        action: ContextSuggestionAction.surahKahf,
+      ));
+      if (!_isTaskDone(kProphetPrayer)) {
+        suggestions.add(const ContextSuggestion(
+          title: '$kProphetPrayer ﷺ',
+          subtitle: 'أكثر من الصلاة على النبي ﷺ في يوم الجمعة المبارك 💛',
+          categoryLabel: 'سنن الجمعة',
+          icon: Icons.favorite_rounded,
+          accentColor: Color(0xFFE11D48),
+          action: ContextSuggestionAction.prophetPrayer,
+        ));
+      }
+    }
+
+    // 4. Daily Quran Wird / Khatmah
+    if (!_isTaskDone(kQuranWird)) {
+      suggestions.add(const ContextSuggestion(
+        title: 'متابعة ورد القرآن والختمة',
+        subtitle: 'افتح متابع الختمة وتقدم في وردك اليومي من كتاب الله 📖',
+        categoryLabel: 'كتاب الله',
+        icon: Icons.menu_book_rounded,
+        accentColor: Color(0xFF0F766E),
+        action: ContextSuggestionAction.khatmah,
+      ));
+    }
+
+    // 5. Happiness Jar (Uplifting Daily Message)
+    suggestions.add(const ContextSuggestion(
+      title: 'برطمان السعادة 💛',
+      subtitle: 'اسحب رسالة مبهجة تزرع الأمل والسرور في قلبك اليوم ✨',
+      categoryLabel: 'جرعة تفاؤل',
+      icon: Icons.card_giftcard_rounded,
+      accentColor: Color(0xFFD97706),
+      action: ContextSuggestionAction.happinessJar,
+    ));
+
+    // 6. Prophet Prayer (non-Friday if incomplete)
+    if (now.weekday != DateTime.friday && !_isTaskDone(kProphetPrayer)) {
+      suggestions.add(const ContextSuggestion(
+        title: '$kProphetPrayer ﷺ',
+        subtitle: 'من صلى عليّ صلاةً صلى الله عليه بها عشراً 🌿',
+        categoryLabel: 'ذكر مبارك',
+        icon: Icons.favorite_rounded,
+        accentColor: Color(0xFFDB2777),
+        action: ContextSuggestionAction.prophetPrayer,
+      ));
+    }
+
+    // 7. Tasbeeh / Istighfar
+    suggestions.add(const ContextSuggestion(
+      title: 'استغفر الله • المسبحة الذكية',
+      subtitle: 'رطّب لسانك بالاستغفار والتسبيح في دقائق معدودة 📿',
+      categoryLabel: 'تسبيح وذكر',
+      icon: Icons.fingerprint_rounded,
+      accentColor: Color(0xFF0F766E),
+      action: ContextSuggestionAction.tasbeeh,
+    ));
+
+    return suggestions;
   }
 
   // --- Dynamic Background Logic ---

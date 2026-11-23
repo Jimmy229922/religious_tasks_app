@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -153,8 +154,10 @@ class _SplashScreenState extends State<SplashScreen> {
     final mutedColor =
         isDark ? Colors.white.withValues(alpha: 0.75) : const Color(0xFF334155);
 
-    return Scaffold(
-      body: SizedBox.expand(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        body: SizedBox.expand(
         child: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -333,6 +336,7 @@ class _SplashScreenState extends State<SplashScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }

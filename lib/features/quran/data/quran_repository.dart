@@ -46,7 +46,7 @@ class QuranRepository {
   static Map<String, dynamic>? _pageMappingJson;
   static final Map<int, String> _surahTextCache = {};
   static final Map<int, MushafPageContent> _pageCache = {};
-  static final Map<int, MushafPageContent> _kahfPageCache = {};
+  static final Map<String, MushafPageContent> _filteredSurahPageCache = {};
 
   /// Loads and validates the full Quran JSON from assets/data/quran.json
   static Future<List<dynamic>> loadQuran() async {
@@ -126,37 +126,165 @@ class QuranRepository {
     return fallback.text;
   }
 
+  static SurahInfo findSurahByName(String surahName) {
+    final normalized = surahName.trim();
+    return QuranData.surahs.firstWhere(
+      (s) => s.name == normalized,
+      orElse: () => QuranData.surahs.first,
+    );
+  }
+
+  static int getCompletedAyahsCount(int surahNumber, int ayahNumber) {
+    int total = 0;
+    for (final surah in QuranData.surahs) {
+      if (surah.number < surahNumber) {
+        total += surah.ayahCount;
+      } else if (surah.number == surahNumber) {
+        total += ayahNumber.clamp(1, surah.ayahCount);
+        break;
+      }
+    }
+    return total.clamp(0, 6236);
+  }
+
+  static Future<String?> getVerseText(int surahNumber, int ayahNumber) async {
+    try {
+      final surahs = await loadQuran();
+      final surahData = surahs.firstWhere(
+        (s) => s['id'] == surahNumber,
+        orElse: () => null,
+      );
+      if (surahData != null && surahData['verses'] is List) {
+        final verses = surahData['verses'] as List;
+        final verseObj = verses.firstWhere(
+          (v) => v['id'] == ayahNumber,
+          orElse: () => null,
+        );
+        if (verseObj != null) {
+          var text = (verseObj['text'] as String).trim();
+          if (ayahNumber == 1 && surahNumber != 1 && surahNumber != 9) {
+            final bismillahPattern = RegExp(
+              r'^بِسۡمِ\s+ٱللَّهِ\s+ٱلرَّحۡمَٰنِ\s+ٱلرَّحِيمِ\s*|^بِسْمِ\s+ٱللَّهِ\s+ٱلرَّحْمَٰنِ\s+ٱلرَّحِيمِ\s*|^بِسْمِ\s+اللَّهِ\s+الرَّحْمَٰنِ\s+الرَّحِيمِ\s*',
+            );
+            text = text.replaceFirst(bismillahPattern, '').trim();
+          }
+          return text;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<int> getPageForAyah(int surahNumber, int ayahNumber) async {
+    try {
+      final mapping = await loadPageMapping();
+      if (mapping.containsKey('pages') && mapping['pages'] is List) {
+        final pagesList = mapping['pages'] as List;
+        for (final pageData in pagesList) {
+          final sections = pageData['sections'];
+          if (sections is List) {
+            for (final sec in sections) {
+              if (sec['surah_number'] == surahNumber) {
+                final start = sec['verse_start'] as int;
+                final end = sec['verse_end'] as int;
+                if (ayahNumber >= start && ayahNumber <= end) {
+                  return (pageData['page'] as int).clamp(1, 604);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return (QuranPageMapping.surahStartPage[surahNumber] ?? 1).clamp(1, 604);
+  }
+
+  static Future<List<int>> getSurahPages(int surahNumber) async {
+    final pages = <int>[];
+    try {
+      final mapping = await loadPageMapping();
+      if (mapping.containsKey('pages') && mapping['pages'] is List) {
+        final pagesList = mapping['pages'] as List;
+        for (final pageData in pagesList) {
+          final sections = pageData['sections'];
+          if (sections is List &&
+              sections.any((sec) => sec['surah_number'] == surahNumber)) {
+            final page = pageData['page'];
+            if (page is int) {
+              pages.add(page.clamp(1, 604));
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (pages.isNotEmpty) {
+      pages.sort();
+      return pages.toSet().toList();
+    }
+
+    final start = (QuranPageMapping.surahStartPage[surahNumber] ?? 1).clamp(1, 604);
+    final nextStart = surahNumber < 114
+        ? (QuranPageMapping.surahStartPage[surahNumber + 1] ?? 604)
+        : 604;
+    final end = nextStart >= start ? nextStart : start;
+    return [for (int p = start; p <= end; p++) p];
+  }
+
   static MushafPageContent? getCachedPageContent(
     int pageNumber, {
     bool filterKahfOnly = false,
+    int? onlySurahNumber,
   }) {
     final pageNum = pageNumber.clamp(1, 604);
-    return filterKahfOnly ? _kahfPageCache[pageNum] : _pageCache[pageNum];
+    final effectiveSurah = onlySurahNumber ?? (filterKahfOnly ? 18 : null);
+    if (effectiveSurah != null) {
+      return _filteredSurahPageCache['${effectiveSurah}_$pageNum'];
+    }
+    return _pageCache[pageNum];
   }
 
   static void prefetchAdjacentPages(
     int pageNumber, {
     bool filterKahfOnly = false,
+    int? onlySurahNumber,
+    List<int>? allowedPages,
   }) {
+    final effectiveSurah = onlySurahNumber ?? (filterKahfOnly ? 18 : null);
     final minPage = filterKahfOnly ? 293 : 1;
     final maxPage = filterKahfOnly ? 304 : 604;
     for (final target in [pageNumber - 1, pageNumber + 1]) {
+      if (allowedPages != null && !allowedPages.contains(target)) {
+        continue;
+      }
       if (target >= minPage && target <= maxPage) {
-        if (getCachedPageContent(target, filterKahfOnly: filterKahfOnly) ==
+        if (getCachedPageContent(
+              target,
+              onlySurahNumber: effectiveSurah,
+            ) ==
             null) {
-          getPageContent(target, filterKahfOnly: filterKahfOnly);
+          getPageContent(
+            target,
+            onlySurahNumber: effectiveSurah,
+          );
         }
       }
     }
   }
 
   /// Gets the exact page content for any Madani Mushaf page (1 to 604) based on official 604-page mapping JSON
-  static Future<MushafPageContent> getPageContent(int pageNumber, {bool filterKahfOnly = false}) async {
+  static Future<MushafPageContent> getPageContent(
+    int pageNumber, {
+    bool filterKahfOnly = false,
+    int? onlySurahNumber,
+  }) async {
     final pageNum = pageNumber.clamp(1, 604);
-    if (filterKahfOnly && _kahfPageCache.containsKey(pageNum)) {
-      return _kahfPageCache[pageNum]!;
+    final effectiveSurah = onlySurahNumber ?? (filterKahfOnly ? 18 : null);
+    final cacheKey = effectiveSurah != null ? '${effectiveSurah}_$pageNum' : null;
+    if (cacheKey != null && _filteredSurahPageCache.containsKey(cacheKey)) {
+      return _filteredSurahPageCache[cacheKey]!;
     }
-    if (!filterKahfOnly && _pageCache.containsKey(pageNum)) {
+    if (cacheKey == null && _pageCache.containsKey(pageNum)) {
       return _pageCache[pageNum]!;
     }
 
@@ -175,8 +303,13 @@ class QuranRepository {
         final sections = pageData['sections'] as List;
         final buffer = StringBuffer();
         final pageSections = <MushafPageSection>[];
-        int primarySurahNumber = 18;
-        String primarySurahName = "الكهف";
+        int primarySurahNumber = effectiveSurah ?? 18;
+        String primarySurahName = QuranData.surahs
+            .firstWhere(
+              (s) => s.number == primarySurahNumber,
+              orElse: () => QuranData.surahs.first,
+            )
+            .name;
 
         for (int i = 0; i < sections.length; i++) {
           final sec = sections[i];
@@ -185,8 +318,8 @@ class QuranRepository {
           final vStart = sec['verse_start'] as int;
           final vEnd = sec['verse_end'] as int;
 
-          // If in Surah Kahf screen, skip Surah 17 (Al-Isra) verses on Page 293
-          if (filterKahfOnly && sId != 18) {
+          // If in single-surah mode (e.g. Surah Al-Kahf or Surah Al-Mulk), filter other surahs out
+          if (effectiveSurah != null && sId != effectiveSurah) {
             continue;
           }
 
@@ -246,8 +379,8 @@ class QuranRepository {
           sections: pageSections,
         );
 
-        if (filterKahfOnly) {
-          _kahfPageCache[pageNum] = pageContent;
+        if (cacheKey != null) {
+          _filteredSurahPageCache[cacheKey] = pageContent;
         } else {
           _pageCache[pageNum] = pageContent;
         }
@@ -265,7 +398,7 @@ class QuranRepository {
     );
 
     for (int sId = range.startSurah; sId <= range.endSurah; sId++) {
-      if (filterKahfOnly && sId != 18) continue;
+      if (effectiveSurah != null && sId != effectiveSurah) continue;
 
       final surahData = surahs.firstWhere(
         (s) => s['id'] == sId,
@@ -323,8 +456,8 @@ class QuranRepository {
       sections: pageSections,
     );
 
-    if (filterKahfOnly) {
-      _kahfPageCache[pageNum] = pageContent;
+    if (cacheKey != null) {
+      _filteredSurahPageCache[cacheKey] = pageContent;
     } else {
       _pageCache[pageNum] = pageContent;
     }

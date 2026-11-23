@@ -9,6 +9,9 @@ import '../models/dhikr_item.dart';
 import 'package:religious_tasks_app/core/services/athkar_tracking_service.dart';
 import 'package:religious_tasks_app/core/services/storage_service.dart';
 import 'package:religious_tasks_app/features/athkar/models/athkar_time_helper.dart';
+import 'package:religious_tasks_app/features/quran/data/quran_data.dart';
+import 'package:religious_tasks_app/features/quran/data/quran_page_mapping.dart';
+import 'package:religious_tasks_app/features/quran/screens/quran_surah_reader_screen.dart';
 import '../widgets/dhikr_card.dart';
 import '../widgets/details/athkar_header.dart';
 import '../widgets/details/athkar_controls.dart';
@@ -89,10 +92,24 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
     _cachedTheme = baseTheme.copyWith(
       textTheme: GoogleFonts.cairoTextTheme(baseTheme.textTheme),
       scaffoldBackgroundColor:
-          _isNightMode ? Colors.black : const Color(0xFFFAFAFA),
-      appBarTheme: _isNightMode
-          ? const AppBarTheme(backgroundColor: Colors.black)
-          : null,
+          _isNightMode ? Colors.black : const Color(0xFFF6F7FB),
+      cardTheme: CardThemeData(
+        color: _isNightMode ? const Color(0xFF141A1E) : Colors.white,
+        surfaceTintColor: Colors.transparent,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: _isNightMode ? const Color(0xFF18181B) : Colors.white,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: _isNightMode ? const Color(0xFF18181B) : Colors.white,
+        surfaceTintColor: Colors.transparent,
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: _isNightMode ? Colors.black : null,
+        foregroundColor: Colors.white,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+      ),
     );
   }
 
@@ -416,8 +433,45 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
     });
   }
 
+  bool _isSurahMulkItem(DhikrItem item) =>
+      _isSleepAthkar && item.text.contains('الْمُلْكِ');
+
+  void _markItemCompleted(DhikrItem item) {
+    if (item.current >= item.count) return;
+    HapticFeedback.mediumImpact();
+    setState(() {
+      item.current = item.count;
+    });
+    _saveProgress();
+    if (!_showCompleted) {
+      _scheduleRemovalSequence(item);
+    }
+    _checkCelebration();
+  }
+
+  void _openSurahMulkReader(DhikrItem item) {
+    final surahMulk = QuranData.surahs.firstWhere(
+      (s) => s.number == 67,
+      orElse: () => QuranData.surahs.first,
+    );
+    final startPage = QuranPageMapping.surahStartPage[67] ?? 562;
+    Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QuranSurahReaderScreen(
+          surah: surahMulk,
+          initialPage: startPage,
+          singleSurahOnly: true,
+          isCompleted: item.current >= item.count,
+          onMarkCompleted: () => _markItemCompleted(item),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAnimatedItem(BuildContext context, DhikrItem item, int index) {
     final isRemoving = _removingItems.contains(item);
+    final isSurahMulk = _isSurahMulkItem(item);
     return AnimatedSwitcher(
       key: ObjectKey(item),
       duration: _removeDuration,
@@ -449,10 +503,15 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
                 totalCount: _visibleAthkar.length,
                 isFocus: false,
                 isMorning: widget.isMorning,
+                isSleep: _isSleepAthkar,
                 trueBlackMode: _isNightMode,
                 fontScale: _fontScale,
                 fallbackReward: _fallbackReward,
                 onIncrement: _increment,
+                onOpenAction:
+                    isSurahMulk ? () => _openSurahMulkReader(item) : null,
+                actionLabel:
+                    isSurahMulk ? 'اقرأ سورة الملك في المصحف 📖' : null,
               ),
             ),
     );
@@ -500,10 +559,17 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
                     totalCount: _visibleAthkar.length,
                     isFocus: true,
                     isMorning: widget.isMorning,
+                    isSleep: _isSleepAthkar,
                     trueBlackMode: _isNightMode,
                     fontScale: _fontScale,
                     fallbackReward: _fallbackReward,
                     onIncrement: _increment,
+                    onOpenAction: _isSurahMulkItem(item)
+                        ? () => _openSurahMulkReader(item)
+                        : null,
+                    actionLabel: _isSurahMulkItem(item)
+                        ? 'اقرأ سورة الملك في المصحف 📖'
+                        : null,
                   ),
                 ),
         ),
@@ -530,6 +596,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
           AthkarHeader(
             title: widget.title,
             isMorning: widget.isMorning,
+            isSleep: _isSleepAthkar,
             totalTarget: _totalTarget,
             totalCurrent: _totalCurrent,
             progress: _overallProgress,
@@ -562,6 +629,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
           AthkarHeader(
             title: widget.title,
             isMorning: widget.isMorning,
+            isSleep: _isSleepAthkar,
             totalTarget: _totalTarget,
             totalCurrent: _totalCurrent,
             progress: _overallProgress,
@@ -713,7 +781,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
         final appBarColor = isDark
             ? Colors.black
             : (widget.title == "أذكار النوم"
-                ? const Color(0xFF0F172A)
+                ? const Color(0xFF3949AB)
                 : (widget.isMorning
                     ? const Color(0xFF2E7D32)
                     : const Color(0xFF3949AB)));
@@ -732,6 +800,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
                 title: Text(widget.title),
                 backgroundColor: appBarColor,
                 foregroundColor: Colors.white,
+                systemOverlayStyle: SystemUiOverlayStyle.light,
                 elevation: 0,
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
@@ -762,7 +831,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
                           colors: isDark
                               ? const [Color(0xFF0B131E), Color(0xFF152233)]
                               : (_isSleepAthkar
-                                  ? const [Color(0xFF0F172A), Color(0xFF1E293B)]
+                                  ? const [Color(0xFFEEF2FF), Color(0xFFE0E7FF)]
                                   : (widget.isMorning
                                       ? const [Color(0xFFF0FDF4), Color(0xFFE6F4EA), Color(0xFFF0FDF4)]
                                       : const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)])),
