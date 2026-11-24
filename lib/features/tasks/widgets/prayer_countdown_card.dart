@@ -3,6 +3,7 @@ import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import '../providers/tasks_view_model.dart';
 import '../../prayers/screens/prayer_details_screen.dart';
 
@@ -102,16 +103,16 @@ class _PrayerCountdownCardState extends State<PrayerCountdownCard> {
                 const Color(0xFF2C5364)
               ]
             : [
-                const Color(0xFF0F766E),
-                const Color(0xFF0D9488),
-                const Color(0xFF14B8A6)
+                context.primaryColor,
+                context.primaryDarkColor,
+                context.primaryLightColor,
               ];
         timeIcon = Icons.bedtime_rounded;
         break;
       default:
         gradientColors = widget.isDark
             ? [const Color(0xFF141E30), const Color(0xFF243B55)]
-            : [const Color(0xFF0F766E), const Color(0xFF14B8A6)];
+            : [context.primaryColor, context.primaryLightColor];
         timeIcon = Icons.access_time_rounded;
     }
 

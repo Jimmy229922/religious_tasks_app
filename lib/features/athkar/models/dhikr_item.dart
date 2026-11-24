@@ -1,6 +1,8 @@
 class DhikrItem {
   String text;
   String reward;
+  String virtueDetails;
+  String source;
   int count;
   int current;
   final bool isOptional;
@@ -9,6 +11,8 @@ class DhikrItem {
   DhikrItem({
     required this.text,
     required this.reward,
+    this.virtueDetails = '',
+    this.source = '',
     required this.count,
     this.current = 0,
     this.isOptional = false,

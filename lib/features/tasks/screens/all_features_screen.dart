@@ -147,6 +147,20 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
                 context, MaterialPageRoute(builder: (_) => const RuqyahScreen())),
           ),
           AppFeatureItem(
+            title: "رقية الأطفال والتحصين",
+            description: "أدعية التحصين والرقية الموثوقة لحفظ الأطفال من العين والحسد",
+            icon: Icons.child_care_rounded,
+            color: const Color(0xFF0284C7),
+            badge: "جديد",
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    const RuqyahScreen(initialCategoryId: 'children'),
+              ),
+            ),
+          ),
+          AppFeatureItem(
             title: "أسماء الله الحسنى",
             description: "تأمل ومعاني أسماء الله الحسنى وفوائدها",
             icon: Icons.stars_rounded,
@@ -177,6 +191,32 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
             color: const Color(0xFF0288D1),
             onTap: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => const DuaaSafarScreen())),
+          ),
+          AppFeatureItem(
+            title: "أذكار الاستيقاظ",
+            description: "أذكار الاستيقاظ من النوم والشكر على بداية اليوم",
+            icon: Icons.wb_sunny_rounded,
+            color: const Color(0xFFF59E0B),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    const VariousAthkarScreen(initialCategoryId: 'daily_life'),
+              ),
+            ),
+          ),
+          AppFeatureItem(
+            title: "أذكار المسجد",
+            description: "أدعية الذهاب إلى المسجد ودخوله والخروج منه والوضوء",
+            icon: Icons.mosque_rounded,
+            color: const Color(0xFF0D9488),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    const VariousAthkarScreen(initialCategoryId: 'mosque'),
+              ),
+            ),
           ),
         ],
       ),
@@ -390,10 +430,10 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 1.4,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
+                            crossAxisCount: 3,
+                            childAspectRatio: 0.92,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
                           ),
                           itemCount: category.features.length,
                           itemBuilder: (context, fIndex) {
@@ -438,7 +478,7 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
         onTap: feature.onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(12.0),
+          padding: const EdgeInsets.all(9.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -447,7 +487,7 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
                       color: feature.color.withValues(alpha: isDark ? 0.2 : 0.12),
                       shape: BoxShape.circle,
@@ -455,13 +495,13 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
                     child: Icon(
                       feature.icon,
                       color: feature.color,
-                      size: 22,
+                      size: 19,
                     ),
                   ),
                   if (feature.isLocked)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.amber.shade800,
                         borderRadius: BorderRadius.circular(8),
@@ -469,7 +509,7 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
                       child: Text(
                         feature.badge ?? "قريباً",
                         style: GoogleFonts.cairo(
-                          fontSize: 9,
+                          fontSize: 8.5,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
@@ -478,18 +518,18 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
                   else
                     Icon(
                       Icons.arrow_forward_ios_rounded,
-                      size: 14,
+                      size: 12,
                       color: isDark ? Colors.white38 : Colors.grey.shade400,
                     ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 feature.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.cairo(
-                  fontSize: 13,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white : const Color(0xFF1E293B),
                 ),
@@ -499,9 +539,9 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.cairo(
-                  fontSize: 10,
+                  fontSize: 9.2,
                   color: isDark ? Colors.white60 : Colors.grey.shade600,
-                  height: 1.3,
+                  height: 1.25,
                 ),
               ),
             ],

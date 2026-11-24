@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import 'package:religious_tasks_app/shared/services/audio/radio_service.dart';
 import '../providers/radio_view_model.dart';
@@ -16,8 +17,8 @@ class RadioScreen extends StatefulWidget {
 }
 
 class _RadioScreenState extends State<RadioScreen> {
-  static const Color _emerald = Color(0xFF0F766E);
-  static const Color _emeraldDark = Color(0xFF064E3B);
+  Color get _emerald => context.primaryColor;
+  Color get _emeraldDark => context.primaryDarkColor;
   static const Color _gold = Color(0xFFD4AF37);
 
   final TextEditingController _searchController = TextEditingController();
@@ -76,7 +77,7 @@ class _RadioScreenState extends State<RadioScreen> {
                         color: _emerald.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.bedtime_rounded,
+                      child: Icon(Icons.bedtime_rounded,
                           color: _emerald, size: 22),
                     ),
                     const SizedBox(width: 10),
@@ -133,7 +134,7 @@ class _RadioScreenState extends State<RadioScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.hourglass_bottom_rounded,
+                        Icon(Icons.hourglass_bottom_rounded,
                             color: _emerald, size: 18),
                         const SizedBox(width: 8),
                         Text(
@@ -412,7 +413,7 @@ class _RadioScreenState extends State<RadioScreen> {
                                   ? Colors.white38
                                   : Colors.grey.shade500,
                             ),
-                            prefixIcon: const Icon(Icons.search_rounded,
+                            prefixIcon: Icon(Icons.search_rounded,
                                 color: _emerald),
                             suffixIcon: _searchController.text.isNotEmpty
                                 ? IconButton(
@@ -449,7 +450,7 @@ class _RadioScreenState extends State<RadioScreen> {
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
                               borderSide:
-                                  const BorderSide(color: _emerald, width: 1.5),
+                                  BorderSide(color: _emerald, width: 1.5),
                             ),
                           ),
                         ),
@@ -542,7 +543,7 @@ class _RadioScreenState extends State<RadioScreen> {
           gradient: LinearGradient(
             colors: isDark
                 ? const [Color(0xFF0E2926), Color(0xFF132234)]
-                : const [_emerald, _emeraldDark],
+                : [_emerald, _emeraldDark],
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
           ),
@@ -663,7 +664,7 @@ class _RadioScreenState extends State<RadioScreen> {
         gradient: LinearGradient(
           colors: isDark
               ? const [Color(0xFF0E2926), Color(0xFF132234)]
-              : const [_emerald, _emeraldDark],
+              : [_emerald, _emeraldDark],
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
         ),

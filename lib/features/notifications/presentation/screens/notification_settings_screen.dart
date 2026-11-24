@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:religious_tasks_app/core/constants/strings.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/full_adhan_overlay_dialog.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import 'package:religious_tasks_app/features/happiness_jar/screens/happiness_jar_screen.dart';
@@ -27,8 +28,8 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
-  static const Color _emerald = Color(0xFF0F766E);
-  static const Color _emeraldDark = Color(0xFF064E3B);
+  Color get _emerald => context.primaryColor;
+  Color get _emeraldDark => context.primaryDarkColor;
   static const Color _gold = Color(0xFFD4AF37);
 
   final NotificationPreferencesService _preferencesService =
@@ -957,7 +958,7 @@ class _NotificationSettingsScreenState
                           onPressed:
                               _isApplying ? null : _testSalawatNotification,
                           icon:
-                              const Icon(Icons.favorite_rounded, color: _emerald),
+                              Icon(Icons.favorite_rounded, color: _emerald),
                           label: Text('تجربة إشعار الصلاة على النبي',
                               style: GoogleFonts.cairo()),
                           style: OutlinedButton.styleFrom(
@@ -1013,7 +1014,7 @@ class _NotificationSettingsScreenState
           colors: _isAllPermissionsGranted
               ? (isDark
                   ? const [Color(0xFF0E2926), Color(0xFF132234)]
-                  : const [_emerald, _emeraldDark])
+                  : [_emerald, _emeraldDark])
               : (isDark
                   ? const [Color(0xFF312214), Color(0xFF1F1812)]
                   : const [Color(0xFFB45309), Color(0xFF92400E)]),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 
 class GuidedTasbeehScreen extends StatefulWidget {
   const GuidedTasbeehScreen({super.key});
@@ -108,7 +109,7 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accentColor =
-        isDark ? const Color(0xFFE94560) : const Color(0xFF0F766E);
+        isDark ? const Color(0xFFE94560) : context.primaryColor;
 
     return Scaffold(
       backgroundColor:
@@ -233,7 +234,7 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
           onPressed: () => Navigator.pop(context),
           style: ElevatedButton.styleFrom(
               backgroundColor:
-                  isDark ? Colors.white10 : const Color(0xFF0F766E),
+                  isDark ? Colors.white10 : context.primaryColor,
               padding:
                   const EdgeInsets.symmetric(horizontal: 30, vertical: 12)),
           child: const Text("عودة", style: TextStyle(color: Colors.white)),
@@ -243,7 +244,7 @@ class _GuidedTasbeehScreenState extends State<GuidedTasbeehScreen>
           onPressed: _reset,
           child: Text("بدء مرة أخرى",
               style: TextStyle(
-                  color: isDark ? Colors.white70 : const Color(0xFF0F766E))),
+                  color: isDark ? Colors.white70 : context.primaryColor)),
         )
       ],
     );

@@ -41,6 +41,280 @@ class _TasksScreenState extends State<TasksScreen> {
   bool _showRemainingSunnahOnly = false;
   int _bottomInsightTab = 0; // 0: آية وهمسة اليوم, 1: واحة الشكر والامتنان
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkFridaySurahKahfReminder();
+    });
+  }
+
+  Future<void> _checkFridaySurahKahfReminder() async {
+    if (!mounted || DateTime.now().weekday != DateTime.friday) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedDate = prefs.getString(SurahKahfScreen.fridayDismissedDateKey);
+      if (savedDate == SurahKahfScreen.todayDateKey()) return;
+      if (!mounted) return;
+      await _showFridaySurahKahfDialog(prefs);
+    } catch (_) {}
+  }
+
+  Future<void> _showFridaySurahKahfDialog(SharedPreferences prefs) async {
+    bool dontShowAgain = false;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = context.primaryColor;
+    const gold = Color(0xFFD4AF37);
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(26),
+                  side: BorderSide(
+                    color: gold.withValues(alpha: isDark ? 0.45 : 0.6),
+                    width: 1.2,
+                  ),
+                ),
+                backgroundColor:
+                    isDark ? const Color(0xFF131D2B) : Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [accent, context.primaryDarkColor],
+                            begin: Alignment.topRight,
+                            end: Alignment.bottomLeft,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.28),
+                              blurRadius: 14,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.menu_book_rounded,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: gold.withValues(alpha: isDark ? 0.18 : 0.14),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: gold.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Text(
+                          "جمعة مباركة ✨",
+                          style: GoogleFonts.cairo(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? const Color(0xFFFDE68A)
+                                : const Color(0xFF92400E),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        "لا تنسَ قراءة سورة الكهف اليوم",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.cairo(
+                          fontSize: 17.5,
+                          fontWeight: FontWeight.bold,
+                          color:
+                              isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "«مَنْ قَرَأَ سُورَةَ الْكَهْفِ فِي يَوْمِ الْجُمُعَةِ أَضَاءَ لَهُ مِنَ النُّورِ مَا بَيْنَ الْجُمُعَتَيْنِ»",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.amiri(
+                          fontSize: 16,
+                          height: 1.65,
+                          color: isDark
+                              ? Colors.white70
+                              : const Color(0xFF475569),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setDialogState(() {
+                            dontShowAgain = !dontShowAgain;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.05)
+                                : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: dontShowAgain
+                                  ? accent.withValues(alpha: 0.6)
+                                  : (isDark
+                                      ? Colors.white.withValues(alpha: 0.1)
+                                      : const Color(0xFFE2E8F0)),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: dontShowAgain
+                                      ? accent
+                                      : Colors.transparent,
+                                  border: Border.all(
+                                    color: dontShowAgain
+                                        ? accent
+                                        : (isDark
+                                            ? Colors.white54
+                                            : const Color(0xFF94A3B8)),
+                                    width: 1.8,
+                                  ),
+                                ),
+                                child: dontShowAgain
+                                    ? const Icon(
+                                        Icons.check_rounded,
+                                        size: 14,
+                                        color: Colors.white,
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  "عدم إظهار هذا التذكير مجدداً هذه الجمعة",
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.9)
+                                        : const Color(0xFF334155),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () async {
+                                if (dontShowAgain) {
+                                  await prefs.setString(
+                                    SurahKahfScreen.fridayDismissedDateKey,
+                                    SurahKahfScreen.todayDateKey(),
+                                  );
+                                }
+                                if (ctx.mounted) {
+                                  Navigator.pop(ctx);
+                                }
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                side: BorderSide(
+                                  color: isDark
+                                      ? Colors.white24
+                                      : const Color(0xFFCBD5E1),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: Text(
+                                "إلغاء",
+                                style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark
+                                      ? Colors.white70
+                                      : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const SurahKahfScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.auto_stories_rounded,
+                                size: 18,
+                              ),
+                              label: Text(
+                                "اقرأ الآن",
+                                style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: accent,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   double _horizontalInset(double availableWidth) {
     final basePad = availableWidth < 360 ? 12.0 : 16.0;
     if (availableWidth <= _maxContentWidth + (basePad * 2)) {
@@ -95,7 +369,7 @@ class _TasksScreenState extends State<TasksScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: const Color(0xFF0F766E),
+        backgroundColor: context.primaryColor,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
@@ -381,7 +655,7 @@ class _TasksScreenState extends State<TasksScreen> {
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.18)
-              : const Color(0xFF0F766E).withValues(alpha: 0.24),
+              : context.primaryColor.withValues(alpha: 0.24),
           width: 1.25,
         ),
         boxShadow: isDark
@@ -446,7 +720,7 @@ class _TasksScreenState extends State<TasksScreen> {
     required List<TaskItem> allTasks,
     required bool isDark,
   }) {
-    final accent = isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E);
+    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
     final completed = allTasks.where((t) => t.isCompleted).length;
 
     return LayoutBuilder(
@@ -570,7 +844,7 @@ class _TasksScreenState extends State<TasksScreen> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF0F766E) : Colors.transparent,
+          color: selected ? context.primaryColor : Colors.transparent,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
@@ -588,7 +862,7 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Widget _buildAllSunnahDoneBanner(bool isDark) {
-    final accent = isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E);
+    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
@@ -650,7 +924,7 @@ class _TasksScreenState extends State<TasksScreen> {
       );
     }
 
-    final accent = isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E);
+    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
     return Column(
       children: [
         Container(
@@ -723,7 +997,7 @@ class _TasksScreenState extends State<TasksScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF0F766E) : Colors.transparent,
+          color: selected ? context.primaryColor : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -980,7 +1254,7 @@ class _TasksScreenState extends State<TasksScreen> {
   ) {
     final blessingOfDay =
         vm.currentBlessing.isEmpty ? "نعمة الإسلام والهداية" : vm.currentBlessing;
-    final accent = isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E);
+    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
     const gold = Color(0xFFD97706);
 
     return Container(
@@ -1047,7 +1321,7 @@ class _TasksScreenState extends State<TasksScreen> {
               ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F766E),
+              backgroundColor: context.primaryColor,
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
@@ -1238,7 +1512,7 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Widget _buildSmartEventBanner(String event, bool isDark) {
-    final accent = isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E);
+    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
@@ -1279,7 +1553,7 @@ class _TasksScreenState extends State<TasksScreen> {
   Widget _buildContextAwareSuggestion(
       BuildContext context, TasksViewModel vm, bool isDark) {
     final suggestion = vm.activeContextSuggestion;
-    final accent = isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E);
+    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
     final badgeAccent = suggestion.accentColor;
 
     return Container(
@@ -1318,7 +1592,7 @@ class _TasksScreenState extends State<TasksScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F766E),
+                    color: context.primaryColor,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -1612,7 +1886,7 @@ class _TasksScreenState extends State<TasksScreen> {
     required bool isDark,
     String? trailingText,
   }) {
-    final accent = isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E);
+    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
     return Row(
       children: [
         Container(

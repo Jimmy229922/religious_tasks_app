@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:religious_tasks_app/core/services/storage_service.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_data.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_page_mapping.dart';
@@ -21,8 +22,8 @@ class KhatmahScreen extends StatefulWidget {
 }
 
 class _KhatmahScreenState extends State<KhatmahScreen> {
-  static const Color _emerald = Color(0xFF0F766E);
-  static const Color _emeraldDark = Color(0xFF064E3B);
+  Color get _emerald => context.primaryColor;
+  Color get _emeraldDark => context.primaryDarkColor;
   static const Color _gold = Color(0xFFD4AF37);
   static const List<int> _juzStartPages = [
     1, 22, 42, 62, 82, 102, 122, 142, 162, 182,
@@ -286,7 +287,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
                       child: Row(
                         children: [
-                          const Icon(Icons.menu_book_rounded, color: _emerald),
+                          Icon(Icons.menu_book_rounded, color: _emerald),
                           const SizedBox(width: 8),
                           Text(
                             "اختر السورة",
@@ -307,7 +308,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                           hintText: "ابحث باسم السورة أو رقمها...",
                           hintStyle: GoogleFonts.cairo(fontSize: 13),
                           prefixIcon:
-                              const Icon(Icons.search_rounded, color: _emerald),
+                              Icon(Icons.search_rounded, color: _emerald),
                           filled: true,
                           fillColor: isDark
                               ? const Color(0xFF1E293B)
@@ -414,7 +415,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                                     ),
                                   ),
                                   if (isSelected)
-                                    const Icon(Icons.check_circle_rounded,
+                                    Icon(Icons.check_circle_rounded,
                                         color: _emerald),
                                 ],
                               ),
@@ -581,7 +582,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.auto_stories_rounded,
+                              Icon(Icons.auto_stories_rounded,
                                   color: _emerald, size: 19),
                               const SizedBox(width: 8),
                               Expanded(
@@ -598,7 +599,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(Icons.mosque_rounded,
+                              Icon(Icons.mosque_rounded,
                                   color: _emerald, size: 19),
                               const SizedBox(width: 8),
                               Expanded(
@@ -856,7 +857,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
         gradient: LinearGradient(
           colors: isDark
               ? const [Color(0xFF0E2926), Color(0xFF132234)]
-              : const [_emerald, _emeraldDark],
+              : [_emerald, _emeraldDark],
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
         ),
@@ -1333,7 +1334,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.today_rounded,
+                      Icon(Icons.today_rounded,
                           size: 17, color: _emerald),
                       const SizedBox(width: 6),
                       Expanded(
@@ -1549,7 +1550,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                   color: _emerald.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.edit_location_alt_rounded,
+                child: Icon(Icons.edit_location_alt_rounded,
                     color: _emerald, size: 21),
               ),
               const SizedBox(width: 10),
@@ -1696,7 +1697,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: _emerald, width: 1.6),
+                      borderSide: BorderSide(color: _emerald, width: 1.6),
                     ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   ),
@@ -1815,7 +1816,7 @@ class _KhatmahScreenState extends State<KhatmahScreen> {
                       color: _emerald.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.grid_view_rounded,
+                    child: Icon(Icons.grid_view_rounded,
                         color: _emerald, size: 19),
                   ),
                   const SizedBox(width: 10),

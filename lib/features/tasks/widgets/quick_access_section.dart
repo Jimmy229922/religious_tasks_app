@@ -2,6 +2,7 @@ import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/features/athkar/screens/duaa_safar_screen.dart';
 import 'package:religious_tasks_app/features/happiness_jar/screens/happiness_jar_screen.dart';
 import 'package:religious_tasks_app/features/names_of_allah/screens/names_of_allah_screen.dart';
@@ -68,7 +69,7 @@ class _QuickAccessSectionState extends State<QuickAccessSection> {
         vm.prayerTimes?.coordinates ?? Coordinates(21.4225, 39.8262);
     final textScale = MediaQuery.textScalerOf(context).scale(1.0);
 
-    const emeraldPrimary = Color(0xFF0F766E);
+    final emeraldPrimary = context.primaryColor;
     const goldPrimary = Color(0xFFB45309);
     const slateIndigo = Color(0xFF1E3A5F);
 
@@ -413,7 +414,7 @@ class _QuickAccessSectionState extends State<QuickAccessSection> {
 
   Widget _buildShowMoreItem(BuildContext context) {
     final isDark = widget.isDark;
-    const baseColor = Color(0xFF0F766E);
+    final baseColor = context.primaryColor;
 
     return Material(
       color: Colors.transparent,

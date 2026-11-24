@@ -1,14 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:religious_tasks_app/core/services/storage_service.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import 'package:religious_tasks_app/features/athkar/data/surah_kahf_data.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_repository.dart';
+import 'package:religious_tasks_app/features/quran/widgets/ayah_tafsir_sheet.dart';
 
 class SurahKahfScreen extends StatefulWidget {
   const SurahKahfScreen({super.key});
+
+  static const String fridayDismissedDateKey = 'friday_kahf_dismissed_date_v1';
+
+  static String todayDateKey() {
+    final now = DateTime.now();
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    return '${now.year}-$m-$d';
+  }
 
   @override
   State<SurahKahfScreen> createState() => _SurahKahfScreenState();
@@ -22,7 +34,10 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
   String? _savedBookmarkedVerse;
   int? _savedBookmarkedPage;
   String? _savedBookmarkedSnippet;
+  String? _inspectingVerse;
+  int? _inspectingPage;
   final Map<int, ScrollController> _pageScrollControllers = {};
+  bool _isCompletedToday = false;
 
   static const int _kahfStartPage = 293;
   static const int _kahfTotalPages = 12; // Pages 293 to 304 (All 110 Verses)
@@ -31,6 +46,84 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
   void initState() {
     super.initState();
     _initBookmarkAndController();
+    _loadCompletionState();
+  }
+
+  Future<void> _loadCompletionState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedDate = prefs.getString(SurahKahfScreen.fridayDismissedDateKey);
+      if (!mounted) return;
+      setState(() {
+        _isCompletedToday = savedDate == SurahKahfScreen.todayDateKey();
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _markSurahKahfCompleted() async {
+    HapticFeedback.mediumImpact();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        SurahKahfScreen.fridayDismissedDateKey,
+        SurahKahfScreen.todayDateKey(),
+      );
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _isCompletedToday = true;
+    });
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          "تقبل الله منك! تم تسجيل إتمام قراءة سورة الكهف اليوم 🌿",
+          style: GoogleFonts.cairo(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: context.primaryColor,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _onVerseLongPressed(
+    int absolutePage,
+    String verseNum,
+    String pageText,
+  ) async {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _inspectingVerse = verseNum;
+      _inspectingPage = absolutePage;
+    });
+
+    final ayahInt = QuranTextFormatter.parseVerseNumber(verseNum) ?? 1;
+    var fullVerseText = QuranTextFormatter.extractFullVerseText(
+      pageText,
+      verseNum,
+    );
+    if (fullVerseText.isEmpty) {
+      fullVerseText = await QuranRepository.getVerseText(18, ayahInt) ?? '';
+    }
+    if (!mounted) return;
+
+    await showAyahTafsirSheet(
+      context: context,
+      surahNumber: 18,
+      surahName: 'الكهف',
+      ayahNumber: ayahInt,
+      ayahText: fullVerseText,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _inspectingVerse = null;
+      _inspectingPage = null;
+    });
   }
 
   @override
@@ -252,7 +345,7 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
                 "حسناً",
                 style: GoogleFonts.cairo(
                   fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.tealAccent : const Color(0xFF0F766E),
+                  color: isDark ? Colors.tealAccent : context.primaryColor,
                 ),
               ),
             ),
@@ -363,7 +456,7 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F766E),
+                backgroundColor: context.primaryColor,
               ),
               onPressed: () {
                 final targetAbsolutePage = _savedBookmarkedPage!;
@@ -397,7 +490,7 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
         ? const [Color(0xFF0B131E), Color(0xFF152233)]
         : const [Color(0xFFF0FDF4), Color(0xFFE6F4EA), Color(0xFFF0FDF4)];
 
-    const accent = Color(0xFF0F766E);
+    final accent = context.primaryColor;
     final absolutePageNumber = _kahfStartPage + _currentPageIndex;
     final arabicPageNum = QuranTextFormatter.toArabicDigits(absolutePageNumber.toString());
     final arabicJuzNum = absolutePageNumber >= 302 ? '١٦' : '١٥';
@@ -607,7 +700,7 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
                                     color: accent.withValues(alpha: 0.12),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const SizedBox(
+                                  child: SizedBox(
                                     width: 28,
                                     height: 28,
                                     child: CircularProgressIndicator(
@@ -774,13 +867,23 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
                                                     0xFFD4AF37,
                                                   ),
                                                   isDark: isDark,
-                                                  bookmarkedVerse:
-                                                      _savedBookmarkedPage ==
+                                                  bookmarkedVerse: (_inspectingPage ==
+                                                              absolutePage &&
+                                                          _inspectingVerse !=
+                                                              null)
+                                                      ? _inspectingVerse
+                                                      : (_savedBookmarkedPage ==
                                                               absolutePage
                                                           ? _savedBookmarkedVerse
-                                                          : null,
+                                                          : null),
                                                   onTapVerse: (vNum) =>
                                                       _onVerseTapped(
+                                                    vNum,
+                                                    pageText,
+                                                  ),
+                                                  onLongPressVerse: (vNum) =>
+                                                      _onVerseLongPressed(
+                                                    absolutePage,
                                                     vNum,
                                                     pageText,
                                                   ),
@@ -814,6 +917,56 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+              border: Border(
+                top: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.grey.shade200,
+                ),
+              ),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _isCompletedToday ? null : _markSurahKahfCompleted,
+                icon: Icon(
+                  _isCompletedToday
+                      ? Icons.verified_rounded
+                      : Icons.check_circle_outline_rounded,
+                  size: 20,
+                ),
+                label: Text(
+                  _isCompletedToday
+                      ? "تم إتمام قراءة سورة الكهف اليوم ✓"
+                      : "أتممت قراءة سورة الكهف",
+                  style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14.5,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      _isCompletedToday ? const Color(0xFF10B981) : accent,
+                  disabledBackgroundColor:
+                      const Color(0xFF10B981).withValues(alpha: 0.85),
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

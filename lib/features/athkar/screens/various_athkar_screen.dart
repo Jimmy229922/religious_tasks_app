@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/islamic_card_generator_dialog.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 
@@ -35,7 +36,8 @@ class VariousDhikrItem {
 }
 
 class VariousAthkarScreen extends StatefulWidget {
-  const VariousAthkarScreen({super.key});
+  final String? initialCategoryId;
+  const VariousAthkarScreen({super.key, this.initialCategoryId});
 
   @override
   State<VariousAthkarScreen> createState() => _VariousAthkarScreenState();
@@ -43,9 +45,15 @@ class VariousAthkarScreen extends StatefulWidget {
 
 class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
   double _fontSize = 19.0;
-  String _selectedCategoryId = "home";
+  late String _selectedCategoryId;
   String _searchQuery = "";
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategoryId = widget.initialCategoryId ?? "home";
+  }
 
   static const List<VariousDhikrCategory> _categories = [
     VariousDhikrCategory(
@@ -446,7 +454,7 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
     VariousDhikrItem item,
     bool isDark,
   ) {
-    const accent = Color(0xFF0F766E);
+    final accent = context.primaryColor;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
@@ -473,7 +481,7 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
                 Expanded(
                   child: Row(
                     children: [
-                      const Icon(Icons.bookmark_rounded,
+                      Icon(Icons.bookmark_rounded,
                           color: accent, size: 18),
                       const SizedBox(width: 8),
                       Expanded(
@@ -494,7 +502,7 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
                 IconButton(
                   constraints: const BoxConstraints(),
                   padding: const EdgeInsets.all(6),
-                  icon: const Icon(Icons.style_rounded,
+                  icon: Icon(Icons.style_rounded,
                       color: accent, size: 20),
                   tooltip: "صانع البطاقات الإيمانية",
                   onPressed: () {

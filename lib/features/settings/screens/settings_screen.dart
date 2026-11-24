@@ -32,8 +32,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  static const Color _emerald = Color(0xFF0F766E);
-  static const Color _emeraldDark = Color(0xFF064E3B);
+  Color get _emerald => context.primaryColor;
+  Color get _emeraldDark => context.primaryDarkColor;
   static const Color _gold = Color(0xFFD4AF37);
 
   static const List<Map<String, String>> _availableMoazzens = [
@@ -757,7 +757,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             gradient: LinearGradient(
               colors: isDark
                   ? const [Color(0xFF0E2926), Color(0xFF132234)]
-                  : const [_emerald, _emeraldDark],
+                  : [_emerald, _emeraldDark],
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
             ),
@@ -991,7 +991,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           color: _emerald.withValues(alpha: 0.14),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.mic_rounded,
                           color: _emerald,
                           size: 22,
@@ -1021,7 +1021,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ],
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.keyboard_arrow_down_rounded,
                         color: _emerald,
                       ),
@@ -1399,7 +1399,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               color: _emerald.withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.record_voice_over_rounded,
                               color: _emerald,
                               size: 20,
@@ -1762,7 +1762,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             gradient: LinearGradient(
               colors: isDark
                   ? const [Color(0xFF0E2926), Color(0xFF132234)]
-                  : const [_emerald, _emeraldDark],
+                  : [_emerald, _emeraldDark],
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
             ),

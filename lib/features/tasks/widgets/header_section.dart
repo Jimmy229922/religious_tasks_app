@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:intl/intl.dart' as intl;
 
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/calendar_explorer_dialog.dart';
 import '../../prayers/screens/prayer_details_screen.dart';
 import '../providers/tasks_view_model.dart';
@@ -103,27 +104,27 @@ class _HeaderSectionState extends State<HeaderSection> {
         ? Colors.white.withValues(alpha: 0.85)
         : const Color(0xFF475569);
     final greetingColor =
-        isDark ? const Color(0xFFFDE68A) : const Color(0xFF0F766E);
+        isDark ? const Color(0xFFFDE68A) : context.primaryColor;
     final dividerColor = isDark
         ? Colors.white.withValues(alpha: 0.12)
-        : const Color(0xFF0F766E).withValues(alpha: 0.12);
+        : context.primaryColor.withValues(alpha: 0.12);
     final pillBg = isDark
         ? Colors.white.withValues(alpha: 0.1)
         : Colors.white.withValues(alpha: 0.9);
     final pillBorder = isDark
         ? Colors.white.withValues(alpha: 0.20)
-        : const Color(0xFF0F766E).withValues(alpha: 0.28);
+        : context.primaryColor.withValues(alpha: 0.28);
     final innerSurface = isDark
         ? Colors.black.withValues(alpha: 0.22)
         : Colors.white.withValues(alpha: 0.94);
     final innerBorder = isDark
         ? Colors.white.withValues(alpha: 0.16)
-        : const Color(0xFF0F766E).withValues(alpha: 0.24);
+        : context.primaryColor.withValues(alpha: 0.24);
     final progressTrack = isDark
         ? Colors.white.withValues(alpha: 0.14)
         : const Color(0xFFD9EAE5);
     final progressFill =
-        isDark ? const Color(0xFF5EEAD4) : const Color(0xFF0F766E);
+        isDark ? const Color(0xFF5EEAD4) : context.primaryColor;
 
     return Container(
       padding: const EdgeInsets.all(15),
@@ -137,12 +138,12 @@ class _HeaderSectionState extends State<HeaderSection> {
         border: Border.all(
           color: isDark
               ? const Color(0xFFD4AF37).withValues(alpha: 0.50)
-              : const Color(0xFF0F766E).withValues(alpha: 0.30),
+              : context.primaryColor.withValues(alpha: 0.30),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? Colors.black : const Color(0xFF0F766E))
+            color: (isDark ? Colors.black : context.primaryColor)
                 .withValues(alpha: isDark ? 0.28 : 0.08),
             blurRadius: 16,
             offset: const Offset(0, 6),
@@ -195,7 +196,7 @@ class _HeaderSectionState extends State<HeaderSection> {
                                 size: 13.5,
                                 color: isDark
                                     ? Colors.white70
-                                    : const Color(0xFF0F766E),
+                                    : context.primaryColor,
                               ),
                               const SizedBox(width: 5),
                               Flexible(
@@ -232,7 +233,7 @@ class _HeaderSectionState extends State<HeaderSection> {
                           size: 13,
                           color: isDark
                               ? const Color(0xFF5EEAD4)
-                              : const Color(0xFF0F766E),
+                              : context.primaryColor,
                         ),
                         const SizedBox(width: 4),
                         ConstrainedBox(
@@ -331,7 +332,7 @@ class _HeaderSectionState extends State<HeaderSection> {
                           style: GoogleFonts.ibmPlexMono(
                             color: isDark
                                 ? const Color(0xFFFDE68A)
-                                : const Color(0xFF0F766E),
+                                : context.primaryColor,
                             fontSize: 12.5,
                             fontWeight: FontWeight.bold,
                           ),
@@ -400,18 +401,18 @@ class _HeaderSectionState extends State<HeaderSection> {
             decoration: BoxDecoration(
               color: isDark
                   ? Colors.white.withValues(alpha: 0.14)
-                  : const Color(0xFF0F766E).withValues(alpha: 0.1),
+                  : context.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.2)
-                    : const Color(0xFF0F766E).withValues(alpha: 0.26),
+                    : context.primaryColor.withValues(alpha: 0.26),
               ),
             ),
             child: Text(
               "الوقت الآن",
               style: GoogleFonts.cairo(
-                color: isDark ? Colors.white : const Color(0xFF0F766E),
+                color: isDark ? Colors.white : context.primaryColor,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
@@ -517,18 +518,18 @@ class _HeaderSectionState extends State<HeaderSection> {
                 decoration: BoxDecoration(
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.14)
-                      : const Color(0xFF0F766E).withValues(alpha: 0.1),
+                      : context.primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
                     color: isDark
                         ? Colors.white.withValues(alpha: 0.2)
-                        : const Color(0xFF0F766E).withValues(alpha: 0.26),
+                        : context.primaryColor.withValues(alpha: 0.26),
                   ),
                 ),
                 child: Text(
                   formattedTime,
                   style: GoogleFonts.cairo(
-                    color: isDark ? Colors.white : const Color(0xFF0F766E),
+                    color: isDark ? Colors.white : context.primaryColor,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
@@ -587,7 +588,7 @@ class _HeaderSectionState extends State<HeaderSection> {
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.18)
-              : const Color(0xFF0F766E).withValues(alpha: 0.26),
+              : context.primaryColor.withValues(alpha: 0.26),
           width: 1.2,
         ),
       ),
@@ -624,7 +625,7 @@ class _HeaderSectionState extends State<HeaderSection> {
       child: Text(
         ":",
         style: GoogleFonts.ibmPlexMono(
-          color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF0F766E),
+          color: isDark ? const Color(0xFFFDE68A) : context.primaryColor,
           fontSize: 16,
           fontWeight: FontWeight.bold,
         ),

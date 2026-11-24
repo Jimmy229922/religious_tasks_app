@@ -981,7 +981,7 @@ class AppNotificationService {
       final msg = HappinessJarData.getMessageForDate(
         DateTime(candidate.year, candidate.month, candidate.day),
       );
-      final title = '💛 ${msg.title}';
+      final title = '💛 برطمان السعادة • ${msg.title}';
       final collapsedBody = msg.notificationPreview;
       final expandedBody = msg.reflection != null
           ? '${msg.body}\n\n✨ ${msg.reflection}'
@@ -1010,7 +1010,7 @@ class AppNotificationService {
   Future<void> testHappinessJarNotification() async {
     await _ensureInitialized();
     final msg = HappinessJarData.getRandomMessage();
-    final title = '💛 ${msg.title}';
+    final title = '💛 برطمان السعادة • ${msg.title}';
     final collapsedBody = msg.notificationPreview;
     final expandedBody = msg.reflection != null
         ? '${msg.body}\n\n✨ ${msg.reflection}'

@@ -236,3 +236,13 @@ class ThemeProvider extends ChangeNotifier {
     return 'سكون الليل والقيام';
   }
 }
+
+extension AppThemeColors on BuildContext {
+  Color get primaryColor => Theme.of(this).colorScheme.primary;
+
+  Color get primaryDarkColor =>
+      Color.lerp(Theme.of(this).colorScheme.primary, Colors.black, 0.36)!;
+
+  Color get primaryLightColor =>
+      Color.lerp(Theme.of(this).colorScheme.primary, Colors.white, 0.38)!;
+}

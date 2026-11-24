@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -174,12 +175,13 @@ class QuranTextFormatter {
     String? bookmarkedVerse,
     bool? isDark,
     void Function(String verseNumber)? onTapVerse,
+    void Function(String verseNumber)? onLongPressVerse,
   }) {
     final effectiveDark =
         isDark ?? ((baseStyle.color?.computeLuminance() ?? 0.0) > 0.5);
     final effectiveBadgeColor = badgeColor ?? baseStyle.color ?? defaultGold;
 
-    if (onTapVerse != null) {
+    if (onTapVerse != null || onLongPressVerse != null) {
       return _InteractiveQuranRichText(
         text: text,
         baseStyle: baseStyle,
@@ -188,6 +190,7 @@ class QuranTextFormatter {
         bookmarkedVerse: bookmarkedVerse,
         isDark: effectiveDark,
         onTapVerse: onTapVerse,
+        onLongPressVerse: onLongPressVerse,
       );
     }
 
@@ -267,7 +270,8 @@ class QuranTextFormatter {
     String? bookmarkedVerse,
     bool isDark = false,
     void Function(String verseNumber)? onTapVerse,
-    List<TapGestureRecognizer>? recognizerCollector,
+    void Function(String verseNumber)? onLongPressVerse,
+    List<GestureRecognizer>? recognizerCollector,
   }) {
     final spans = <InlineSpan>[];
 
@@ -281,12 +285,18 @@ class QuranTextFormatter {
     final activeBadgeColor =
         isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
 
+    final normalizedBookmark = bookmarkedVerse == null
+        ? null
+        : toEnglishDigits(bookmarkedVerse).trim();
+
     for (final match in matches) {
       final rawNum = match.group(1) ?? match.group(2) ?? match.group(3) ?? '';
       final arabicNum = toArabicDigits(rawNum);
+      final normalizedRaw = toEnglishDigits(rawNum).trim();
 
-      final isBookmarked = bookmarkedVerse != null &&
-          (bookmarkedVerse == rawNum || bookmarkedVerse == arabicNum);
+      final isBookmarked = normalizedBookmark != null &&
+          normalizedBookmark.isNotEmpty &&
+          normalizedBookmark == normalizedRaw;
 
       final ayahSegment = match.start > currentPosition
           ? text.substring(currentPosition, match.start).trimRight()
@@ -308,9 +318,19 @@ class QuranTextFormatter {
         fontSize: baseFontSize * 0.96,
       );
 
-      TapGestureRecognizer? recognizer;
-      if (onTapVerse != null) {
+      GestureRecognizer? recognizer;
+      if (onTapVerse != null && onLongPressVerse != null) {
+        recognizer = _TapAndLongPressGestureRecognizer(
+          onTap: () => onTapVerse(rawNum),
+          onLongPress: () => onLongPressVerse(rawNum),
+        );
+        recognizerCollector?.add(recognizer);
+      } else if (onTapVerse != null) {
         recognizer = TapGestureRecognizer()..onTap = () => onTapVerse(rawNum);
+        recognizerCollector?.add(recognizer);
+      } else if (onLongPressVerse != null) {
+        recognizer = LongPressGestureRecognizer()
+          ..onLongPress = () => onLongPressVerse(rawNum);
         recognizerCollector?.add(recognizer);
       }
 
@@ -352,7 +372,8 @@ class _InteractiveQuranRichText extends StatefulWidget {
   final Color badgeColor;
   final String? bookmarkedVerse;
   final bool isDark;
-  final void Function(String verseNumber) onTapVerse;
+  final void Function(String verseNumber)? onTapVerse;
+  final void Function(String verseNumber)? onLongPressVerse;
 
   const _InteractiveQuranRichText({
     required this.text,
@@ -361,7 +382,8 @@ class _InteractiveQuranRichText extends StatefulWidget {
     required this.badgeColor,
     required this.bookmarkedVerse,
     required this.isDark,
-    required this.onTapVerse,
+    this.onTapVerse,
+    this.onLongPressVerse,
   });
 
   @override
@@ -370,7 +392,7 @@ class _InteractiveQuranRichText extends StatefulWidget {
 }
 
 class _InteractiveQuranRichTextState extends State<_InteractiveQuranRichText> {
-  final List<TapGestureRecognizer> _recognizers = [];
+  final List<GestureRecognizer> _recognizers = [];
   late List<InlineSpan> _spans;
 
   @override
@@ -388,7 +410,8 @@ class _InteractiveQuranRichTextState extends State<_InteractiveQuranRichText> {
         oldWidget.badgeColor != widget.badgeColor ||
         oldWidget.bookmarkedVerse != widget.bookmarkedVerse ||
         oldWidget.isDark != widget.isDark ||
-        oldWidget.onTapVerse != widget.onTapVerse) {
+        oldWidget.onTapVerse != widget.onTapVerse ||
+        oldWidget.onLongPressVerse != widget.onLongPressVerse) {
       _disposeRecognizers();
       _rebuildSpans();
     }
@@ -403,6 +426,7 @@ class _InteractiveQuranRichTextState extends State<_InteractiveQuranRichText> {
       bookmarkedVerse: widget.bookmarkedVerse,
       isDark: widget.isDark,
       onTapVerse: widget.onTapVerse,
+      onLongPressVerse: widget.onLongPressVerse,
       recognizerCollector: _recognizers,
     );
   }
@@ -434,6 +458,80 @@ class _InteractiveQuranRichTextState extends State<_InteractiveQuranRichText> {
         forceStrutHeight: true,
       ),
     );
+  }
+}
+
+class _TapAndLongPressGestureRecognizer extends OneSequenceGestureRecognizer {
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  _TapAndLongPressGestureRecognizer({
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  Timer? _longPressTimer;
+  Offset? _initialPosition;
+  bool _longPressTriggered = false;
+  int? _activePointer;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    if (_activePointer != null) return;
+    startTrackingPointer(event.pointer, event.transform);
+    _activePointer = event.pointer;
+    _initialPosition = event.position;
+    _longPressTriggered = false;
+    _longPressTimer?.cancel();
+    _longPressTimer = Timer(kLongPressTimeout, () {
+      _longPressTriggered = true;
+      resolve(GestureDisposition.accepted);
+      onLongPress();
+    });
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event.pointer != _activePointer) return;
+    if (event is PointerMoveEvent) {
+      final start = _initialPosition;
+      if (start != null && (event.position - start).distance > kTouchSlop) {
+        _reset();
+        resolve(GestureDisposition.rejected);
+      }
+    } else if (event is PointerUpEvent) {
+      final wasLongPress = _longPressTriggered;
+      _reset();
+      if (!wasLongPress) {
+        resolve(GestureDisposition.accepted);
+        onTap();
+      }
+    } else if (event is PointerCancelEvent) {
+      _reset();
+      resolve(GestureDisposition.rejected);
+    }
+  }
+
+  void _reset() {
+    _longPressTimer?.cancel();
+    _longPressTimer = null;
+    if (_activePointer != null) {
+      stopTrackingPointer(_activePointer!);
+      _activePointer = null;
+    }
+    _initialPosition = null;
+  }
+
+  @override
+  String get debugDescription => 'tap and long press';
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {}
+
+  @override
+  void dispose() {
+    _reset();
+    super.dispose();
   }
 }
 

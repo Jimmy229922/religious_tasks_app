@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/islamic_card_generator_dialog.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import 'package:religious_tasks_app/features/happiness_jar/data/happiness_jar_data.dart';
@@ -22,8 +23,8 @@ class HappinessJarScreen extends StatefulWidget {
 class _HappinessJarScreenState extends State<HappinessJarScreen>
     with TickerProviderStateMixin {
   static const String _favoritesKey = 'happiness_jar_favorites_v1';
-  static const Color _emerald = Color(0xFF0F766E);
-  static const Color _emeraldDark = Color(0xFF064E3B);
+  Color get _emerald => context.primaryColor;
+  Color get _emeraldDark => context.primaryDarkColor;
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _amber = Color(0xFFD97706);
 
@@ -406,7 +407,7 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
         gradient: LinearGradient(
           colors: isDark
               ? const [Color(0xFF0E2926), Color(0xFF132234)]
-              : const [_emerald, _emeraldDark],
+              : [_emerald, _emeraldDark],
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
         ),

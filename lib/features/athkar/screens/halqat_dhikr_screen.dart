@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 
 class HalqatDhikrScreen extends StatefulWidget {
   const HalqatDhikrScreen({super.key});
@@ -131,7 +132,7 @@ class _HalqatDhikrScreenState extends State<HalqatDhikrScreen> {
             style:
                 TextStyle(fontWeight: FontWeight.bold, fontFamily: 'ArefRuqaa')),
         backgroundColor: Colors.transparent,
-        foregroundColor: isDark ? Colors.white : const Color(0xFF004D40),
+        foregroundColor: isDark ? Colors.white : context.primaryDarkColor,
         systemOverlayStyle:
             isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         elevation: 0,

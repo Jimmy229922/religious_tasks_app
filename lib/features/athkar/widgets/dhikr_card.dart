@@ -10,6 +10,7 @@ import '../models/dhikr_item.dart';
 class DhikrCard extends StatelessWidget {
   final DhikrItem item;
   final int index;
+  final int? displayNumber;
   final int totalCount;
   final bool isFocus;
   final bool isMorning;
@@ -25,6 +26,7 @@ class DhikrCard extends StatelessWidget {
     super.key,
     required this.item,
     required this.index,
+    this.displayNumber,
     required this.totalCount,
     required this.isFocus,
     required this.isMorning,
@@ -161,7 +163,7 @@ class DhikrCard extends StatelessWidget {
                         ),
                       ] else ...[
                         Text(
-                          "الذكر ${index + 1} من $totalCount",
+                          "الذكر ${displayNumber ?? (index + 1)} من $totalCount",
                           style: GoogleFonts.cairo(
                             color: textMuted,
                             fontSize: 12,
@@ -245,40 +247,58 @@ class DhikrCard extends StatelessWidget {
 
               // Reward / Virtue Section (matching Ruqyah & Qiyam Layl info cards)
               if (rewardText.isNotEmpty) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: trueBlackMode
-                        ? Colors.white10
-                        : (isDark
-                            ? Colors.white.withValues(alpha: 0.05)
-                            : accent.withValues(alpha: 0.07)),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isDark
+                InkWell(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _showVirtueDetailsDialog(
+                      context,
+                      rewardText: rewardText,
+                      accent: accent,
+                      isDark: isDark,
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: trueBlackMode
                           ? Colors.white10
-                          : accent.withValues(alpha: 0.2),
+                          : (isDark
+                              ? Colors.white.withValues(alpha: 0.05)
+                              : accent.withValues(alpha: 0.07)),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white10
+                            : accent.withValues(alpha: 0.2),
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.info_outline_rounded,
-                          color: Colors.amber, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          rewardText,
-                          style: GoogleFonts.cairo(
-                            color: rewardColor,
-                            fontSize: rewardSize,
-                            height: 1.5,
-                            fontWeight: FontWeight.w600,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            color: Colors.amber, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            rewardText,
+                            style: GoogleFonts.cairo(
+                              color: rewardColor,
+                              fontSize: rewardSize,
+                              height: 1.5,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.open_in_new_rounded,
+                          size: 15,
+                          color: isDark ? Colors.amber.shade200 : accent,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -445,6 +465,153 @@ class DhikrCard extends StatelessWidget {
         fontSize: fontSize,
         height: 1.85,
         forceStrutHeight: true,
+      ),
+    );
+  }
+
+  void _showVirtueDetailsDialog(
+    BuildContext context, {
+    required String rewardText,
+    required Color accent,
+    required bool isDark,
+  }) {
+    final details = item.virtueDetails.trim().isNotEmpty
+        ? item.virtueDetails.trim()
+        : rewardText;
+    final source = item.source.trim();
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: isDark ? const Color(0xFF141A1E) : Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.16),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome_rounded,
+                        color: Colors.amber,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        "فضل الذكر وتخريجه",
+                        style: GoogleFonts.cairo(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: isDark ? 0.14 : 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: accent.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Text(
+                    rewardText,
+                    style: GoogleFonts.cairo(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.amber.shade200 : accent,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  details,
+                  style: GoogleFonts.cairo(
+                    fontSize: 13.5,
+                    height: 1.7,
+                    color: isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF334155),
+                  ),
+                ),
+                if (source.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.menu_book_rounded,
+                          size: 16,
+                          color: isDark ? Colors.amber.shade200 : accent,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "المرجع: $source",
+                            style: GoogleFonts.cairo(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white70 : const Color(0xFF475569),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accent,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      "إغلاق",
+                      style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

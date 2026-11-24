@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../athkar/models/dhikr_item.dart';
 import '../data/prayer_details_data.dart';
 
@@ -123,7 +124,7 @@ class _PrayerDetailsScreenState extends State<PrayerDetailsScreen>
     } else if (widget.prayerName.contains(kPrayerIsha)) {
       return isDark
           ? [const Color(0xFF0F2027), const Color(0xFF203A43)]
-          : [const Color(0xFF0F766E), const Color(0xFF0D9488)];
+          : [context.primaryColor, context.primaryLightColor];
     }
     return [Colors.teal.shade800, Colors.teal.shade600];
   }

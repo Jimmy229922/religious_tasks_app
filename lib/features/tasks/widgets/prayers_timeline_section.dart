@@ -1,9 +1,12 @@
+import 'dart:async';
+import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'package:religious_tasks_app/core/constants/app_constants.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import '../models/task_item.dart';
 import '../providers/tasks_view_model.dart';
 
@@ -29,12 +32,21 @@ class PrayersTimelineSection extends StatefulWidget {
 
 class _PrayersTimelineSectionState extends State<PrayersTimelineSection> {
   final ScrollController _scrollController = ScrollController();
+  Timer? _countdownTimer;
+  DateTime _now = DateTime.now();
   double _lastCardWidth = 124.0;
   double _scrollRatio = 0.0;
 
   @override
   void initState() {
     super.initState();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          _now = DateTime.now();
+        });
+      }
+    });
     _scrollController.addListener(_onScrollChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToNextPrayer(animate: false);
@@ -54,6 +66,7 @@ class _PrayersTimelineSectionState extends State<PrayersTimelineSection> {
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _scrollController.removeListener(_onScrollChanged);
     _scrollController.dispose();
     super.dispose();
@@ -177,7 +190,7 @@ class _PrayersTimelineSectionState extends State<PrayersTimelineSection> {
     String nextName,
   ) {
     final activeColor =
-        isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E);
+        isDark ? context.primaryLightColor : context.primaryColor;
     final mutedColor =
         isDark ? Colors.white38 : const Color(0xFF94A3B8);
 
@@ -263,8 +276,8 @@ class _PrayersTimelineSectionState extends State<PrayersTimelineSection> {
   }) {
     final isDark = widget.isDark;
     final bool done = task.isCompleted;
-    const Color emerald = Color(0xFF0F766E);
-    const Color emeraldLight = Color(0xFF2DD4BF);
+    final Color emerald = context.primaryColor;
+    final Color emeraldLight = context.primaryLightColor;
     const Color gold = Color(0xFFD4AF37);
 
     final Color accent = done
@@ -397,6 +410,39 @@ class _PrayersTimelineSectionState extends State<PrayersTimelineSection> {
                   ),
                 ),
               ),
+              if (_prayerCountdownText(task) case final countdown?) ...[
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.access_time_filled,
+                        size: 11,
+                        color: isDark
+                            ? const Color(0xFFFFD54F)
+                            : const Color(0xFFD97706),
+                      ),
+                      const SizedBox(width: 4),
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text(
+                          countdown,
+                          maxLines: 1,
+                          style: GoogleFonts.ibmPlexMono(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? const Color(0xFFFFD54F)
+                                : const Color(0xFFD97706),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               GestureDetector(
                 onTap: () {
@@ -477,24 +523,34 @@ class _PrayersTimelineSectionState extends State<PrayersTimelineSection> {
     return task.name.contains(nextPrayerName);
   }
 
+  DateTime? _prayerDateTime(TaskItem task, PrayerTimes? times) {
+    if (times == null) return null;
+    if (task.name.contains(kPrayerFajr)) return times.fajr;
+    if (task.name.contains(kPrayerDhuhr)) return times.dhuhr;
+    if (task.name.contains(kPrayerAsr)) return times.asr;
+    if (task.name.contains(kPrayerMaghrib)) return times.maghrib;
+    if (task.name.contains(kPrayerIsha)) return times.isha;
+    return null;
+  }
+
+  String? _prayerCountdownText(TaskItem task) {
+    final todayDt = _prayerDateTime(task, widget.vm.prayerTimes);
+    if (todayDt == null) return null;
+
+    final target =
+        todayDt.isBefore(_now) ? todayDt.add(const Duration(days: 1)) : todayDt;
+    final diff = target.difference(_now);
+    final safeDiff = diff.isNegative ? Duration.zero : diff;
+    final hours = safeDiff.inHours.toString().padLeft(2, '0');
+    final minutes = (safeDiff.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (safeDiff.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
+  }
+
   String _prayerTimeLabel(TaskItem task) {
-    final times = widget.vm.prayerTimes;
-    if (times != null) {
-      DateTime? dt;
-      if (task.name.contains(kPrayerFajr)) {
-        dt = times.fajr;
-      } else if (task.name.contains(kPrayerDhuhr)) {
-        dt = times.dhuhr;
-      } else if (task.name.contains(kPrayerAsr)) {
-        dt = times.asr;
-      } else if (task.name.contains(kPrayerMaghrib)) {
-        dt = times.maghrib;
-      } else if (task.name.contains(kPrayerIsha)) {
-        dt = times.isha;
-      }
-      if (dt != null) {
-        return intl.DateFormat('hh:mm a', 'ar').format(dt);
-      }
+    final dt = _prayerDateTime(task, widget.vm.prayerTimes);
+    if (dt != null) {
+      return intl.DateFormat('hh:mm a', 'ar').format(dt);
     }
     if (task.description.isNotEmpty) {
       return task.description;

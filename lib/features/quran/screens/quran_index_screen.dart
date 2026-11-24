@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:religious_tasks_app/core/services/storage_service.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_data.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_repository.dart';
@@ -60,7 +61,7 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
         ? const [Color(0xFF0B131E), Color(0xFF152233)]
         : const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)];
 
-    const accent = Color(0xFF0F766E);
+    final accent = context.primaryColor;
 
     final filteredSurahs = QuranData.surahs.where((surah) {
       final matchesSearch = surah.name.contains(_searchQuery) ||
@@ -216,7 +217,7 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
                         color: isDark ? Colors.white54 : Colors.grey.shade600,
                         fontSize: 12.5,
                       ),
-                      prefixIcon: const Icon(Icons.search_rounded, color: accent),
+                      prefixIcon: Icon(Icons.search_rounded, color: accent),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear_rounded, size: 18),

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import 'package:religious_tasks_app/core/services/athkar_tracking_service.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import '../../tasbeeh/providers/tasbeeh_view_model.dart';
+import 'achievements_screen.dart';
 
 class StatisticsScreen extends StatelessWidget {
   final int morningStreak;
@@ -28,7 +30,8 @@ class StatisticsScreen extends StatelessWidget {
         math.max(eveningStreak, storedStreaks['evening'] ?? 0);
     final effectiveSleepStreak =
         math.max(sleepStreak, storedStreaks['sleep'] ?? 0);
-    final todayCounts = AthkarTrackingService.loadTodayAthkarReadCounts();
+    final todaySummary =
+        AthkarTrackingService.loadTodayAthkarCompletionSummary();
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -45,7 +48,7 @@ class StatisticsScreen extends StatelessWidget {
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            _buildTodayReadChartSection(todayCounts, isDark),
+            _buildTodayReadChartSection(todaySummary, isDark),
             const SizedBox(height: 20),
             _buildStreakChartSection(
               effectiveMorningStreak,
@@ -57,6 +60,7 @@ class StatisticsScreen extends StatelessWidget {
             _buildTotalTasbeehSection(tasbeehVM.totalCounter, isDark),
             const SizedBox(height: 24),
             _buildBadgesSection(
+              context,
               tasbeehVM.totalCounter,
               effectiveMorningStreak,
               effectiveEveningStreak,
@@ -69,12 +73,16 @@ class StatisticsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTodayReadChartSection(Map<String, int> counts, bool isDark) {
-    final mCount = counts['morning'] ?? 0;
-    final eCount = counts['evening'] ?? 0;
-    final sCount = counts['sleep'] ?? 0;
-    final maxVal = math.max(mCount, math.max(eCount, sCount));
-    final maxY = (maxVal < 10 ? 10 : maxVal + (maxVal * 0.2).ceil()).toDouble();
+  Widget _buildTodayReadChartSection(
+    Map<String, ({int completed, int total})> summary,
+    bool isDark,
+  ) {
+    final m = summary['morning'] ?? (completed: 0, total: 0);
+    final e = summary['evening'] ?? (completed: 0, total: 0);
+    final s = summary['sleep'] ?? (completed: 0, total: 0);
+    double pct(({int completed, int total}) item) =>
+        item.total == 0 ? 0.0 : (item.completed / item.total) * 100.0;
+    const maxY = 100.0;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -125,11 +133,14 @@ class StatisticsScreen extends StatelessWidget {
                         );
                         switch (value.toInt()) {
                           case 0:
-                            return Text('صباح ($mCount)', style: style);
+                            return Text('صباح (${m.completed}/${m.total})',
+                                style: style);
                           case 1:
-                            return Text('مساء ($eCount)', style: style);
+                            return Text('مساء (${e.completed}/${e.total})',
+                                style: style);
                           case 2:
-                            return Text('نوم ($sCount)', style: style);
+                            return Text('نوم (${s.completed}/${s.total})',
+                                style: style);
                           default:
                             return const Text('');
                         }
@@ -146,9 +157,9 @@ class StatisticsScreen extends StatelessWidget {
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
                 barGroups: [
-                  _makeBarGroup(0, mCount.toDouble(), Colors.teal, maxY),
-                  _makeBarGroup(1, eCount.toDouble(), Colors.indigo, maxY),
-                  _makeBarGroup(2, sCount.toDouble(), Colors.deepPurple, maxY),
+                  _makeBarGroup(0, pct(m), Colors.teal, maxY),
+                  _makeBarGroup(1, pct(e), Colors.indigo, maxY),
+                  _makeBarGroup(2, pct(s), Colors.deepPurple, maxY),
                 ],
               ),
             ),
@@ -292,28 +303,94 @@ class StatisticsScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   fontFamily: 'IBMPlexMono')),
           const SizedBox(height: 8),
-          const Text("ما شاء الله، استمر في ذكر الله",
-              style: TextStyle(
-                  color: Colors.white60, fontSize: 12, fontStyle: FontStyle.italic)),
+          Text(
+            _tasbeehMotivationMessage(total),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12.5,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
         ],
       ),
     );
   }
 
+  String _tasbeehMotivationMessage(int total) {
+    if (total <= 0) {
+      return "ابدأ الآن بتسبيحة واحدة، فبها يُفتح باب الخير والأجر 🌿";
+    }
+    if (total < 100) {
+      return "بداية مباركة! واصل الذكر لتبلغ أول ١٠٠ تسبيحة ✨";
+    }
+    if (total < 1000) {
+      return "جميل جداً! كل تسبيحة غرسٌ لك في الجنة، اقتربت من ١٠٠٠ تسبيحة 💛";
+    }
+    if (total < 5000) {
+      return "ما شاء الله، لسانٌ رطبٌ بذكر الله — استمر نحو وسام السبّاح 🌟";
+    }
+    if (total < 10000) {
+      return "همّة عالية مباركة! اقتربت من أعلى أوسمة التسبيح 🏆";
+    }
+    return "ما شاء الله تبارك الله، من الذاكرين الله كثيراً — ثبّتك الله ✨";
+  }
+
   Widget _buildBadgesSection(
+    BuildContext context,
     int totalTasbeeh,
     int effectiveMorningStreak,
     int effectiveEveningStreak,
     int effectiveSleepStreak,
     bool isDark,
   ) {
+    final allBadges = buildAchievementBadges(
+      totalTasbeeh: totalTasbeeh,
+      morningStreak: effectiveMorningStreak,
+      eveningStreak: effectiveEveningStreak,
+      sleepStreak: effectiveSleepStreak,
+    );
+    final previewBadges = allBadges.take(6).toList();
+    final accent = context.primaryColor;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(right: 8.0, bottom: 12),
-          child: Text("أوسمة الإنجاز",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        Padding(
+          padding: const EdgeInsets.only(right: 4.0, bottom: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "أوسمة الإنجاز",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AchievementsScreen(
+                        totalTasbeeh: totalTasbeeh,
+                        morningStreak: effectiveMorningStreak,
+                        eveningStreak: effectiveEveningStreak,
+                        sleepStreak: effectiveSleepStreak,
+                      ),
+                    ),
+                  );
+                },
+                icon: Icon(Icons.grid_view_rounded, size: 16, color: accent),
+                label: Text(
+                  "عرض المزيد (${allBadges.length})",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         GridView.count(
           shrinkWrap: true,
@@ -322,95 +399,11 @@ class StatisticsScreen extends StatelessWidget {
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           childAspectRatio: 0.8,
-          children: [
-            _buildBadge(
-              "المحافظ",
-              "7 أيام فجر",
-              effectiveMorningStreak >= 7,
-              Icons.wb_twilight_rounded,
-              Colors.orange,
-              isDark,
-            ),
-            _buildBadge(
-              "الذاكر",
-              "1000 تسبيحة",
-              totalTasbeeh >= 1000,
-              Icons.favorite_rounded,
-              Colors.redAccent,
-              isDark,
-            ),
-            _buildBadge(
-              "المثابر",
-              "3 أيام مساء",
-              effectiveEveningStreak >= 3,
-              Icons.nightlight_round,
-              Colors.indigo,
-              isDark,
-            ),
-            _buildBadge(
-              "نور الليل",
-              "10 أيام نوم",
-              effectiveSleepStreak >= 10,
-              Icons.bed_rounded,
-              Colors.deepPurple,
-              isDark,
-            ),
-            _buildBadge(
-              "السبّاح",
-              "5000 تسبيحة",
-              totalTasbeeh >= 5000,
-              Icons.stars_rounded,
-              Colors.amber,
-              isDark,
-            ),
-            _buildBadge(
-              "المخلص",
-              "30 يوم فجر",
-              effectiveMorningStreak >= 30,
-              Icons.mosque_rounded,
-              Colors.teal,
-              isDark,
-            ),
-          ],
+          children: previewBadges
+              .map((badge) => buildAchievementBadgeCard(context, badge, isDark))
+              .toList(),
         ),
       ],
-    );
-  }
-
-  Widget _buildBadge(String title, String subtitle, bool isUnlocked, IconData icon, Color color, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isUnlocked ? color : Colors.grey.withValues(alpha: 0.2), width: 2),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Opacity(
-            opacity: isUnlocked ? 1.0 : 0.2,
-            child: Icon(icon, size: 36, color: color),
-          ),
-          const SizedBox(height: 8),
-          Text(title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: isUnlocked
-                    ? (isDark ? Colors.white : Colors.black87)
-                    : Colors.grey,
-              )),
-          Text(subtitle,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 9,
-                color: isUnlocked
-                    ? (isDark ? Colors.white70 : Colors.black54)
-                    : Colors.grey,
-              )),
-        ],
-      ),
     );
   }
 }

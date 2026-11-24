@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:religious_tasks_app/core/services/location_service.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
 
@@ -40,7 +41,7 @@ class QiblaScreen extends StatefulWidget {
 }
 
 class _QiblaScreenState extends State<QiblaScreen> {
-  static const Color _emerald = Color(0xFF0F766E);
+  Color get _emerald => context.primaryColor;
   static const Color _gold = Color(0xFFD4AF37);
   static const double _alignmentToleranceDeg = 4.0;
 
@@ -210,7 +211,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
           ),
           title: Row(
             children: [
-              const Icon(Icons.explore_rounded, color: _emerald),
+              Icon(Icons.explore_rounded, color: _emerald),
               const SizedBox(width: 8),
               Text(
                 "طريقة استخدام البوصلة",
@@ -478,7 +479,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
@@ -582,7 +583,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.location_on_rounded,
+                Icon(Icons.location_on_rounded,
                     color: _emerald, size: 17),
                 const SizedBox(width: 6),
                 Expanded(

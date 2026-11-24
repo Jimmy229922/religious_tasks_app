@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/islamic_card_generator_dialog.dart';
 import '../providers/tasks_view_model.dart';
 
@@ -19,7 +20,7 @@ class DailyInspirationCard extends StatelessWidget {
     final bool isQuran = vm.isInspirationQuran;
     final String source = vm.currentInspirationSource.trim();
     final Color accent = isQuran
-        ? (isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E))
+        ? (isDark ? context.primaryLightColor : context.primaryColor)
         : (isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706));
     final Color contentColor =
         isDark ? Colors.white : const Color(0xFF0F172A);

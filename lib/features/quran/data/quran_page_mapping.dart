@@ -114,7 +114,7 @@ class QuranPageMapping {
     }
 
     final offsetInSurah = page - surahStartPage[startSurah]!;
-    final startA = (offsetInSurah * 15) + 1;
+    final startA = ((offsetInSurah * 15) + 1).clamp(1, 286);
     final endA = ((offsetInSurah + 1) * 15).clamp(startA, 286);
 
     return MushafPageRange(

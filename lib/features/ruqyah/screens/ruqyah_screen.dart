@@ -1,18 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/islamic_card_generator_dialog.dart';
 import 'package:religious_tasks_app/features/ruqyah/data/ruqyah_data.dart';
 
 class RuqyahScreen extends StatefulWidget {
-  const RuqyahScreen({super.key});
+  final String? initialCategoryId;
+  const RuqyahScreen({super.key, this.initialCategoryId});
 
   @override
   State<RuqyahScreen> createState() => _RuqyahScreenState();
 }
 
 class _RuqyahScreenState extends State<RuqyahScreen> {
-  RuqyahCategory _selectedCategory = RuqyahData.categories.first;
+  late RuqyahCategory _selectedCategory;
   double _fontSize = 18.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategory = RuqyahData.categories.firstWhere(
+      (c) => c.id == widget.initialCategoryId,
+      orElse: () => RuqyahData.categories.first,
+    );
+  }
 
   void _onCategoryChanged(RuqyahCategory cat) {
     if (_selectedCategory.id == cat.id) return;
@@ -101,33 +113,57 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
                 ),
               ),
 
-              // Subtitle Card
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.teal.withValues(alpha: 0.1),
+              // Subtitle Card (tappable guide)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                child: InkWell(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _showRuqyahGuideDialog(context, isDark);
+                  },
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.teal.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded, color: Colors.teal, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _selectedCategory.description,
-                        style: GoogleFonts.cairo(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white70 : Colors.teal.shade900,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: context.primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: context.primaryColor.withValues(alpha: 0.25),
                       ),
                     ),
-                  ],
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: context.primaryColor,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _selectedCategory.description,
+                            style: GoogleFonts.cairo(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? Colors.white70
+                                  : context.primaryDarkColor,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.open_in_new_rounded,
+                          size: 15,
+                          color: context.primaryColor,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
 
@@ -251,6 +287,188 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showRuqyahGuideDialog(BuildContext context, bool isDark) {
+    final accent = context.primaryColor;
+    final isChildren = _selectedCategory.id == 'children';
+    final title = isChildren
+        ? 'طريقة رقية الأطفال الصحيحة 👶'
+        : 'آداب وطريقة الرقية الشرعية 📖';
+
+    final steps = isChildren
+        ? const [
+            (
+              '1. النية واليقين بالله',
+              'استحضر بقلبك أن الشفاء والحفظ من الله وحده، وأن الرقية سبب شرعي مبارك يأخذ به الوالدان لحفظ أبنائهما.',
+            ),
+            (
+              '2. الطهارة والوضوء',
+              'يُستحب أن يكون الراقي (الأب أو الأم) على وضوء وطهارة، وأن يبدأ بالبسملة وحمد الله والصلاة على النبي ﷺ.',
+            ),
+            (
+              '3. وضع اليد على رأس الطفل',
+              'ضع يدك اليمنى على رأس الطفل أو على موضع الألم برفق واطمئنان أثناء القراءة والدعاء.',
+            ),
+            (
+              '4. النفث اللطيف والمسح بالمعوذات',
+              'اجمع كفيك واقرأ الفاتحة وآية الكرسي والمعوذات (الإخلاص، الفلق، الناس) ثلاثاً مع نفث لطيف (هواء يسير بلا ريق)، ثم امسح بهما رأس الطفل ووجهه وما أقبل من جسده.',
+            ),
+            (
+              '5. تعويذ الحسن والحسين',
+              'كرّر قول النبي ﷺ ثلاث مرات: «أُعيذك بكلمات الله التامة من كل شيطان وهامة ومن كل عين لامة» (صحيح البخاري 3371).',
+            ),
+            (
+              '6. المواظبة والأوقات المستحبة',
+              'حافظ على تحصين الأطفال في الصباح والمساء وعند النوم وقبل الخروج، وكذلك عند البكاء الشديد أو المرض.',
+            ),
+          ]
+        : const [
+            (
+              '1. الإخلاص واليقين',
+              'الاعتقاد الجازم بأن القرآن شفاء وهداية وأن النفع والضر بيد الله وحده.',
+            ),
+            (
+              '2. الوضوء واستقبال القبلة',
+              'يُستحب أن يكون القارئ على طهارة متوضئاً في مكان هادئ وبحضور قلب وتدبر للآيات.',
+            ),
+            (
+              '3. النفث والمسح باليد',
+              'القراءة في الكفين مع نفث خفيف ثم مسح الرأس والجسد، أو وضع اليد اليمنى على موضع الألم.',
+            ),
+            (
+              '4. المداومة على الأذكار',
+              'الجمع بين الرقية الشرعية وأذكار الصباح والمساء والنوم لتحصين النفس والأهل يومياً.',
+            ),
+          ];
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: isDark ? const Color(0xFF141A1E) : Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.14),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.menu_book_rounded,
+                          color: accent,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: GoogleFonts.cairo(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  for (int i = 0; i < steps.length; i++) ...[
+                    _buildGuideStep(
+                      steps[i].$1,
+                      steps[i].$2,
+                      accent,
+                      isDark,
+                    ),
+                    if (i < steps.length - 1) const SizedBox(height: 10),
+                  ],
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        'فهمت، جزاكم الله خيراً',
+                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGuideStep(
+    String title,
+    String body,
+    Color accent,
+    bool isDark,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.cairo(
+              fontSize: 13.5,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.amber.shade200 : accent,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            body,
+            style: GoogleFonts.cairo(
+              fontSize: 12.5,
+              height: 1.6,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.88)
+                  : const Color(0xFF334155),
+            ),
+          ),
+        ],
       ),
     );
   }

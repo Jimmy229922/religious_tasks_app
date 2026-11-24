@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:religious_tasks_app/features/athkar/data/athkar_data.dart';
+import 'package:religious_tasks_app/features/athkar/models/dhikr_item.dart';
 import 'storage_service.dart';
 
 class AthkarTrackingService {
@@ -132,6 +134,62 @@ class AthkarTrackingService {
       return total;
     } catch (_) {
       return 0;
+    }
+  }
+
+  static Map<String, ({int completed, int total})>
+      loadTodayAthkarCompletionSummary() {
+    final todayStr = formatDay(DateTime.now());
+    return {
+      'morning': _countCompletedForDate(
+        'athkar_morning_date',
+        'athkar_morning_progress',
+        todayStr,
+        buildMorningAthkar(),
+      ),
+      'evening': _countCompletedForDate(
+        'athkar_evening_date',
+        'athkar_evening_progress',
+        todayStr,
+        buildEveningAthkar(),
+      ),
+      'sleep': _countCompletedForDate(
+        'athkar_sleep_date',
+        'athkar_sleep_progress',
+        todayStr,
+        buildSleepAthkar(),
+      ),
+    };
+  }
+
+  static ({int completed, int total}) _countCompletedForDate(
+    String dateKey,
+    String progressKey,
+    String todayStr,
+    List<DhikrItem> items,
+  ) {
+    final total = items.length;
+    final prefs = StorageService.instance.prefs;
+    if (prefs.getString(dateKey) != todayStr) {
+      return (completed: 0, total: total);
+    }
+    final raw = prefs.getString(progressKey);
+    if (raw == null || raw.isEmpty) {
+      return (completed: 0, total: total);
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return (completed: 0, total: total);
+      int completed = 0;
+      for (int i = 0; i < total && i < decoded.length; i++) {
+        final val = decoded[i];
+        if (val is int && val >= items[i].count) {
+          completed++;
+        }
+      }
+      return (completed: completed, total: total);
+    } catch (_) {
+      return (completed: 0, total: total);
     }
   }
 }

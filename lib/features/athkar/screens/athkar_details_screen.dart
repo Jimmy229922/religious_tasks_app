@@ -500,7 +500,8 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
               child: DhikrCard(
                 item: item,
                 index: index,
-                totalCount: _visibleAthkar.length,
+                displayNumber: _allAthkar.indexOf(item) + 1,
+                totalCount: _allAthkar.length,
                 isFocus: false,
                 isMorning: widget.isMorning,
                 isSleep: _isSleepAthkar,
@@ -556,7 +557,8 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
                   child: DhikrCard(
                     item: item,
                     index: _focusIndex,
-                    totalCount: _visibleAthkar.length,
+                    displayNumber: _allAthkar.indexOf(item) + 1,
+                    totalCount: _allAthkar.length,
                     isFocus: true,
                     isMorning: widget.isMorning,
                     isSleep: _isSleepAthkar,
@@ -771,6 +773,170 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
     );
   }
 
+  void _showTipsDialog(BuildContext context) {
+    final isDark = _isNightMode;
+    final accent = isDark
+        ? const Color(0xFF2DD4BF)
+        : (widget.isMorning && !_isSleepAthkar
+            ? const Color(0xFF2E7D32)
+            : const Color(0xFF3949AB));
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: isDark ? const Color(0xFF141A1E) : Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.14),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.info_outline_rounded,
+                        color: accent,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        "دليل المزايا والاختصارات",
+                        style: GoogleFonts.cairo(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildTipRow(
+                  icon: Icons.touch_app_rounded,
+                  accent: accent,
+                  isDark: isDark,
+                  title: "ضغطة مطوّلة على أي ذكر",
+                  subtitle: "ينسخ نص الذكر تلقائياً ويفتح لك نافذة المشاركة النصية فوراً.",
+                ),
+                const SizedBox(height: 12),
+                _buildTipRow(
+                  icon: Icons.style_rounded,
+                  accent: accent,
+                  isDark: isDark,
+                  title: "أيقونة البطاقات عند كل ذكر",
+                  subtitle: "تحوّل الذكر إلى بطاقة إيمانية مصممة يمكنك حفظها ومشاركتها كصورة.",
+                ),
+                const SizedBox(height: 12),
+                _buildTipRow(
+                  icon: Icons.check_circle_outline_rounded,
+                  accent: accent,
+                  isDark: isDark,
+                  title: "الضغط العادي على البطاقة",
+                  subtitle: "يزيد عداد الذكر، وعند اكتمال العدد يختفي تلقائياً (ويمكنك إظهاره من الأعلى).",
+                ),
+                const SizedBox(height: 12),
+                _buildTipRow(
+                  icon: Icons.info_outline_rounded,
+                  accent: Colors.amber.shade700,
+                  isDark: isDark,
+                  title: "الضغط على شريط الفضل الأصفر",
+                  subtitle: "يعرض لك الشرح التفصيلي لفضل الذكر والمرجع الديني الموثق الخاص به.",
+                ),
+                const SizedBox(height: 12),
+                _buildTipRow(
+                  icon: Icons.center_focus_strong_rounded,
+                  accent: accent,
+                  isDark: isDark,
+                  title: "وضع التركيز وتكبير الخط",
+                  subtitle: "من شريط التحكم يمكنك عرض ذكر واحد بتركيز كامل أو تعديل حجم الخط.",
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accent,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      "فهمت، شكراً",
+                      style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTipRow({
+    required IconData icon,
+    required Color accent,
+    required bool isDark,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 18, color: accent),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.cairo(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: GoogleFonts.cairo(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: isDark ? Colors.white70 : const Color(0xFF475569),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -807,6 +973,11 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
                   onPressed: _exitScreen,
                 ),
                 actions: [
+                  IconButton(
+                    icon: const Icon(Icons.info_outline_rounded),
+                    tooltip: "دليل المزايا",
+                    onPressed: () => _showTipsDialog(context),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.restart_alt),
                     tooltip: "إعادة البدء",

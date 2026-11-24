@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/features/athkar/data/athkar_data.dart';
 
 class CustomAthkarManagerScreen extends StatefulWidget {
@@ -67,7 +68,7 @@ class _CustomAthkarManagerScreenState extends State<CustomAthkarManagerScreen> {
   Color _targetColor(CustomDhikrTarget target) {
     switch (target) {
       case CustomDhikrTarget.morning:
-        return const Color(0xFF0F766E);
+        return context.primaryColor;
       case CustomDhikrTarget.evening:
         return const Color(0xFF4F46E5);
       case CustomDhikrTarget.both:
@@ -162,7 +163,7 @@ class _CustomAthkarManagerScreenState extends State<CustomAthkarManagerScreen> {
                             ),
                           ),
                           selected: isSelected,
-                          selectedColor: const Color(0xFF0F766E),
+                          selectedColor: context.primaryColor,
                           onSelected: (_) {
                             setDialogState(() {
                               countController.text = preset.toString();
@@ -230,7 +231,7 @@ class _CustomAthkarManagerScreenState extends State<CustomAthkarManagerScreen> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F766E),
+                    backgroundColor: context.primaryColor,
                   ),
                   onPressed: () async {
                     final text = textController.text.trim();
@@ -338,7 +339,7 @@ class _CustomAthkarManagerScreenState extends State<CustomAthkarManagerScreen> {
     final bgGradient = isDark
         ? const [Color(0xFF0B131E), Color(0xFF152233)]
         : const [Color(0xFFF0FDF4), Color(0xFFE6F4EA), Color(0xFFF0FDF4)];
-    const accent = Color(0xFF0F766E);
+    final accent = context.primaryColor;
     final filtered = _filteredItems;
 
     return Directionality(
@@ -390,7 +391,7 @@ class _CustomAthkarManagerScreenState extends State<CustomAthkarManagerScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded,
+                    Icon(Icons.info_outline_rounded,
                         color: accent, size: 20),
                     const SizedBox(width: 8),
                     Expanded(

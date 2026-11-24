@@ -76,6 +76,7 @@ class _ReligiousAppState extends State<ReligiousApp> {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
+        fontFamily: 'Cairo',
         scaffoldBackgroundColor: const Color(0xFFF6F7FB),
         colorScheme: ColorScheme.fromSeed(
           seedColor: seedColor,
@@ -136,6 +137,7 @@ class _ReligiousAppState extends State<ReligiousApp> {
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
+        fontFamily: 'Cairo',
         scaffoldBackgroundColor: themeProvider.useOledBlack
             ? const Color(0xFF000000)
             : const Color(0xFF0B131E),

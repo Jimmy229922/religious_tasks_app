@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:religious_tasks_app/core/constants/app_constants.dart';
 import 'package:religious_tasks_app/core/constants/strings.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import '../models/task_item.dart';
 
 class TaskItemWidget extends StatelessWidget {
@@ -46,6 +47,7 @@ class TaskItemWidget extends StatelessWidget {
 
     if (compactGridCard) {
       return _buildGridTile(
+        context,
         isProphetPrayer: isProphetPrayer,
         isCounterTask: isCounterTask,
         isAthkar: isAthkar,
@@ -188,7 +190,8 @@ class TaskItemWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildGridTile({
+  Widget _buildGridTile(
+    BuildContext context, {
     required bool isProphetPrayer,
     required bool isCounterTask,
     required bool isAthkar,
@@ -222,8 +225,8 @@ class TaskItemWidget extends StatelessWidget {
 
     const completedBgLight = Color(0xFFF0FDF9);
     const completedBgDark = Color(0xFF0E2A26);
-    const emerald = Color(0xFF0F766E);
-    const emeraldLight = Color(0xFF2DD4BF);
+    final emerald = context.primaryColor;
+    final emeraldLight = context.primaryLightColor;
 
     return Material(
       color: Colors.transparent,

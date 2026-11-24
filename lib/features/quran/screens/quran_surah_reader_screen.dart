@@ -4,11 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:religious_tasks_app/core/services/storage_service.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/islamic_card_generator_dialog.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_data.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_page_mapping.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_repository.dart';
+import 'package:religious_tasks_app/features/quran/widgets/ayah_tafsir_sheet.dart';
 import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
 
 class QuranSurahReaderScreen extends StatefulWidget {
@@ -43,6 +45,9 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
   String? _savedBookmarkedSurahName;
   int? _savedBookmarkedSurahNumber;
   String? _savedBookmarkedSnippet;
+  String? _inspectingVerse;
+  int? _inspectingPage;
+  int? _inspectingSurahNumber;
 
   final Map<int, ScrollController> _pageScrollControllers = {};
   String _currentSurahName = "";
@@ -217,14 +222,20 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
   }
 
   Future<void> _onVerseTapped(
+    int tappedPage,
     int surahNumber,
     String surahName,
     String verseNum,
     String sectionText,
   ) async {
-    final isSameBookmark = _savedBookmarkedPage == _currentPage &&
+    final normalizedTappedVerse =
+        QuranTextFormatter.toEnglishDigits(verseNum).trim();
+    final normalizedSavedVerse = _savedBookmarkedVerse == null
+        ? null
+        : QuranTextFormatter.toEnglishDigits(_savedBookmarkedVerse!).trim();
+    final isSameBookmark = _savedBookmarkedPage == tappedPage &&
         _savedBookmarkedSurahNumber == surahNumber &&
-        _savedBookmarkedVerse == verseNum;
+        normalizedSavedVerse == normalizedTappedVerse;
 
     if (isSameBookmark) {
       _clearGlobalBookmark();
@@ -255,7 +266,7 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
 
     setState(() {
       _savedBookmarkedVerse = verseNum;
-      _savedBookmarkedPage = _currentPage;
+      _savedBookmarkedPage = tappedPage;
       _savedBookmarkedSurahName = surahName;
       _savedBookmarkedSurahNumber = surahNumber;
       _savedBookmarkedSnippet = snippet;
@@ -264,7 +275,7 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
 
     final prefs = StorageService.instance.prefs;
     await prefs.setString('quran_global_bookmark_verse', verseNum);
-    await prefs.setInt('quran_global_bookmark_page', _currentPage);
+    await prefs.setInt('quran_global_bookmark_page', tappedPage);
     await prefs.setString('quran_global_bookmark_surah_name', surahName);
     await prefs.setInt('quran_global_bookmark_surah_number', surahNumber);
     await prefs.setString('quran_global_bookmark_snippet', snippet);
@@ -279,14 +290,55 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
       surahName,
       ayahInt,
       surahNumber: surahNumber,
-      page: _currentPage,
+      page: tappedPage,
       verseText: fullVerseText,
       hasBookmark: true,
     );
 
     _showStatusToast(
-      "تم حفظ الموقف وتحديث الختمة: سورة $surahName • ص (${QuranTextFormatter.toArabicDigits(_currentPage.toString())}) • آية ($arabicNum)",
+      "تم حفظ الموقف وتحديث الختمة: سورة $surahName • ص (${QuranTextFormatter.toArabicDigits(tappedPage.toString())}) • آية ($arabicNum)",
     );
+  }
+
+  Future<void> _onVerseLongPressed(
+    int tappedPage,
+    int surahNumber,
+    String surahName,
+    String verseNum,
+    String sectionText,
+  ) async {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _inspectingVerse = verseNum;
+      _inspectingPage = tappedPage;
+      _inspectingSurahNumber = surahNumber;
+    });
+
+    final ayahInt = QuranTextFormatter.parseVerseNumber(verseNum) ?? 1;
+    var fullVerseText = QuranTextFormatter.extractFullVerseText(
+      sectionText,
+      verseNum,
+    );
+    if (fullVerseText.isEmpty) {
+      fullVerseText =
+          await QuranRepository.getVerseText(surahNumber, ayahInt) ?? '';
+    }
+    if (!mounted) return;
+
+    await showAyahTafsirSheet(
+      context: context,
+      surahNumber: surahNumber,
+      surahName: surahName,
+      ayahNumber: ayahInt,
+      ayahText: fullVerseText,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _inspectingVerse = null;
+      _inspectingPage = null;
+      _inspectingSurahNumber = null;
+    });
   }
 
   void _clearGlobalBookmark() async {
@@ -315,17 +367,26 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
     if (widget.singleSurahOnly) {
       final idx = _surahPages.indexOf(targetPage);
       if (idx == -1) return;
-      _pageController.animateToPage(
-        idx,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOutCubic,
-      );
+      final currentIdx = _surahPages.indexOf(_currentPage);
+      if (currentIdx != -1 && (idx - currentIdx).abs() > 3) {
+        _pageController.jumpToPage(idx);
+      } else {
+        _pageController.animateToPage(
+          idx,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOutCubic,
+        );
+      }
     } else {
-      _pageController.animateToPage(
-        targetPage - 1,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOutCubic,
-      );
+      if ((targetPage - _currentPage).abs() > 3) {
+        _pageController.jumpToPage(targetPage - 1);
+      } else {
+        _pageController.animateToPage(
+          targetPage - 1,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOutCubic,
+        );
+      }
     }
     if (scrollToBookmark) {
       _scrollToBookmarkedVerse(targetPage);
@@ -334,56 +395,94 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
 
   void _showJumpToPageDialog(BuildContext context) {
     final controller = TextEditingController(text: _currentPage.toString());
-    showDialog(
+    String? errorText;
+
+    void submit(BuildContext ctx, StateSetter setDialogState) {
+      final normalized =
+          QuranTextFormatter.toEnglishDigits(controller.text.trim());
+      final p = int.tryParse(normalized);
+      if (p != null && p >= 1 && p <= 604) {
+        Navigator.pop(ctx);
+        _jumpToPage(p);
+      } else {
+        setDialogState(() {
+          errorText = "أدخل رقماً صحيحاً بين ١ و ٦٠٤";
+        });
+      }
+    }
+
+    showDialog<void>(
       context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: Text(
-            "الانتقال إلى صفحة 📖",
-            style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "أدخل رقم الصفحة (من 1 إلى 604):",
-                style: GoogleFonts.cairo(fontSize: 13),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            title: Text(
+              "الانتقال إلى صفحة 📖",
+              style: GoogleFonts.cairo(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                textAlign: TextAlign.center,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  hintText: "مثال: 293",
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "أدخل رقم الصفحة (من 1 إلى 604):",
+                    style: GoogleFonts.cairo(fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.go,
+                    autofocus: true,
+                    textAlign: TextAlign.center,
+                    onSubmitted: (_) => submit(ctx, setDialogState),
+                    onChanged: (_) {
+                      if (errorText != null) {
+                        setDialogState(() => errorText = null);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      hintText: "مثال: 293",
+                      errorText: errorText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("إلغاء"),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: context.primaryColor,
+                ),
+                onPressed: () => submit(ctx, setDialogState),
+                child: const Text(
+                  "انتقال 🎯",
+                  style: TextStyle(color: Colors.white),
                 ),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("إلغاء"),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E)),
-              onPressed: () {
-                final p = int.tryParse(controller.text.trim());
-                if (p != null && p >= 1 && p <= 604) {
-                  Navigator.pop(ctx);
-                  _jumpToPage(p);
-                }
-              },
-              child: const Text("انتقال 🎯", style: TextStyle(color: Colors.white)),
-            ),
-          ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.dispose();
+      });
+    });
   }
 
   void _showBookmarkDetailsDialog(BuildContext context, bool isDark) {
@@ -488,7 +587,7 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F766E),
+                backgroundColor: context.primaryColor,
               ),
               onPressed: () {
                 final targetPage = _savedBookmarkedPage!;
@@ -517,7 +616,7 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
         ? const [Color(0xFF0B131E), Color(0xFF152233)]
         : const [Color(0xFFF0FDF4), Color(0xFFE6F4EA), Color(0xFFF0FDF4)];
 
-    const accent = Color(0xFF0F766E);
+    final accent = context.primaryColor;
     final currentJuz = QuranPageMapping.getJuzForPage(_currentPage);
     final arabicPageNum = QuranTextFormatter.toArabicDigits(_currentPage.toString());
     final arabicJuzNum = QuranTextFormatter.toArabicDigits(currentJuz.toString());
@@ -529,6 +628,7 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         backgroundColor: solidBgColor,
         appBar: AppBar(
           centerTitle: false,
@@ -564,7 +664,7 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
             ],
           ),
           elevation: 0,
-          backgroundColor: isDark ? const Color(0xFF0B131E) : const Color(0xFF0F766E),
+          backgroundColor: isDark ? const Color(0xFF0B131E) : context.primaryColor,
           foregroundColor: Colors.white,
           systemOverlayStyle: SystemUiOverlayStyle.light,
           actions: [
@@ -705,7 +805,7 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
                                     color: accent.withValues(alpha: 0.12),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const SizedBox(
+                                  child: SizedBox(
                                     width: 28,
                                     height: 28,
                                     child: CircularProgressIndicator(
@@ -909,17 +1009,34 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
                                                       0xFFD4AF37,
                                                     ),
                                                     isDark: isDark,
-                                                    bookmarkedVerse: (_savedBookmarkedPage ==
+                                                    bookmarkedVerse: (_inspectingPage ==
                                                                 pageNumber &&
-                                                            (_savedBookmarkedSurahNumber ==
-                                                                    null ||
-                                                                _savedBookmarkedSurahNumber ==
-                                                                    sections[i]
-                                                                        .surahNumber))
-                                                        ? _savedBookmarkedVerse
-                                                        : null,
+                                                            _inspectingSurahNumber ==
+                                                                sections[i]
+                                                                    .surahNumber &&
+                                                            _inspectingVerse !=
+                                                                null)
+                                                        ? _inspectingVerse
+                                                        : ((_savedBookmarkedPage ==
+                                                                    pageNumber &&
+                                                                (_savedBookmarkedSurahNumber ==
+                                                                        null ||
+                                                                    _savedBookmarkedSurahNumber ==
+                                                                        sections[i]
+                                                                            .surahNumber))
+                                                            ? _savedBookmarkedVerse
+                                                            : null),
                                                     onTapVerse: (vNum) =>
                                                         _onVerseTapped(
+                                                      pageNumber,
+                                                      sections[i].surahNumber,
+                                                      sections[i].surahName,
+                                                      vNum,
+                                                      sections[i].text,
+                                                    ),
+                                                    onLongPressVerse: (vNum) =>
+                                                        _onVerseLongPressed(
+                                                      pageNumber,
                                                       sections[i].surahNumber,
                                                       sections[i].surahName,
                                                       vNum,
