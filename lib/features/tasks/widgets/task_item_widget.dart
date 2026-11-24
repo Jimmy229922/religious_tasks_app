@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:religious_tasks_app/core/constants/app_constants.dart';
 import 'package:religious_tasks_app/core/constants/strings.dart';
-import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import '../models/task_item.dart';
 
 class TaskItemWidget extends StatelessWidget {
@@ -223,10 +222,10 @@ class TaskItemWidget extends StatelessWidget {
       statusText = "اضغط للإتمام";
     }
 
-    const completedBgLight = Color(0xFFF0FDF9);
-    const completedBgDark = Color(0xFF0E2A26);
-    final emerald = context.primaryColor;
-    final emeraldLight = context.primaryLightColor;
+    const gold = Color(0xFFD4AF37);
+    const completedBgLight = Color(0xFFECFDF5);
+    const completedBgDark = Color(0xFF0A2E25);
+    const emeraldDone = Color(0xFF10B981);
 
     return Material(
       color: Colors.transparent,
@@ -236,29 +235,35 @@ class TaskItemWidget extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: task.isCompleted
-                ? (isDark ? completedBgDark : completedBgLight)
-                : surface,
+            gradient: task.isCompleted
+                ? LinearGradient(
+                    colors: isDark
+                        ? const [completedBgDark, Color(0xFF07211A)]
+                        : const [completedBgLight, Color(0xFFD1FAE5)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  )
+                : LinearGradient(
+                    colors: isDark
+                        ? const [Color(0xFF0E211E), Color(0xFF0A171C)]
+                        : const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: task.isCompleted
-                  ? (isDark
-                      ? emeraldLight.withValues(alpha: 0.56)
-                      : emerald.withValues(alpha: 0.48))
-                  : (isDark
-                      ? Colors.white.withValues(alpha: 0.16)
-                      : const Color(0xFFCBD5E1)),
-              width: task.isCompleted ? 1.45 : 1.25,
+                  ? emeraldDone
+                  : gold.withValues(alpha: isDark ? 0.45 : 0.65),
+              width: task.isCompleted ? 1.45 : 1.2,
             ),
-            boxShadow: isDark
-                ? null
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+            boxShadow: [
+              BoxShadow(
+                color: (isDark ? Colors.black : gold).withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,10 +281,10 @@ class TaskItemWidget extends StatelessWidget {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: accent.withValues(alpha: isDark ? 0.22 : 0.14),
-                          borderRadius: BorderRadius.circular(13),
+                          shape: BoxShape.circle,
+                          color: accent.withValues(alpha: isDark ? 0.16 : 0.14),
                           border: Border.all(
-                            color: accent.withValues(alpha: isDark ? 0.34 : 0.24),
+                            color: gold.withValues(alpha: 0.45),
                           ),
                         ),
                         child: Icon(icon, color: accent, size: 20),

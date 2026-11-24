@@ -1,22 +1,32 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:religious_tasks_app/core/services/athkar_tracking_service.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
+import 'package:religious_tasks_app/features/settings/screens/settings_screen.dart';
 import '../../tasbeeh/providers/tasbeeh_view_model.dart';
 import 'achievements_screen.dart';
 
 class StatisticsScreen extends StatelessWidget {
+  static const Color _gold = Color(0xFFD4AF37);
+  static const Color _goldLight = Color(0xFFFDE68A);
+
   final int morningStreak;
   final int eveningStreak;
   final int sleepStreak;
+  final bool embedded;
+  final ThemeProvider? themeProvider;
 
   const StatisticsScreen({
     super.key,
     required this.morningStreak,
     required this.eveningStreak,
     required this.sleepStreak,
+    this.embedded = false,
+    this.themeProvider,
   });
 
   @override
@@ -32,48 +42,293 @@ class StatisticsScreen extends StatelessWidget {
         math.max(sleepStreak, storedStreaks['sleep'] ?? 0);
     final todaySummary =
         AthkarTrackingService.loadTodayAthkarCompletionSummary();
+    final allBadges = buildAchievementBadges(
+      totalTasbeeh: tasbeehVM.totalCounter,
+      morningStreak: effectiveMorningStreak,
+      eveningStreak: effectiveEveningStreak,
+      sleepStreak: effectiveSleepStreak,
+    );
+
+    final bodyContent = ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+      children: [
+        _buildStatsDomeHeader(
+          context: context,
+          isDark: isDark,
+          badgesCount: allBadges.length,
+        ),
+        const SizedBox(height: 16),
+        _buildTodayReadChartSection(context, todaySummary, isDark),
+        const SizedBox(height: 16),
+        _buildStreakChartSection(
+          context,
+          effectiveMorningStreak,
+          effectiveEveningStreak,
+          effectiveSleepStreak,
+          isDark,
+        ),
+        const SizedBox(height: 16),
+        _buildTotalTasbeehSection(context, tasbeehVM.totalCounter, isDark),
+        const SizedBox(height: 20),
+        _buildBadgesSection(
+          context,
+          allBadges,
+          tasbeehVM.totalCounter,
+          effectiveMorningStreak,
+          effectiveEveningStreak,
+          effectiveSleepStreak,
+          isDark,
+        ),
+      ],
+    );
+
+    if (embedded) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: bodyContent,
+        ),
+      );
+    }
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: isDark ? Colors.black : const Color(0xFFF8F9FA),
-        appBar: AppBar(
-          title: const Text("إحصائيات الإيمان",
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          centerTitle: true,
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
-        ),
-        body: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            _buildTodayReadChartSection(todaySummary, isDark),
-            const SizedBox(height: 20),
-            _buildStreakChartSection(
-              effectiveMorningStreak,
-              effectiveEveningStreak,
-              effectiveSleepStreak,
-              isDark,
+        backgroundColor: context.appScaffoldBg,
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: context.appBgGradient,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
-            const SizedBox(height: 24),
-            _buildTotalTasbeehSection(tasbeehVM.totalCounter, isDark),
-            const SizedBox(height: 24),
-            _buildBadgesSection(
-              context,
-              tasbeehVM.totalCounter,
-              effectiveMorningStreak,
-              effectiveEveningStreak,
-              effectiveSleepStreak,
-              isDark,
-            ),
-          ],
+          ),
+          child: SafeArea(child: bodyContent),
         ),
       ),
     );
   }
 
+  Widget _buildStatsDomeHeader({
+    required BuildContext context,
+    required bool isDark,
+    required int badgesCount,
+  }) {
+    final accent = context.primaryColor;
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? const [Color(0xFF0A241D), Color(0xFF0F2D24)]
+              : const [Color(0xFFFFFDF7), Color(0xFFF6EED9)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(32),
+          bottom: Radius.circular(22),
+        ),
+        border: Border.all(
+          color: _gold.withValues(alpha: isDark ? 0.5 : 0.7),
+          width: 1.4,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isDark ? Colors.black : _gold).withValues(alpha: 0.14),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _StatsArchLatticePainter(
+                color: _gold.withValues(alpha: isDark ? 0.12 : 0.2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (embedded)
+                  _buildCircleHeaderBtn(
+                    icon: Icons.settings_outlined,
+                    tooltip: 'الإعدادات',
+                    isDark: isDark,
+                    accent: accent,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    ),
+                  )
+                else
+                  _buildCircleHeaderBtn(
+                    icon: Icons.arrow_back_ios_new_rounded,
+                    tooltip: 'رجوع',
+                    isDark: isDark,
+                    accent: accent,
+                    onTap: () => Navigator.pop(context),
+                  ),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'إحصائيات الإيمان',
+                        style: GoogleFonts.cairo(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? _goldLight : context.primaryDarkColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _gold.withValues(alpha: isDark ? 0.16 : 0.14),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: _gold.withValues(alpha: isDark ? 0.45 : 0.6),
+                          ),
+                        ),
+                        child: Text(
+                          '$badgesCount وسام إنجاز متاح',
+                          style: GoogleFonts.cairo(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? _goldLight : const Color(0xFF78350F),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (themeProvider != null)
+                  _buildCircleHeaderBtn(
+                    icon: isDark
+                        ? Icons.wb_sunny_rounded
+                        : Icons.nights_stay_rounded,
+                    tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
+                    isDark: isDark,
+                    accent: accent,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      themeProvider!.toggleTheme(!isDark);
+                    },
+                  )
+                else
+                  const SizedBox(width: 40),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCircleHeaderBtn({
+    required IconData icon,
+    required String tooltip,
+    required bool isDark,
+    required Color accent,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.07)
+                : Colors.white.withValues(alpha: 0.9),
+            border: Border.all(
+              color: _gold.withValues(alpha: isDark ? 0.45 : 0.6),
+            ),
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: isDark ? _goldLight : accent,
+          ),
+        ),
+      ),
+    );
+  }
+
+  BoxDecoration _goldCardDecoration(BuildContext context, bool isDark) {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        colors: context.appCardGradient,
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: _gold.withValues(alpha: isDark ? 0.45 : 0.65),
+        width: 1.25,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: (isDark ? Colors.black : _gold).withValues(alpha: 0.1),
+          blurRadius: 12,
+          offset: const Offset(0, 5),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCardTitleRow(
+    BuildContext context,
+    String title,
+    IconData icon,
+    bool isDark,
+  ) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _gold.withValues(alpha: isDark ? 0.16 : 0.14),
+            border: Border.all(color: _gold.withValues(alpha: 0.45)),
+          ),
+          child: Icon(
+            icon,
+            size: 17,
+            color: isDark ? _goldLight : context.primaryColor,
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text(
+            title,
+            style: GoogleFonts.cairo(
+              fontWeight: FontWeight.bold,
+              fontSize: 15.5,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTodayReadChartSection(
+    BuildContext context,
     Map<String, ({int completed, int total})> summary,
     bool isDark,
   ) {
@@ -85,31 +340,18 @@ class StatisticsScreen extends StatelessWidget {
     const maxY = 100.0;
 
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: isDark
-            ? null
-            : Border.all(color: Colors.black.withValues(alpha: 0.06)),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-      ),
+      padding: const EdgeInsets.all(18),
+      decoration: _goldCardDecoration(context, isDark),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          _buildCardTitleRow(
+            context,
             "أذكار اليوم المقروءة (مباشر)",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            Icons.bar_chart_rounded,
+            isDark,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           SizedBox(
             height: 190,
             child: BarChart(
@@ -124,7 +366,7 @@ class StatisticsScreen extends StatelessWidget {
                       showTitles: true,
                       reservedSize: 38,
                       getTitlesWidget: (value, meta) {
-                        final style = TextStyle(
+                        final style = GoogleFonts.cairo(
                           fontWeight: FontWeight.bold,
                           fontSize: 11.5,
                           color: isDark
@@ -157,9 +399,9 @@ class StatisticsScreen extends StatelessWidget {
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
                 barGroups: [
-                  _makeBarGroup(0, pct(m), Colors.teal, maxY),
-                  _makeBarGroup(1, pct(e), Colors.indigo, maxY),
-                  _makeBarGroup(2, pct(s), Colors.deepPurple, maxY),
+                  _makeBarGroup(0, pct(m), const Color(0xFF10B981), maxY),
+                  _makeBarGroup(1, pct(e), _gold, maxY),
+                  _makeBarGroup(2, pct(s), const Color(0xFF2DD4BF), maxY),
                 ],
               ),
             ),
@@ -170,6 +412,7 @@ class StatisticsScreen extends StatelessWidget {
   }
 
   Widget _buildStreakChartSection(
+    BuildContext context,
     int mStreak,
     int eStreak,
     int sStreak,
@@ -179,29 +422,18 @@ class StatisticsScreen extends StatelessWidget {
     final maxY = (maxVal + 5).toDouble();
 
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: isDark
-            ? null
-            : Border.all(color: Colors.black.withValues(alpha: 0.06)),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-      ),
+      padding: const EdgeInsets.all(18),
+      decoration: _goldCardDecoration(context, isDark),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("نشاطك في الأذكار (أيام متتالية)",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 24),
+          _buildCardTitleRow(
+            context,
+            "نشاطك في الأذكار (أيام متتالية)",
+            Icons.local_fire_department_rounded,
+            isDark,
+          ),
+          const SizedBox(height: 20),
           SizedBox(
             height: 190,
             child: BarChart(
@@ -216,7 +448,7 @@ class StatisticsScreen extends StatelessWidget {
                       showTitles: true,
                       reservedSize: 38,
                       getTitlesWidget: (value, meta) {
-                        final style = TextStyle(
+                        final style = GoogleFonts.cairo(
                           fontWeight: FontWeight.bold,
                           fontSize: 11.5,
                           color: isDark
@@ -236,16 +468,21 @@ class StatisticsScreen extends StatelessWidget {
                       },
                     ),
                   ),
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                 ),
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
                 barGroups: [
-                  _makeBarGroup(0, mStreak.toDouble(), Colors.orange, maxY),
-                  _makeBarGroup(1, eStreak.toDouble(), Colors.indigo, maxY),
-                  _makeBarGroup(2, sStreak.toDouble(), Colors.deepPurple, maxY),
+                  _makeBarGroup(
+                      0, mStreak.toDouble(), const Color(0xFFF59E0B), maxY),
+                  _makeBarGroup(
+                      1, eStreak.toDouble(), const Color(0xFF10B981), maxY),
+                  _makeBarGroup(2, sStreak.toDouble(), _gold, maxY),
                 ],
               ),
             ),
@@ -272,44 +509,82 @@ class StatisticsScreen extends StatelessWidget {
           backDrawRodData: BackgroundBarChartRodData(
             show: true,
             toY: maxY,
-            color: color.withValues(alpha: 0.1),
+            color: color.withValues(alpha: 0.12),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildTotalTasbeehSection(int total, bool isDark) {
+  Widget _buildTotalTasbeehSection(
+      BuildContext context, int total, bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isDark ? [const Color(0xFF0F2027), const Color(0xFF203A43)] : [const Color(0xFF1565C0), const Color(0xFF1E88E5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [Color(0xFF0A241D), Color(0xFF0F2D24)]
+              : const [Color(0xFFFFFDF7), Color(0xFFF6EED9)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
         ),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: _gold.withValues(alpha: isDark ? 0.65 : 0.8),
+          width: 1.4,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _gold.withValues(alpha: isDark ? 0.14 : 0.2),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          const Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 40),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _gold.withValues(alpha: isDark ? 0.18 : 0.16),
+              border: Border.all(
+                color: _gold.withValues(alpha: 0.65),
+                width: 1.4,
+              ),
+            ),
+            child: Icon(
+              Icons.emoji_events_rounded,
+              color: isDark ? _goldLight : const Color(0xFFB45309),
+              size: 34,
+            ),
+          ),
           const SizedBox(height: 12),
-          const Text("إجمالي التسبيحات",
-              style: TextStyle(color: Colors.white70, fontSize: 16)),
-          Text("$total",
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 40,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'IBMPlexMono')),
+          Text(
+            "إجمالي التسبيحات",
+            style: GoogleFonts.cairo(
+              color: isDark ? _goldLight : const Color(0xFF78350F),
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            "$total",
+            style: GoogleFonts.ibmPlexMono(
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+              fontSize: 40,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
             _tasbeehMotivationMessage(total),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white70,
+            style: GoogleFonts.cairo(
+              color: isDark ? Colors.white70 : const Color(0xFF475569),
               fontSize: 12.5,
-              fontStyle: FontStyle.italic,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -338,60 +613,107 @@ class StatisticsScreen extends StatelessWidget {
 
   Widget _buildBadgesSection(
     BuildContext context,
+    List<AchievementBadge> allBadges,
     int totalTasbeeh,
     int effectiveMorningStreak,
     int effectiveEveningStreak,
     int effectiveSleepStreak,
     bool isDark,
   ) {
-    final allBadges = buildAchievementBadges(
-      totalTasbeeh: totalTasbeeh,
-      morningStreak: effectiveMorningStreak,
-      eveningStreak: effectiveEveningStreak,
-      sleepStreak: effectiveSleepStreak,
-    );
     final previewBadges = allBadges.take(6).toList();
-    final accent = context.primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(right: 4.0, bottom: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "أوسمة الإنجاز",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        Row(
+          children: [
+            Expanded(
+              child: Divider(
+                color: _gold.withValues(alpha: 0.45),
+                thickness: 1,
               ),
-              TextButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AchievementsScreen(
-                        totalTasbeeh: totalTasbeeh,
-                        morningStreak: effectiveMorningStreak,
-                        eveningStreak: effectiveEveningStreak,
-                        sleepStreak: effectiveSleepStreak,
-                      ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.workspace_premium_rounded,
+                    size: 18,
+                    color: isDark ? _goldLight : context.primaryDarkColor,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    "أوسمة الإنجاز",
+                    style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: isDark ? _goldLight : context.primaryDarkColor,
                     ),
-                  );
-                },
-                icon: Icon(Icons.grid_view_rounded, size: 16, color: accent),
-                label: Text(
-                  "عرض المزيد (${allBadges.length})",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: accent,
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Divider(
+                color: _gold.withValues(alpha: 0.45),
+                thickness: 1,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: AlignmentDirectional.centerEnd,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AchievementsScreen(
+                    totalTasbeeh: totalTasbeeh,
+                    morningStreak: effectiveMorningStreak,
+                    eveningStreak: effectiveEveningStreak,
+                    sleepStreak: effectiveSleepStreak,
                   ),
                 ),
+              );
+            },
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _gold.withValues(alpha: isDark ? 0.16 : 0.14),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: _gold.withValues(alpha: isDark ? 0.45 : 0.6),
+                ),
               ),
-            ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.grid_view_rounded,
+                    size: 14,
+                    color: isDark ? _goldLight : const Color(0xFF78350F),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    "عرض المزيد (${allBadges.length})",
+                    style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: isDark ? _goldLight : const Color(0xFF78350F),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
+        const SizedBox(height: 12),
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -406,4 +728,34 @@ class StatisticsScreen extends StatelessWidget {
       ],
     );
   }
+}
+
+class _StatsArchLatticePainter extends CustomPainter {
+  final Color color;
+  const _StatsArchLatticePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    const step = 28.0;
+    for (double x = 0; x <= size.width + step; x += step) {
+      for (double y = 0; y <= size.height + step; y += step) {
+        final path = Path()
+          ..moveTo(x, y - 9)
+          ..lineTo(x + 9, y)
+          ..lineTo(x, y + 9)
+          ..lineTo(x - 9, y)
+          ..close();
+        canvas.drawPath(path, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _StatsArchLatticePainter oldDelegate) =>
+      oldDelegate.color != color;
 }

@@ -262,10 +262,10 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgGradient = isDark
-        ? const [Color(0xFF0B131E), Color(0xFF152233)]
-        : const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)];
+    final bgGradient = context.appBgGradient;
 
     final selectedCategory = _categories.firstWhere(
       (c) => c.id == _selectedCategoryId,
@@ -289,12 +289,20 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: context.appScaffoldBg,
         appBar: AppBar(
           title: Text(
-            "أذكار متنوعة وحصن المسلم 📖",
-            style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18),
+            "أذكار متنوعة وحصن المسلم",
+            style: GoogleFonts.cairo(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: isDark ? goldLight : Colors.white,
+            ),
           ),
           centerTitle: true,
+          backgroundColor:
+              isDark ? context.appHeaderBg : context.primaryColor,
+          foregroundColor: isDark ? goldLight : Colors.white,
           elevation: 0,
           actions: [
             IconButton(
@@ -327,17 +335,18 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
                 padding: const EdgeInsets.all(12.0),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF1E293B)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? const [Color(0xFF0E211E), Color(0xFF0A171C)]
+                          : const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)],
+                      begin: Alignment.centerRight,
+                      end: Alignment.centerLeft,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: gold.withValues(alpha: isDark ? 0.45 : 0.65),
+                      width: 1.2,
+                    ),
                   ),
                   child: TextField(
                     controller: _searchController,
@@ -346,16 +355,29 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
                         _searchQuery = val.trim();
                       });
                     },
+                    style: GoogleFonts.cairo(
+                      fontSize: 13.5,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
                     decoration: InputDecoration(
                       hintText: "ابحث في الأذكار المتنوعة...",
                       hintStyle: GoogleFonts.cairo(
-                        color: isDark ? Colors.white54 : Colors.grey.shade600,
+                        color: isDark ? Colors.white54 : const Color(0xFF64748B),
                         fontSize: 13,
                       ),
-                      prefixIcon: const Icon(Icons.search_rounded, color: Colors.teal),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: isDark ? goldLight : context.primaryColor,
+                      ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear_rounded, size: 18),
+                              icon: Icon(
+                                Icons.clear_rounded,
+                                size: 18,
+                                color: isDark
+                                    ? goldLight
+                                    : const Color(0xFF64748B),
+                              ),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() => _searchQuery = "");
@@ -389,7 +411,11 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
                             avatar: Icon(
                               cat.icon,
                               size: 16,
-                              color: isSelected ? Colors.white : Colors.teal,
+                              color: isSelected
+                                  ? (isDark
+                                      ? Colors.white
+                                      : const Color(0xFF451A03))
+                                  : (isDark ? goldLight : context.primaryColor),
                             ),
                             label: Text(
                               cat.title,
@@ -397,15 +423,25 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
                                 color: isSelected
-                                    ? Colors.white
-                                    : (isDark ? Colors.white70 : Colors.teal.shade900),
+                                    ? (isDark
+                                        ? Colors.white
+                                        : const Color(0xFF451A03))
+                                    : (isDark
+                                        ? Colors.white70
+                                        : const Color(0xFF334155)),
                               ),
                             ),
                             selected: isSelected,
-                            selectedColor: Colors.teal,
+                            selectedColor:
+                                isDark ? const Color(0xFF92400E) : goldLight,
                             backgroundColor: isDark
-                                ? Colors.teal.withValues(alpha: 0.15)
-                                : Colors.teal.withValues(alpha: 0.08),
+                                ? const Color(0xFF0E211E)
+                                : const Color(0xFFFFFDF8),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? gold
+                                  : gold.withValues(alpha: isDark ? 0.35 : 0.55),
+                            ),
                             onSelected: (_) {
                               setState(() {
                                 _selectedCategoryId = cat.id;
@@ -454,21 +490,25 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
     VariousDhikrItem item,
     bool isDark,
   ) {
-    final accent = context.primaryColor;
+    const gold = Color(0xFFD4AF37);
+    final accent = isDark ? const Color(0xFFFDE68A) : context.primaryColor;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? const [Color(0xFF0E211E), Color(0xFF0A171C)]
+              : const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(
-          color: isDark
-              ? Colors.white10
-              : accent.withValues(alpha: 0.2),
+        border: Border.all(
+          color: gold.withValues(alpha: isDark ? 0.45 : 0.65),
           width: 1.2,
         ),
       ),
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

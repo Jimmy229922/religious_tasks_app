@@ -5,16 +5,22 @@ import 'package:religious_tasks_app/core/services/storage_service.dart';
 enum AppThemeMode { light, dark, system, dynamic }
 
 enum AppAccentColor {
-  royalBlue(Color(0xFF1565C0), 'الأزرق الملكي'),
-  emerald(Color(0xFF0F766E), 'الزمردي الإسلامي'),
-  deepTeal(Color(0xFF0E7490), 'البترولي الهادئ'),
-  indigo(Color(0xFF3730A3), 'النيلي الليلي'),
-  amberGold(Color(0xFFB45309), 'الذهبي الدافئ'),
-  burgundy(Color(0xFF881337), 'العنابي الوقور');
+  emerald(Color(0xFF0F766E), Color(0xFF2DD4BF), 'الزمردي الإسلامي'),
+  royalBlue(Color(0xFF1565C0), Color(0xFF60A5FA), 'الأزرق الملكي'),
+  deepTeal(Color(0xFF0E7490), Color(0xFF22D3EE), 'البترولي الهادئ'),
+  indigo(Color(0xFF3730A3), Color(0xFF818CF8), 'النيلي الليلي'),
+  amberGold(Color(0xFFB45309), Color(0xFFFBBF24), 'الذهبي الدافئ'),
+  burgundy(Color(0xFF881337), Color(0xFFFB7185), 'العنابي الوقور'),
+  oliveGreen(Color(0xFF3F6212), Color(0xFFA3E635), 'الزيتوني الهادئ'),
+  royalPurple(Color(0xFF6D28D9), Color(0xFFA78BFA), 'البنفسجي الملكي'),
+  desertBronze(Color(0xFF9A3412), Color(0xFFFB923C), 'البرونزي الدافئ');
 
   final Color color;
+  final Color darkColor;
   final String label;
-  const AppAccentColor(this.color, this.label);
+  const AppAccentColor(this.color, this.darkColor, this.label);
+
+  Color colorFor(bool isDark) => isDark ? darkColor : color;
 }
 
 class ThemeProvider extends ChangeNotifier {
@@ -27,7 +33,7 @@ class ThemeProvider extends ChangeNotifier {
   static const List<double> supportedTextScales = [0.92, 1.0, 1.08, 1.16];
 
   AppThemeMode _appThemeMode = AppThemeMode.system;
-  AppAccentColor _accentColor = AppAccentColor.royalBlue;
+  AppAccentColor _accentColor = AppAccentColor.emerald;
   double _textScaleFactor = 1.0;
   bool _useOledBlack = true;
 
@@ -71,7 +77,7 @@ class ThemeProvider extends ChangeNotifier {
         if (savedAccentStr != null) {
           _accentColor = AppAccentColor.values.firstWhere(
             (e) => e.name == savedAccentStr,
-            orElse: () => AppAccentColor.royalBlue,
+            orElse: () => AppAccentColor.emerald,
           );
         }
 
@@ -204,7 +210,7 @@ class ThemeProvider extends ChangeNotifier {
 
   Future<void> resetAppearanceDefaults() async {
     await setThemeMode(AppThemeMode.system);
-    await setAccentColor(AppAccentColor.royalBlue);
+    await setAccentColor(AppAccentColor.emerald);
     await setTextScaleFactor(1.0);
     await setUseOledBlack(true);
   }
@@ -213,8 +219,10 @@ class ThemeProvider extends ChangeNotifier {
     await setThemeMode(isDark ? AppThemeMode.dark : AppThemeMode.light);
   }
 
-  Color getDynamicSeedColor(int hour) {
-    if (_appThemeMode != AppThemeMode.dynamic) return _accentColor.color;
+  Color getDynamicSeedColor(int hour, {bool isDark = false}) {
+    if (_appThemeMode != AppThemeMode.dynamic) {
+      return _accentColor.colorFor(isDark);
+    }
 
     // Fajr (Dawn)
     if (hour >= 4 && hour < 6) return Colors.indigo;
@@ -245,4 +253,54 @@ extension AppThemeColors on BuildContext {
 
   Color get primaryLightColor =>
       Color.lerp(Theme.of(this).colorScheme.primary, Colors.white, 0.38)!;
+
+  bool get _isDarkTheme => Theme.of(this).brightness == Brightness.dark;
+
+  bool get _isDefaultEmerald =>
+      primaryColor.toARGB32() == AppAccentColor.emerald.color.toARGB32() ||
+      primaryColor.toARGB32() == AppAccentColor.emerald.darkColor.toARGB32();
+
+  List<Color> get appBgGradient {
+    if (_isDarkTheme) {
+      if (_isDefaultEmerald) {
+        return const [Color(0xFF041D16), Color(0xFF07281F), Color(0xFF041410)];
+      }
+      return [
+        Color.lerp(const Color(0xFF04070B), primaryColor, 0.22)!,
+        Color.lerp(const Color(0xFF060B12), primaryColor, 0.30)!,
+        Color.lerp(const Color(0xFF030508), primaryColor, 0.15)!,
+      ];
+    }
+    if (_isDefaultEmerald) {
+      return const [Color(0xFFFFFDF7), Color(0xFFF8F0DB), Color(0xFFFFFBF0)];
+    }
+    return [
+      Color.lerp(const Color(0xFFFFFDF9), primaryColor, 0.04)!,
+      Color.lerp(const Color(0xFFFBF6EC), primaryColor, 0.10)!,
+      Color.lerp(const Color(0xFFFFFDF9), primaryColor, 0.05)!,
+    ];
+  }
+
+  Color get appScaffoldBg => appBgGradient.first;
+
+  Color get appHeaderBg => appBgGradient[1];
+
+  List<Color> get appCardGradient {
+    if (_isDarkTheme) {
+      if (_isDefaultEmerald) {
+        return const [Color(0xFF0E211E), Color(0xFF0A171C)];
+      }
+      return [
+        Color.lerp(const Color(0xFF091017), primaryColor, 0.22)!,
+        Color.lerp(const Color(0xFF060B10), primaryColor, 0.14)!,
+      ];
+    }
+    if (_isDefaultEmerald) {
+      return const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)];
+    }
+    return [
+      Color.lerp(const Color(0xFFFFFDF9), primaryColor, 0.03)!,
+      Color.lerp(const Color(0xFFF8F2E7), primaryColor, 0.10)!,
+    ];
+  }
 }

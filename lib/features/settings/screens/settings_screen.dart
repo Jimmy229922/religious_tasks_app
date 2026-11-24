@@ -671,27 +671,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return DefaultTabController(
       length: 4,
       child: Scaffold(
-        backgroundColor:
-            isDark ? const Color(0xFF0B131E) : const Color(0xFFF3F8F6),
+        backgroundColor: context.appScaffoldBg,
         appBar: AppBar(
           title: Text(
             AppStrings.settings,
             style: GoogleFonts.cairo(
               fontWeight: FontWeight.bold,
               fontSize: 18,
+              color: isDark ? const Color(0xFFFDE68A) : Colors.white,
             ),
           ),
           centerTitle: true,
           elevation: 0,
-          backgroundColor: isDark ? const Color(0xFF0B131E) : _emerald,
-          foregroundColor: Colors.white,
+          backgroundColor: isDark ? context.appHeaderBg : _emerald,
+          foregroundColor: isDark ? const Color(0xFFFDE68A) : Colors.white,
           systemOverlayStyle: SystemUiOverlayStyle.light,
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
             indicatorColor: _gold,
             indicatorWeight: 3,
-            labelColor: Colors.white,
+            labelColor: isDark ? const Color(0xFFFDE68A) : Colors.white,
             unselectedLabelColor: Colors.white70,
             labelStyle: GoogleFonts.cairo(
               fontWeight: FontWeight.bold,
@@ -2961,64 +2961,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                 ),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: AppAccentColor.values.map((accent) {
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: AppAccentColor.values.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 1.55,
+                ),
+                itemBuilder: (context, idx) {
+                  final accent = AppAccentColor.values[idx];
+                  final chipColor = accent.colorFor(isDark);
                   final selected = themeProvider.accentColor == accent;
                   return InkWell(
-                    onTap: () => themeProvider.setAccentColor(accent),
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      themeProvider.setAccentColor(accent);
+                    },
                     borderRadius: BorderRadius.circular(14),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 9),
+                          horizontal: 6, vertical: 6),
                       decoration: BoxDecoration(
                         color: selected
-                            ? accent.color.withValues(alpha: 0.14)
+                            ? chipColor.withValues(alpha: isDark ? 0.24 : 0.14)
                             : (isDark
-                                ? const Color(0xFF1E2B3C)
+                                ? context.appCardGradient.first
                                 : const Color(0xFFF8FAFC)),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: selected
-                              ? accent.color
+                              ? chipColor
                               : (isDark
                                   ? Colors.white12
                                   : Colors.grey.shade300),
                           width: selected ? 1.8 : 1,
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
-                            width: 18,
-                            height: 18,
+                            width: 22,
+                            height: 22,
                             decoration: BoxDecoration(
-                              color: accent.color,
+                              color: chipColor,
                               shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.45),
+                                width: 1.2,
+                              ),
                             ),
                             child: selected
-                                ? const Icon(Icons.check,
-                                    size: 12, color: Colors.white)
+                                ? Icon(
+                                    Icons.check_rounded,
+                                    size: 14,
+                                    color: isDark
+                                        ? const Color(0xFF041D16)
+                                        : Colors.white,
+                                  )
                                 : null,
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(height: 5),
                           Text(
                             accent.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
                             style: GoogleFonts.cairo(
-                              fontSize: 12,
+                              fontSize: 10.5,
                               fontWeight: selected
                                   ? FontWeight.bold
                                   : FontWeight.w600,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF0F172A),
                             ),
                           ),
                         ],
                       ),
                     ),
                   );
-                }).toList(),
+                },
               ),
             ],
           ),
@@ -3822,19 +3849,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSectionHeader(IconData icon, String title, {String? badgeText}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const goldLight = Color(0xFFFDE68A);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, right: 4.0),
       child: Row(
         children: [
-          Icon(icon, color: Colors.teal, size: 20),
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _gold.withValues(alpha: isDark ? 0.16 : 0.14),
+              border: Border.all(color: _gold.withValues(alpha: 0.45)),
+            ),
+            child: Icon(
+              icon,
+              color: isDark ? goldLight : _emerald,
+              size: 18,
+            ),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(
+              style: GoogleFonts.cairo(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Colors.teal,
+                color: isDark ? goldLight : _emeraldDark,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -3845,16 +3886,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.amber.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.amber.shade700, width: 1),
+                color: _gold.withValues(alpha: isDark ? 0.18 : 0.14),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: _gold.withValues(alpha: 0.6), width: 1),
               ),
               child: Text(
                 badgeText,
-                style: TextStyle(
+                style: GoogleFonts.cairo(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: Colors.amber.shade900,
+                  color: isDark ? goldLight : const Color(0xFF78350F),
                 ),
               ),
             ),

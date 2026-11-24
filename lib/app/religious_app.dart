@@ -58,7 +58,8 @@ class _ReligiousAppState extends State<ReligiousApp> {
     // Access theme provider
     final themeProvider = Provider.of<ThemeProvider>(context);
     final hour = DateTime.now().hour;
-    final seedColor = themeProvider.getDynamicSeedColor(hour);
+    final lightSeed = themeProvider.getDynamicSeedColor(hour, isDark: false);
+    final darkSeed = themeProvider.getDynamicSeedColor(hour, isDark: true);
 
     return MaterialApp(
       navigatorKey: _navigatorKey,
@@ -79,9 +80,9 @@ class _ReligiousAppState extends State<ReligiousApp> {
         fontFamily: 'Cairo',
         scaffoldBackgroundColor: const Color(0xFFF6F7FB),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: seedColor,
+          seedColor: lightSeed,
           brightness: Brightness.light,
-          primary: seedColor,
+          primary: lightSeed,
           secondary: const Color(0xFFE65100),
           surface: const Color(0xFFFFFFFF),
         ),
@@ -107,7 +108,7 @@ class _ReligiousAppState extends State<ReligiousApp> {
         ),
         chipTheme: ChipThemeData(
           backgroundColor: const Color(0xFFF1F5F9),
-          selectedColor: seedColor,
+          selectedColor: lightSeed,
           labelStyle: GoogleFonts.cairo(
             color: const Color(0xFF0F172A),
             fontWeight: FontWeight.w600,
@@ -143,8 +144,8 @@ class _ReligiousAppState extends State<ReligiousApp> {
             : const Color(0xFF0B131E),
         colorScheme: ColorScheme.fromSeed(
           brightness: Brightness.dark,
-          seedColor: seedColor,
-          primary: seedColor,
+          seedColor: darkSeed,
+          primary: darkSeed,
           secondary: const Color(0xFFFFB74D),
           surface: themeProvider.useOledBlack
               ? const Color(0xFF141414)

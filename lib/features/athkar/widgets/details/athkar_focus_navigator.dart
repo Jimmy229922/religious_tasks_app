@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 
 class AthkarFocusNavigator extends StatelessWidget {
   final bool isMorning;
@@ -20,11 +22,11 @@ class AthkarFocusNavigator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
     final isDark = isNightMode;
-    final accent = isMorning
-        ? (isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32))
-        : (isDark ? const Color(0xFF9FA8DA) : const Color(0xFF3949AB));
-    final border = isDark ? Colors.white12 : Colors.black12;
+    final accent = isDark ? goldLight : context.primaryColor;
+    final border = gold.withValues(alpha: isDark ? 0.5 : 0.65);
 
     return Row(
       children: [
@@ -32,7 +34,10 @@ class AthkarFocusNavigator extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: onPrev,
             icon: const Icon(Icons.chevron_right),
-            label: const Text('السابق'),
+            label: Text(
+              'السابق',
+              style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+            ),
             style: OutlinedButton.styleFrom(
               foregroundColor: accent,
               side: BorderSide(color: border),
@@ -45,16 +50,17 @@ class AthkarFocusNavigator extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
-            color: accent.withValues(alpha: isDark ? 0.18 : 0.12),
+            color: gold.withValues(alpha: isDark ? 0.18 : 0.14),
             borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: border),
           ),
           child: Text(
             '${currentIndex + 1} / $totalCount',
-            style: TextStyle(
-              color: accent,
-              fontWeight: FontWeight.w600,
+            style: GoogleFonts.ibmPlexMono(
+              color: isDark ? goldLight : const Color(0xFF78350F),
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
@@ -63,7 +69,10 @@ class AthkarFocusNavigator extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: onNext,
             icon: const Icon(Icons.chevron_left),
-            label: const Text('التالي'),
+            label: Text(
+              'التالي',
+              style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+            ),
             style: OutlinedButton.styleFrom(
               foregroundColor: accent,
               side: BorderSide(color: border),

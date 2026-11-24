@@ -11,9 +11,7 @@ import 'package:religious_tasks_app/features/athkar/providers/athkar_view_model.
 import '../models/task_item.dart';
 import '../providers/tasks_view_model.dart';
 import '../widgets/daily_inspiration_card.dart';
-import '../widgets/header_section.dart';
-import '../widgets/prayers_timeline_section.dart';
-import '../widgets/quick_access_section.dart';
+import '../widgets/islamic_home_dashboard.dart';
 import '../widgets/task_item_widget.dart';
 
 import '../../athkar/screens/athkar_details_screen.dart';
@@ -26,6 +24,7 @@ import '../../quran/screens/khatmah_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../statistics/screens/statistics_screen.dart';
 import '../../tasbeeh/screens/custom_tasbeeh_screen.dart';
+import 'all_features_screen.dart';
 
 class TasksScreen extends StatefulWidget {
   final ThemeProvider themeProvider;
@@ -39,7 +38,7 @@ class _TasksScreenState extends State<TasksScreen> {
   static const double _maxContentWidth = 1040.0;
 
   bool _showRemainingSunnahOnly = false;
-  int _bottomInsightTab = 0; // 0: آية وهمسة اليوم, 1: واحة الشكر والامتنان
+  int _currentTabIndex = 0;
 
   @override
   void initState() {
@@ -384,11 +383,20 @@ class _TasksScreenState extends State<TasksScreen> {
     final iconColor = isDark ? Colors.white : const Color(0xFF0F172A);
     final textScale = MediaQuery.textScalerOf(context).scale(1.0);
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      body: Directionality(
-        textDirection: TextDirection.rtl,
-        child: SafeArea(
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: context.appScaffoldBg,
+        bottomNavigationBar: _buildBottomNavigationBar(context, isDark),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: context.appBgGradient,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SafeArea(
           child: Consumer<TasksViewModel>(
             builder: (context, vm, child) {
               final allSunnah = vm.otherTasks;
@@ -396,283 +404,695 @@ class _TasksScreenState extends State<TasksScreen> {
                   ? allSunnah.where((t) => !t.isCompleted).toList()
                   : allSunnah;
 
-              return RefreshIndicator(
-                onRefresh: () => _handleRefresh(vm),
-                child: LayoutBuilder(
-                  builder: (context, viewportConstraints) {
-                    final screenWidth = viewportConstraints.maxWidth;
-                    final hPad = _horizontalInset(screenWidth);
-                    final isWide = screenWidth >= 720;
-
-                    return CustomScrollView(
-                      physics: const BouncingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics(),
-                      ),
-                      slivers: [
-                        SliverAppBar(
-                          floating: true,
-                          pinned: true,
-                          backgroundColor: backgroundColor,
-                          surfaceTintColor: Colors.transparent,
-                          systemOverlayStyle: isDark
-                              ? SystemUiOverlayStyle.light
-                              : SystemUiOverlayStyle.dark,
-                          elevation: 0,
-                          leadingWidth: 56,
-                          leading: Padding(
-                            padding: const EdgeInsetsDirectional.only(
-                              start: 10,
-                              top: 6,
-                              bottom: 6,
-                            ),
-                            child: _buildAppBarPillButton(
-                              tooltip: "الإعدادات",
-                              icon: Icons.settings_outlined,
-                              iconColor: iconColor,
-                              isDark: isDark,
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SettingsScreen(),
-                                ),
-                              ),
-                            ),
-                          ),
-                          actions: [
-                            Padding(
-                              padding: const EdgeInsetsDirectional.only(
-                                end: 10,
-                                top: 6,
-                                bottom: 6,
-                              ),
-                              child: _buildAppBarPillButton(
-                                tooltip: "الإحصائيات",
-                                icon: Icons.bar_chart_rounded,
-                                iconColor: iconColor,
-                                isDark: isDark,
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => StatisticsScreen(
-                                      morningStreak: vm.morningStreak,
-                                      eveningStreak: vm.eveningStreak,
-                                      sleepStreak: vm.sleepStreak,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                          title: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              kAppName,
-                              style: GoogleFonts.arefRuqaa(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 26,
-                                color: iconColor,
-                              ),
-                            ),
-                          ),
-                          centerTitle: true,
-                        ),
-
-                        // 1. Unified Hero Dashboard
-                        SliverToBoxAdapter(
-                          child: RepaintBoundary(
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 0),
-                              child: HeaderSection(vm: vm, isDark: isDark),
-                            ),
-                          ),
-                        ),
-
-                        // 2. Interactive Obligatory Prayers Strip right beneath Hero
-                        if (vm.prayerTasks.isNotEmpty)
-                          SliverToBoxAdapter(
-                            child: RepaintBoundary(
-                              child: Padding(
-                                padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
-                                child: _buildFramedSectionContainer(
-                                  isDark: isDark,
-                                  isNarrow: screenWidth < 360,
-                                  header: _buildSectionHeaderRow(
-                                    title: "الصلوات المفروضة",
-                                    icon: Icons.mosque_rounded,
-                                    trailingText:
-                                        "${vm.prayerTasks.where((t) => t.isCompleted).length}/${vm.prayerTasks.length}",
-                                    isDark: isDark,
-                                  ),
-                                  child: PrayersTimelineSection(
-                                    vm: vm,
-                                    prayerTasks: vm.prayerTasks,
-                                    isDark: isDark,
-                                    onOpenDetails: (task) {
-                                      final idx = vm.tasks.indexOf(task);
-                                      if (idx != -1) {
-                                        _handleTaskTap(context, vm, idx, task);
-                                      }
-                                    },
-                                    onToggleCompletion: (task) {
-                                      final idx = vm.tasks.indexOf(task);
-                                      if (idx != -1) {
-                                        vm.toggleTask(idx);
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-
-                        // 3. Smart Event + Priority Context Suggestion
-                        SliverToBoxAdapter(
-                          child: RepaintBoundary(
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
-                              child: _buildSuggestionArea(
-                                context: context,
-                                vm: vm,
-                                isDark: isDark,
-                                textScale: textScale,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // 4. Harmonized Quick Access Hub
-                        SliverToBoxAdapter(
-                          child: RepaintBoundary(
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
-                              child: _buildFramedSectionContainer(
-                                isDark: isDark,
-                                isNarrow: screenWidth < 360,
-                                header: _buildSectionHeaderRow(
-                                  title: "الوصول السريع",
-                                  icon: Icons.apps_rounded,
-                                  isDark: isDark,
-                                ),
-                                child: QuickAccessSection(
-                                  vm: vm,
-                                  isDark: isDark,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // 5. Interactive Sunnah & Athkar Cards with Filter Pill
-                        if (allSunnah.isNotEmpty)
-                          SliverToBoxAdapter(
-                            child: RepaintBoundary(
-                              child: Padding(
-                                padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
-                                child: _buildFramedSectionContainer(
-                                  isDark: isDark,
-                                  isNarrow: screenWidth < 360,
-                                  header: _buildSunnahHeaderWidget(
-                                    allTasks: allSunnah,
-                                    isDark: isDark,
-                                  ),
-                                  child: displayedSunnah.isEmpty
-                                      ? _buildAllSunnahDoneBanner(isDark)
-                                      : _buildSunnahGridWidget(
-                                          context: context,
-                                          vm: vm,
-                                          tasks: displayedSunnah,
-                                          isDark: isDark,
-                                          textScale: textScale,
-                                        ),
-                                ),
-                              ),
-                            ),
-                          ),
-
-                        // 6. Compact Bottom Switcher (Daily Inspiration | Gratitude Oasis) or Side-by-Side on Tablet
-                        SliverToBoxAdapter(
-                          child: RepaintBoundary(
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
-                              child: _buildBottomInsightsArea(
-                                context: context,
-                                vm: vm,
-                                isDark: isDark,
-                                textScale: textScale,
-                                isWide: isWide,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // 7. Earned Badges
-                        if (vm.earnedBadges.isNotEmpty)
-                          SliverToBoxAdapter(
-                            child: RepaintBoundary(
-                              child: Padding(
-                                padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
-                                child: _buildFramedSectionContainer(
-                                  isDark: isDark,
-                                  isNarrow: screenWidth < 360,
-                                  header: _buildSectionHeaderRow(
-                                    title: "أوسمتك المستحقة",
-                                    icon: Icons.emoji_events_rounded,
-                                    trailingText: "${vm.earnedBadges.length}",
-                                    isDark: isDark,
-                                  ),
-                                  child: _buildBadgesSection(vm, isDark),
-                                ),
-                              ),
-                            ),
-                          ),
-
-                        const SliverToBoxAdapter(child: SizedBox(height: 52)),
-                      ],
-                    );
-                  },
+              return AnimatedSwitcher(
+                duration: const Duration(milliseconds: 280),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.03),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  );
+                },
+                child: KeyedSubtree(
+                  key: ValueKey(_currentTabIndex),
+                  child: _buildCurrentTabContent(
+                    context: context,
+                    vm: vm,
+                    isDark: isDark,
+                    backgroundColor: backgroundColor,
+                    iconColor: iconColor,
+                    textScale: textScale,
+                    allSunnah: allSunnah,
+                    displayedSunnah: displayedSunnah,
+                  ),
                 ),
               );
             },
           ),
         ),
       ),
+    ),
     );
   }
 
-  Widget _buildAppBarPillButton({
-    required String tooltip,
-    required IconData icon,
-    required Color iconColor,
+  Widget _buildCurrentTabContent({
+    required BuildContext context,
+    required TasksViewModel vm,
     required bool isDark,
-    required VoidCallback onPressed,
+    required Color backgroundColor,
+    required Color iconColor,
+    required double textScale,
+    required List<TaskItem> allSunnah,
+    required List<TaskItem> displayedSunnah,
   }) {
+    if (_currentTabIndex == 2) {
+      return AllFeaturesScreen(
+        vm: vm,
+        embedded: true,
+        themeProvider: widget.themeProvider,
+      );
+    }
+    if (_currentTabIndex == 3) {
+      return StatisticsScreen(
+        morningStreak: vm.morningStreak,
+        eveningStreak: vm.eveningStreak,
+        sleepStreak: vm.sleepStreak,
+        embedded: true,
+        themeProvider: widget.themeProvider,
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _handleRefresh(vm),
+      child: LayoutBuilder(
+        builder: (context, viewportConstraints) {
+          final screenWidth = viewportConstraints.maxWidth;
+          final hPad = _horizontalInset(screenWidth);
+          final isWide = screenWidth >= 720;
+
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            slivers: [
+              if (_currentTabIndex == 1)
+                SliverToBoxAdapter(
+                  child: RepaintBoundary(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 0),
+                      child: _buildWorshipDomeHeader(
+                        context: context,
+                        vm: vm,
+                        isDark: isDark,
+                      ),
+                    ),
+                  ),
+                ),
+              if (_currentTabIndex == 0) ...[
+                SliverToBoxAdapter(
+                  child: RepaintBoundary(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPad, 2, hPad, 0),
+                      child: IslamicHomeDashboard(
+                        vm: vm,
+                        themeProvider: widget.themeProvider,
+                        isDark: isDark,
+                        onOpenServicesTab: () {
+                          setState(() => _currentTabIndex = 2);
+                        },
+                        onOpenPrayerDetails: (task) {
+                          final idx = vm.tasks.indexOf(task);
+                          if (idx != -1) {
+                            _handleTaskTap(context, vm, idx, task);
+                          }
+                        },
+                        onTogglePrayerCompletion: (task) {
+                          final idx = vm.tasks.indexOf(task);
+                          if (idx != -1) {
+                            vm.toggleTask(idx);
+                          }
+                        },
+                        bottomWidget: DailyInspirationCard(
+                          vm: vm,
+                          isDark: isDark,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                SliverToBoxAdapter(
+                  child: RepaintBoundary(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
+                      child: _buildSuggestionArea(
+                        context: context,
+                        vm: vm,
+                        isDark: isDark,
+                        textScale: textScale,
+                      ),
+                    ),
+                  ),
+                ),
+                if (vm.prayerTasks.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: RepaintBoundary(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
+                        child: _buildQuickPrayersBar(
+                          context: context,
+                          vm: vm,
+                          isDark: isDark,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (allSunnah.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: RepaintBoundary(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 0),
+                        child: _buildFramedSectionContainer(
+                          isDark: isDark,
+                          isNarrow: screenWidth < 360,
+                          header: _buildSunnahHeaderWidget(
+                            allTasks: allSunnah,
+                            isDark: isDark,
+                          ),
+                          child: displayedSunnah.isEmpty
+                              ? _buildAllSunnahDoneBanner(isDark)
+                              : _buildSunnahGridWidget(
+                                  context: context,
+                                  vm: vm,
+                                  tasks: displayedSunnah,
+                                  isDark: isDark,
+                                  textScale: textScale,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                SliverToBoxAdapter(
+                  child: RepaintBoundary(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
+                      child: _buildBottomInsightsArea(
+                        context: context,
+                        vm: vm,
+                        isDark: isDark,
+                        textScale: textScale,
+                        isWide: isWide,
+                      ),
+                    ),
+                  ),
+                ),
+                if (vm.earnedBadges.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: RepaintBoundary(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
+                        child: _buildFramedSectionContainer(
+                          isDark: isDark,
+                          isNarrow: screenWidth < 360,
+                          header: _buildSectionHeaderRow(
+                            title: "أوسمتك المستحقة",
+                            icon: Icons.emoji_events_rounded,
+                            trailingText: "${vm.earnedBadges.length}",
+                            isDark: isDark,
+                          ),
+                          child: _buildBadgesSection(vm, isDark),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+              const SliverToBoxAdapter(child: SizedBox(height: 28)),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar(BuildContext context, bool isDark) {
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
+    const items = [
+      (label: 'الرئيسية', icon: Icons.home_rounded),
+      (label: 'العبادات', icon: Icons.task_alt_rounded),
+      (label: 'الخدمات', icon: Icons.grid_view_rounded),
+      (label: 'إحصائياتي', icon: Icons.bar_chart_rounded),
+    ];
+
     return Container(
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF172231)
-            : Colors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.18)
-              : context.primaryColor.withValues(alpha: 0.24),
-          width: 1.25,
+        gradient: LinearGradient(
+          colors: context.appCardGradient,
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+        border: Border(
+          top: BorderSide(
+            color: gold.withValues(alpha: isDark ? 0.45 : 0.65),
+            width: 1.2,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(items.length, (idx) {
+              final item = items[idx];
+              final selected = _currentTabIndex == idx;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    if (_currentTabIndex == idx) return;
+                    HapticFeedback.selectionClick();
+                    setState(() => _currentTabIndex = idx);
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutCubic,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                    decoration: BoxDecoration(
+                      gradient: selected
+                          ? const LinearGradient(
+                              colors: [goldLight, gold],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            )
+                          : null,
+                      color: selected ? null : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: selected
+                            ? gold
+                            : Colors.transparent,
+                        width: 1.1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedScale(
+                          scale: selected ? 1.1 : 1.0,
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutBack,
+                          child: Icon(
+                            item.icon,
+                            size: 22,
+                            color: selected
+                                ? const Color(0xFF041D16)
+                                : (isDark
+                                    ? Colors.white60
+                                    : const Color(0xFF475569)),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            item.label,
+                            maxLines: 1,
+                            style: GoogleFonts.cairo(
+                              fontSize: 11,
+                              fontWeight: selected
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
+                              color: selected
+                                  ? const Color(0xFF041D16)
+                                  : (isDark
+                                      ? Colors.white60
+                                      : const Color(0xFF475569)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWorshipDomeHeader({
+    required BuildContext context,
+    required TasksViewModel vm,
+    required bool isDark,
+  }) {
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
+    final accent = context.primaryColor;
+    final totalTasks = vm.tasks.length;
+    final completedTasks = vm.tasks.where((t) => t.isCompleted).length;
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? const [Color(0xFF0A241D), Color(0xFF0F2D24)]
+              : const [Color(0xFFFFFDF7), Color(0xFFF6EED9)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(32),
+          bottom: Radius.circular(22),
+        ),
+        border: Border.all(
+          color: gold.withValues(alpha: isDark ? 0.5 : 0.7),
+          width: 1.4,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isDark ? Colors.black : gold).withValues(alpha: 0.14),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _WorshipArchLatticePainter(
+                color: gold.withValues(alpha: isDark ? 0.12 : 0.2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildWorshipCircleBtn(
+                  icon: Icons.settings_outlined,
+                  tooltip: 'الإعدادات',
+                  isDark: isDark,
+                  accent: accent,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'العبادات والمهام',
+                        style: GoogleFonts.cairo(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? goldLight : context.primaryDarkColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: gold.withValues(alpha: isDark ? 0.16 : 0.14),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: gold.withValues(alpha: isDark ? 0.45 : 0.6),
+                          ),
+                        ),
+                        child: Text(
+                          'إنجاز اليوم: $completedTasks / $totalTasks',
+                          style: GoogleFonts.cairo(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? goldLight : const Color(0xFF78350F),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildWorshipCircleBtn(
+                  icon: isDark
+                      ? Icons.wb_sunny_rounded
+                      : Icons.nights_stay_rounded,
+                  tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
+                  isDark: isDark,
+                  accent: accent,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    widget.themeProvider.toggleTheme(!isDark);
+                  },
                 ),
               ],
+            ),
+          ),
+        ],
       ),
-      child: IconButton(
-        tooltip: tooltip,
-        padding: EdgeInsets.zero,
-        icon: Icon(icon, color: iconColor, size: 21),
-        onPressed: onPressed,
+    );
+  }
+
+  Widget _buildWorshipCircleBtn({
+    required IconData icon,
+    required String tooltip,
+    required bool isDark,
+    required Color accent,
+    required VoidCallback onTap,
+  }) {
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.07)
+                : Colors.white.withValues(alpha: 0.9),
+            border: Border.all(
+              color: gold.withValues(alpha: isDark ? 0.45 : 0.6),
+            ),
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: isDark ? goldLight : accent,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickPrayersBar({
+    required BuildContext context,
+    required TasksViewModel vm,
+    required bool isDark,
+  }) {
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
+    const emeraldDone = Color(0xFF10B981);
+    final completedCount = vm.prayerTasks.where((t) => t.isCompleted).length;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? const [Color(0xFF0E211E), Color(0xFF0A171C)]
+              : const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: gold.withValues(alpha: isDark ? 0.45 : 0.65),
+          width: 1.25,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isDark ? Colors.black : gold).withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: gold.withValues(alpha: isDark ? 0.16 : 0.14),
+                  border: Border.all(color: gold.withValues(alpha: 0.45)),
+                ),
+                child: Icon(
+                  Icons.mosque_rounded,
+                  size: 16,
+                  color: isDark ? goldLight : const Color(0xFF78350F),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'الصلوات الخمس',
+                  style: GoogleFonts.cairo(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+                decoration: BoxDecoration(
+                  color: (completedCount == vm.prayerTasks.length
+                          ? emeraldDone
+                          : gold)
+                      .withValues(alpha: isDark ? 0.18 : 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: (completedCount == vm.prayerTasks.length
+                            ? emeraldDone
+                            : gold)
+                        .withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Text(
+                  '$completedCount/${vm.prayerTasks.length}',
+                  style: GoogleFonts.ibmPlexMono(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                    color: completedCount == vm.prayerTasks.length
+                        ? emeraldDone
+                        : (isDark ? goldLight : const Color(0xFF78350F)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: List.generate(vm.prayerTasks.length, (i) {
+              final task = vm.prayerTasks[i];
+              final done = task.isCompleted;
+              final shortName = task.name.replaceFirst('صلاة ', '').trim();
+              final globalIndex = vm.tasks.indexOf(task);
+
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: i == vm.prayerTasks.length - 1 ? 0 : 6,
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      if (globalIndex != -1) {
+                        vm.toggleTask(globalIndex);
+                      }
+                    },
+                    onLongPress: () {
+                      if (globalIndex != -1) {
+                        _handleTaskTap(context, vm, globalIndex, task);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(14),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: done
+                            ? LinearGradient(
+                                colors: isDark
+                                    ? const [
+                                        Color(0xFF065F46),
+                                        Color(0xFF047857),
+                                      ]
+                                    : const [
+                                        Color(0xFFD1FAE5),
+                                        Color(0xFFA7F3D0),
+                                      ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              )
+                            : LinearGradient(
+                                colors: isDark
+                                    ? const [
+                                        Color(0xFF102421),
+                                        Color(0xFF0B171D),
+                                      ]
+                                    : const [
+                                        Color(0xFFFFFFFF),
+                                        Color(0xFFFDF8EC),
+                                      ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: done
+                              ? emeraldDone
+                              : gold.withValues(alpha: isDark ? 0.35 : 0.55),
+                          width: done ? 1.4 : 1.0,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            done
+                                ? Icons.check_circle_rounded
+                                : Icons.radio_button_unchecked_rounded,
+                            size: 16,
+                            color: done
+                                ? (isDark
+                                    ? Colors.white
+                                    : const Color(0xFF065F46))
+                                : (isDark ? goldLight : const Color(0xFF92400E)),
+                          ),
+                          const SizedBox(height: 4),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              shortName,
+                              maxLines: 1,
+                              style: GoogleFonts.cairo(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: done
+                                    ? (isDark
+                                        ? Colors.white
+                                        : const Color(0xFF064E3B))
+                                    : (isDark
+                                        ? Colors.white
+                                        : const Color(0xFF1E293B)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
       ),
     );
   }
@@ -683,26 +1103,27 @@ class _TasksScreenState extends State<TasksScreen> {
     required Widget header,
     required Widget child,
   }) {
+    const gold = Color(0xFFD4AF37);
     return Container(
       padding: EdgeInsets.all(isNarrow ? 12 : 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF101926) : const Color(0xFFFAFCFE),
+        gradient: LinearGradient(
+          colors: context.appCardGradient,
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.14)
-              : const Color(0xFFCBD5E1),
-          width: 1.35,
+          color: gold.withValues(alpha: isDark ? 0.45 : 0.65),
+          width: 1.25,
         ),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.035),
-                  blurRadius: 14,
-                  offset: const Offset(0, 5),
-                ),
-              ],
+        boxShadow: [
+          BoxShadow(
+            color: (isDark ? Colors.black : gold).withValues(alpha: 0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -720,7 +1141,9 @@ class _TasksScreenState extends State<TasksScreen> {
     required List<TaskItem> allTasks,
     required bool isDark,
   }) {
-    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
+    final accent = isDark ? goldLight : context.primaryColor;
     final completed = allTasks.where((t) => t.isCompleted).length;
 
     return LayoutBuilder(
@@ -733,10 +1156,10 @@ class _TasksScreenState extends State<TasksScreen> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: accent.withValues(alpha: isDark ? 0.18 : 0.12),
-                borderRadius: BorderRadius.circular(10),
+                shape: BoxShape.circle,
+                color: gold.withValues(alpha: isDark ? 0.16 : 0.14),
                 border: Border.all(
-                  color: accent.withValues(alpha: isDark ? 0.34 : 0.25),
+                  color: gold.withValues(alpha: 0.45),
                 ),
               ),
               child: Icon(Icons.spa_rounded, size: 17, color: accent),
@@ -758,10 +1181,10 @@ class _TasksScreenState extends State<TasksScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
               decoration: BoxDecoration(
-                color: accent.withValues(alpha: isDark ? 0.18 : 0.1),
+                color: gold.withValues(alpha: isDark ? 0.18 : 0.12),
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: accent.withValues(alpha: isDark ? 0.36 : 0.28),
+                  color: gold.withValues(alpha: isDark ? 0.45 : 0.55),
                 ),
               ),
               child: Text(
@@ -769,7 +1192,7 @@ class _TasksScreenState extends State<TasksScreen> {
                 style: GoogleFonts.ibmPlexMono(
                   fontSize: 11.5,
                   fontWeight: FontWeight.bold,
-                  color: accent,
+                  color: isDark ? goldLight : const Color(0xFF78350F),
                 ),
               ),
             ),
@@ -779,13 +1202,11 @@ class _TasksScreenState extends State<TasksScreen> {
         final filterPill = Container(
           padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF172231) : Colors.white,
+            color: isDark ? const Color(0xFF0A171C) : Colors.white,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.18)
-                  : const Color(0xFFCBD5E1),
-              width: 1.25,
+              color: gold.withValues(alpha: isDark ? 0.4 : 0.55),
+              width: 1.2,
             ),
           ),
           child: Row(
@@ -909,126 +1330,7 @@ class _TasksScreenState extends State<TasksScreen> {
     required double textScale,
     required bool isWide,
   }) {
-    if (isWide) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: DailyInspirationCard(vm: vm, isDark: isDark),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: _buildGratitudeSection(context, vm, isDark, textScale),
-          ),
-        ],
-      );
-    }
-
-    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF172231) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.16)
-                  : const Color(0xFFCBD5E1),
-              width: 1.3,
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: _buildBottomTabButton(
-                  label: "آية وهمسة اليوم",
-                  icon: Icons.menu_book_rounded,
-                  selected: _bottomInsightTab == 0,
-                  isDark: isDark,
-                  accent: accent,
-                  onTap: () => setState(() => _bottomInsightTab = 0),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: _buildBottomTabButton(
-                  label: "واحة الشكر",
-                  icon: Icons.volunteer_activism_rounded,
-                  selected: _bottomInsightTab == 1,
-                  isDark: isDark,
-                  accent: accent,
-                  onTap: () => setState(() => _bottomInsightTab = 1),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 240),
-          child: _bottomInsightTab == 0
-              ? KeyedSubtree(
-                  key: const ValueKey('daily_inspiration_tab'),
-                  child: DailyInspirationCard(vm: vm, isDark: isDark),
-                )
-              : KeyedSubtree(
-                  key: const ValueKey('gratitude_oasis_tab'),
-                  child: _buildGratitudeSection(context, vm, isDark, textScale),
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBottomTabButton({
-    required String label,
-    required IconData icon,
-    required bool selected,
-    required bool isDark,
-    required Color accent,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(
-          color: selected ? context.primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: selected
-                  ? Colors.white
-                  : (isDark ? Colors.white70 : const Color(0xFF475569)),
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.cairo(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.bold,
-                  color: selected
-                      ? Colors.white
-                      : (isDark ? Colors.white70 : const Color(0xFF334155)),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return _buildGratitudeSection(context, vm, isDark, textScale);
   }
 
   Widget _buildSuggestionArea({
@@ -1512,16 +1814,23 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Widget _buildSmartEventBanner(String event, bool isDark) {
-    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF132230) : const Color(0xFFF0FDF9),
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: isDark
+              ? const [Color(0xFF0E211E), Color(0xFF0A171C)]
+              : const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)],
+          begin: Alignment.centerRight,
+          end: Alignment.centerLeft,
+        ),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: accent.withValues(alpha: isDark ? 0.40 : 0.32),
+          color: gold.withValues(alpha: isDark ? 0.5 : 0.7),
           width: 1.3,
         ),
       ),
@@ -1530,7 +1839,7 @@ class _TasksScreenState extends State<TasksScreen> {
         children: [
           Icon(
             Icons.stars_rounded,
-            color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFD97706),
+            color: isDark ? goldLight : const Color(0xFFD97706),
             size: 19,
           ),
           const SizedBox(width: 8),
@@ -1553,36 +1862,59 @@ class _TasksScreenState extends State<TasksScreen> {
   Widget _buildContextAwareSuggestion(
       BuildContext context, TasksViewModel vm, bool isDark) {
     final suggestion = vm.activeContextSuggestion;
-    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
-    final badgeAccent = suggestion.accentColor;
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
+    final accent = isDark ? goldLight : context.primaryColor;
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF172231) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isDark
-              ? accent.withValues(alpha: 0.42)
-              : const Color(0xFFCBD5E1),
-          width: 1.35,
+          color: gold.withValues(alpha: isDark ? 0.7 : 0.85),
+          width: 1.5,
         ),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+        boxShadow: [
+          BoxShadow(
+            color: gold.withValues(alpha: isDark ? 0.16 : 0.24),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        image: DecorationImage(
+          image: AssetImage(
+            isDark
+                ? 'assets/images/worship_hero_dark.jpg'
+                : 'assets/images/worship_hero_light.jpg',
+          ),
+          fit: BoxFit.cover,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           onTap: () => _handleSuggestionTap(context, vm, suggestion),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22.5),
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [
+                        const Color(0xFF041D16).withValues(alpha: 0.78),
+                        const Color(0xFF041D16).withValues(alpha: 0.35),
+                        Colors.transparent,
+                      ]
+                    : [
+                        const Color(0xFFFFFDF7).withValues(alpha: 0.82),
+                        const Color(0xFFFFFDF7).withValues(alpha: 0.42),
+                        Colors.transparent,
+                      ],
+                stops: const [0.0, 0.55, 1.0],
+                begin: Alignment.centerRight,
+                end: Alignment.centerLeft,
+              ),
+            ),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final textScale = MediaQuery.textScalerOf(context).scale(1.0);
@@ -1590,10 +1922,10 @@ class _TasksScreenState extends State<TasksScreen> {
 
                 final openBadge = Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
                   decoration: BoxDecoration(
-                    color: context.primaryColor,
-                    borderRadius: BorderRadius.circular(10),
+                    color: isDark ? gold : context.primaryColor,
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1601,16 +1933,17 @@ class _TasksScreenState extends State<TasksScreen> {
                       Text(
                         "افتح",
                         style: GoogleFonts.cairo(
-                          fontSize: 10.5,
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color:
+                              isDark ? const Color(0xFF041D16) : Colors.white,
                         ),
                       ),
-                      const SizedBox(width: 2),
-                      const Icon(
+                      const SizedBox(width: 3),
+                      Icon(
                         Icons.arrow_forward_ios_rounded,
                         size: 10,
-                        color: Colors.white,
+                        color: isDark ? const Color(0xFF041D16) : Colors.white,
                       ),
                     ],
                   ),
@@ -1622,8 +1955,8 @@ class _TasksScreenState extends State<TasksScreen> {
                   onPressed: vm.cycleContextSuggestion,
                   icon: Icon(
                     Icons.autorenew_rounded,
-                    size: 18,
-                    color: isDark ? Colors.white70 : accent,
+                    size: 19,
+                    color: isDark ? goldLight : accent,
                   ),
                 );
 
@@ -1633,54 +1966,53 @@ class _TasksScreenState extends State<TasksScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: badgeAccent.withValues(
-                                alpha: isDark ? 0.2 : 0.12),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: badgeAccent.withValues(
-                                  alpha: isDark ? 0.34 : 0.24),
-                            ),
-                          ),
-                          child: Icon(
-                            suggestion.icon,
-                            color: isDark ? Colors.white : badgeAccent,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 11),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
+                                  horizontal: 9,
+                                  vertical: 2.5,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: accent.withValues(
-                                      alpha: isDark ? 0.2 : 0.1),
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: gold.withValues(
+                                      alpha: isDark ? 0.2 : 0.16),
+                                  borderRadius: BorderRadius.circular(999),
                                   border: Border.all(
-                                    color: accent.withValues(
-                                        alpha: isDark ? 0.32 : 0.22),
+                                    color: gold.withValues(
+                                        alpha: isDark ? 0.5 : 0.65),
                                   ),
                                 ),
-                                child: Text(
-                                  "مقترح لك الآن • ${suggestion.categoryLabel}",
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: accent,
-                                  ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      suggestion.icon,
+                                      size: 12,
+                                      color: isDark
+                                          ? goldLight
+                                          : const Color(0xFF78350F),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Flexible(
+                                      child: Text(
+                                        "مقترح لك الآن • ${suggestion.categoryLabel}",
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.cairo(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark
+                                              ? goldLight
+                                              : const Color(0xFF78350F),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 6),
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 alignment: AlignmentDirectional.centerStart,
@@ -1688,31 +2020,32 @@ class _TasksScreenState extends State<TasksScreen> {
                                   suggestion.title,
                                   maxLines: 1,
                                   style: GoogleFonts.cairo(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
                                     color: isDark
                                         ? Colors.white
                                         : const Color(0xFF0F172A),
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 1),
+                              const SizedBox(height: 2),
                               Text(
                                 suggestion.subtitle,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.cairo(
                                   fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
                                   color: isDark
-                                      ? Colors.white70
-                                      : const Color(0xFF475569),
+                                      ? Colors.white.withValues(alpha: 0.88)
+                                      : const Color(0xFF334155),
                                 ),
                               ),
                             ],
                           ),
                         ),
                         if (!compact) ...[
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 8),
                           Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -1886,16 +2219,18 @@ class _TasksScreenState extends State<TasksScreen> {
     required bool isDark,
     String? trailingText,
   }) {
-    final accent = isDark ? const Color(0xFF2DD4BF) : context.primaryColor;
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
+    final accent = isDark ? goldLight : context.primaryColor;
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: accent.withValues(alpha: isDark ? 0.18 : 0.12),
-            borderRadius: BorderRadius.circular(10),
+            shape: BoxShape.circle,
+            color: gold.withValues(alpha: isDark ? 0.16 : 0.14),
             border: Border.all(
-              color: accent.withValues(alpha: isDark ? 0.34 : 0.25),
+              color: gold.withValues(alpha: 0.45),
             ),
           ),
           child: Icon(icon, size: 17, color: accent),
@@ -1915,10 +2250,10 @@ class _TasksScreenState extends State<TasksScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
-              color: accent.withValues(alpha: isDark ? 0.18 : 0.1),
+              color: gold.withValues(alpha: isDark ? 0.18 : 0.12),
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: accent.withValues(alpha: isDark ? 0.36 : 0.28),
+                color: gold.withValues(alpha: isDark ? 0.45 : 0.55),
               ),
             ),
             child: Text(
@@ -1926,7 +2261,7 @@ class _TasksScreenState extends State<TasksScreen> {
               style: GoogleFonts.ibmPlexMono(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: accent,
+                color: isDark ? goldLight : const Color(0xFF78350F),
               ),
             ),
           ),
@@ -2051,4 +2386,34 @@ class _TasksScreenState extends State<TasksScreen> {
       }
     });
   }
+}
+
+class _WorshipArchLatticePainter extends CustomPainter {
+  final Color color;
+  const _WorshipArchLatticePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    const step = 28.0;
+    for (double x = 0; x <= size.width + step; x += step) {
+      for (double y = 0; y <= size.height + step; y += step) {
+        final path = Path()
+          ..moveTo(x, y - 9)
+          ..lineTo(x + 9, y)
+          ..lineTo(x, y + 9)
+          ..lineTo(x - 9, y)
+          ..close();
+        canvas.drawPath(path, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WorshipArchLatticePainter oldDelegate) =>
+      oldDelegate.color != color;
 }

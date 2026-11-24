@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../athkar/models/dhikr_item.dart';
 import '../data/prayer_details_data.dart';
@@ -89,44 +88,11 @@ class _PrayerDetailsScreenState extends State<PrayerDetailsScreen>
     HapticFeedback.selectionClick();
   }
 
-  Color _getPrayerAccent(bool isDark) {
-    if (widget.prayerName.contains(kPrayerFajr)) {
-      return isDark ? const Color(0xFF4DD0E1) : const Color(0xFF00838F);
-    } else if (widget.prayerName.contains(kPrayerDhuhr)) {
-      return isDark ? const Color(0xFF64B5F6) : const Color(0xFF1976D2);
-    } else if (widget.prayerName.contains(kPrayerAsr)) {
-      return isDark ? const Color(0xFFFFB74D) : const Color(0xFFF57C00);
-    } else if (widget.prayerName.contains(kPrayerMaghrib)) {
-      return isDark ? const Color(0xFFBA68C8) : const Color(0xFF7B1FA2);
-    } else if (widget.prayerName.contains(kPrayerIsha)) {
-      return isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32);
-    }
-    return Colors.teal;
-  }
+  static const Color _gold = Color(0xFFD4AF37);
+  static const Color _goldLight = Color(0xFFFDE68A);
 
-  List<Color> _getHeaderGradient(bool isDark) {
-    if (widget.prayerName.contains(kPrayerFajr)) {
-      return isDark
-          ? [const Color(0xFF0D324D), const Color(0xFF1C5D99)]
-          : [const Color(0xFF006064), const Color(0xFF00838F)];
-    } else if (widget.prayerName.contains(kPrayerDhuhr)) {
-      return isDark
-          ? [const Color(0xFF1565C0), const Color(0xFF0D47A1)]
-          : [const Color(0xFF0288D1), const Color(0xFF00ACC1)];
-    } else if (widget.prayerName.contains(kPrayerAsr)) {
-      return isDark
-          ? [const Color(0xFFE65100), const Color(0xFFBF360C)]
-          : [const Color(0xFFF59E0B), const Color(0xFFD97706)];
-    } else if (widget.prayerName.contains(kPrayerMaghrib)) {
-      return isDark
-          ? [const Color(0xFF4A00E0), const Color(0xFF8E2DE2)]
-          : [const Color(0xFF7C3AED), const Color(0xFF6D28D9)];
-    } else if (widget.prayerName.contains(kPrayerIsha)) {
-      return isDark
-          ? [const Color(0xFF0F2027), const Color(0xFF203A43)]
-          : [context.primaryColor, context.primaryLightColor];
-    }
-    return [Colors.teal.shade800, Colors.teal.shade600];
+  Color _getPrayerAccent(bool isDark) {
+    return isDark ? _goldLight : context.primaryColor;
   }
 
   @override
@@ -134,212 +100,294 @@ class _PrayerDetailsScreenState extends State<PrayerDetailsScreen>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final accent = _getPrayerAccent(isDark);
-    final gradient = _getHeaderGradient(isDark);
-    final backgroundColor = isDark ? Colors.black : const Color(0xFFF8FAFC);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
-        backgroundColor: backgroundColor,
-      body: Directionality(
-        textDirection: TextDirection.rtl,
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Custom Header Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: gradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(28),
-                    bottomRight: Radius.circular(28),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: gradient.first.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+        backgroundColor: context.appScaffoldBg,
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: context.appBgGradient,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: SafeArea(
+              child: Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: _gold.withValues(alpha: isDark ? 0.65 : 0.8),
+                        width: 1.4,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _gold.withValues(alpha: isDark ? 0.16 : 0.22),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                      image: DecorationImage(
+                        image: AssetImage(
+                          isDark
+                              ? 'assets/images/prayer_hero_dark.png'
+                              : 'assets/images/prayer_hero_light.png',
+                        ),
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back_ios,
-                              color: Colors.white),
-                          onPressed: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22.5),
+                        gradient: LinearGradient(
+                          colors: isDark
+                              ? [
+                                  Colors.black.withValues(alpha: 0.62),
+                                  Colors.black.withValues(alpha: 0.25),
+                                ]
+                              : [
+                                  Colors.white.withValues(alpha: 0.68),
+                                  Colors.white.withValues(alpha: 0.25),
+                                ],
+                          begin: Alignment.centerRight,
+                          end: Alignment.centerLeft,
                         ),
-                        Expanded(
-                          child: Text(
-                            "صلاة ${_info.title}",
-                            style: GoogleFonts.arefRuqaa(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _isCompleted = !_isCompleted;
-                            });
-                            widget.onToggleCompletion?.call();
-                            HapticFeedback.mediumImpact();
-                          },
-                          borderRadius: BorderRadius.circular(30),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: _isCompleted
-                                  ? Colors.green.withValues(alpha: 0.9)
-                                  : Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white38,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _isCompleted
-                                      ? Icons.check_circle
-                                      : Icons.radio_button_unchecked,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _isCompleted ? "مكتملة" : "إتمام الصلاة",
-                                  style: GoogleFonts.cairo(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              InkWell(
+                                onTap: () => Navigator.pop(context),
+                                borderRadius: BorderRadius.circular(999),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: isDark
+                                        ? Colors.black.withValues(alpha: 0.35)
+                                        : Colors.white.withValues(alpha: 0.85),
+                                    border: Border.all(
+                                      color: _gold.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    size: 18,
+                                    color: isDark
+                                        ? _goldLight
+                                        : const Color(0xFF0F172A),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  "صلاة ${_info.title}",
+                                  style: GoogleFonts.arefRuqaa(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _isCompleted = !_isCompleted;
+                                  });
+                                  widget.onToggleCompletion?.call();
+                                  HapticFeedback.mediumImpact();
+                                },
+                                borderRadius: BorderRadius.circular(999),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: _isCompleted
+                                        ? const Color(0xFF10B981)
+                                        : (isDark
+                                            ? Colors.black.withValues(alpha: 0.4)
+                                            : Colors.white
+                                                .withValues(alpha: 0.85)),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: _isCompleted
+                                          ? const Color(0xFF10B981)
+                                          : _gold.withValues(alpha: 0.7),
+                                      width: 1.3,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _isCompleted
+                                            ? Icons.check_circle_rounded
+                                            : Icons.radio_button_unchecked_rounded,
+                                        color: _isCompleted
+                                            ? Colors.white
+                                            : (isDark
+                                                ? _goldLight
+                                                : const Color(0xFF78350F)),
+                                        size: 17,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        _isCompleted ? "مكتملة" : "إتمام الصلاة",
+                                        style: GoogleFonts.cairo(
+                                          color: _isCompleted
+                                              ? Colors.white
+                                              : (isDark
+                                                  ? _goldLight
+                                                  : const Color(0xFF78350F)),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Quick Info Chips
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        _buildHeaderChip(
-                          icon: Icons.numbers,
-                          label: "${_info.rakaat} ركعات",
-                        ),
-                        _buildHeaderChip(
-                          icon: Icons.record_voice_over,
-                          label: _info.type,
-                        ),
-                        if (widget.prayerTime != null)
-                          _buildHeaderChip(
-                            icon: Icons.access_time,
-                            label:
-                                "${widget.prayerTime!.hour.toString().padLeft(2, '0')}:${widget.prayerTime!.minute.toString().padLeft(2, '0')}",
+                          const SizedBox(height: 12),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              _buildHeaderChip(
+                                icon: Icons.numbers,
+                                label: "${_info.rakaat} ركعات",
+                                isDark: isDark,
+                              ),
+                              _buildHeaderChip(
+                                icon: Icons.record_voice_over,
+                                label: _info.type,
+                                isDark: isDark,
+                              ),
+                              if (widget.prayerTime != null)
+                                _buildHeaderChip(
+                                  icon: Icons.access_time,
+                                  label:
+                                      "${widget.prayerTime!.hour.toString().padLeft(2, '0')}:${widget.prayerTime!.minute.toString().padLeft(2, '0')}",
+                                  isDark: isDark,
+                                ),
+                            ],
                           ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // TabBar Navigation
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  dividerColor: Colors.transparent,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  indicator: BoxDecoration(
-                    color: accent,
-                    borderRadius: BorderRadius.circular(12),
                   ),
-                  labelColor: Colors.white,
-                  unselectedLabelColor:
-                      isDark ? Colors.white60 : Colors.grey[700],
-                  labelStyle: GoogleFonts.cairo(
-                      fontWeight: FontWeight.bold, fontSize: 13.5),
-                  tabs: const [
-                    Tab(
-                      height: 40,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text("أذكار بعد الصلاة"),
+                  const SizedBox(height: 12),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 14),
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF0E211E)
+                          : const Color(0xFFFFFDF8),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: _gold.withValues(alpha: isDark ? 0.45 : 0.65),
                       ),
                     ),
-                    Tab(
-                      height: 40,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text("تفاصيل وأحكام الصلاة"),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      dividerColor: Colors.transparent,
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+                      indicator: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isDark
+                              ? const [Color(0xFF92400E), Color(0xFFD4AF37)]
+                              : const [Color(0xFFFDE68A), Color(0xFFE5B84B)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
                       ),
+                      labelColor:
+                          isDark ? Colors.white : const Color(0xFF451A03),
+                      unselectedLabelColor:
+                          isDark ? Colors.white70 : const Color(0xFF475569),
+                      labelStyle: GoogleFonts.cairo(
+                          fontWeight: FontWeight.bold, fontSize: 13.5),
+                      tabs: const [
+                        Tab(
+                          height: 40,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text("أذكار بعد الصلاة"),
+                          ),
+                        ),
+                        Tab(
+                          height: 40,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text("تفاصيل وأحكام الصلاة"),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildAthkarTab(isDark, accent),
+                        _buildDetailsTab(isDark, accent),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-
-              const SizedBox(height: 10),
-
-              // TabBarView Content
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildAthkarTab(isDark, accent),
-                    _buildDetailsTab(isDark, accent),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 
-  Widget _buildHeaderChip({required IconData icon, required String label}) {
+  Widget _buildHeaderChip({
+    required IconData icon,
+    required String label,
+    required bool isDark,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
+        color: isDark
+            ? Colors.black.withValues(alpha: 0.45)
+            : Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: _gold.withValues(alpha: 0.5),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white, size: 14),
+          Icon(
+            icon,
+            color: isDark ? _goldLight : const Color(0xFF78350F),
+            size: 14,
+          ),
           const SizedBox(width: 4),
           Text(
             label,
             style: GoogleFonts.cairo(
-              color: Colors.white,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -355,20 +403,20 @@ class _PrayerDetailsScreenState extends State<PrayerDetailsScreen>
       children: [
         // Progress Card
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: isDark
+                  ? const [Color(0xFF0E211E), Color(0xFF0A171C)]
+                  : const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
-                color: accent.withValues(alpha: isDark ? 0.3 : 0.2)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              )
-            ],
+              color: _gold.withValues(alpha: isDark ? 0.45 : 0.65),
+            ),
           ),
           child: Column(
             children: [
@@ -384,7 +432,7 @@ class _PrayerDetailsScreenState extends State<PrayerDetailsScreen>
                         style: GoogleFonts.cairo(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
-                          color: isDark ? Colors.white : Colors.black87,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
                     ],
@@ -417,9 +465,10 @@ class _PrayerDetailsScreenState extends State<PrayerDetailsScreen>
                 child: LinearProgressIndicator(
                   value: _athkarProgress,
                   minHeight: 8,
-                  backgroundColor:
-                      isDark ? Colors.grey[800] : Colors.grey[200],
-                  valueColor: AlwaysStoppedAnimation<Color>(accent),
+                  backgroundColor: isDark
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : const Color(0xFFE2E8F0),
+                  valueColor: const AlwaysStoppedAnimation<Color>(_gold),
                 ),
               ),
             ],
@@ -429,7 +478,7 @@ class _PrayerDetailsScreenState extends State<PrayerDetailsScreen>
         // Dhikr Cards List
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             itemCount: _athkar.length,
             itemBuilder: (context, index) {
               final item = _athkar[index];
@@ -438,25 +487,28 @@ class _PrayerDetailsScreenState extends State<PrayerDetailsScreen>
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: isDone
-                      ? (isDark
-                          ? Colors.teal.withValues(alpha: 0.15)
-                          : Colors.teal.shade50)
-                      : (isDark ? const Color(0xFF151A1F) : Colors.white),
-                  borderRadius: BorderRadius.circular(16),
+                  gradient: isDone
+                      ? LinearGradient(
+                          colors: isDark
+                              ? const [Color(0xFF0A2E25), Color(0xFF07211A)]
+                              : const [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : LinearGradient(
+                          colors: isDark
+                              ? const [Color(0xFF0E211E), Color(0xFF0A171C)]
+                              : const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                  borderRadius: BorderRadius.circular(18),
                   border: Border.all(
                     color: isDone
-                        ? Colors.teal
-                        : accent.withValues(alpha: isDark ? 0.2 : 0.15),
-                    width: isDone ? 1.5 : 1,
+                        ? const Color(0xFF10B981)
+                        : _gold.withValues(alpha: isDark ? 0.45 : 0.65),
+                    width: isDone ? 1.5 : 1.2,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
                 child: InkWell(
                   onTap: () => _incrementDhikr(index),

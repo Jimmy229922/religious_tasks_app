@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import '../data/athkar_data.dart';
 import '../models/dhikr_item.dart';
 import 'package:religious_tasks_app/core/services/athkar_tracking_service.dart';
 import 'package:religious_tasks_app/core/services/storage_service.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/features/athkar/models/athkar_time_helper.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_data.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_page_mapping.dart';
@@ -86,10 +88,20 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   }
 
   void _updateCachedTheme() {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final seedColor = themeProvider.getDynamicSeedColor(
+      DateTime.now().hour,
+      isDark: _isNightMode,
+    );
     final baseTheme = _isNightMode
         ? ThemeData.dark(useMaterial3: true)
         : ThemeData.light(useMaterial3: true);
     _cachedTheme = baseTheme.copyWith(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: seedColor,
+        primary: seedColor,
+        brightness: _isNightMode ? Brightness.dark : Brightness.light,
+      ),
       textTheme: GoogleFonts.cairoTextTheme(baseTheme.textTheme),
       scaffoldBackgroundColor:
           _isNightMode ? Colors.black : const Color(0xFFF6F7FB),
@@ -944,13 +956,8 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
       child: Builder(builder: (context) {
         final isDark = _isNightMode;
 
-        final appBarColor = isDark
-            ? Colors.black
-            : (widget.title == "أذكار النوم"
-                ? const Color(0xFF3949AB)
-                : (widget.isMorning
-                    ? const Color(0xFF2E7D32)
-                    : const Color(0xFF3949AB)));
+        final appBarColor =
+            isDark ? context.appHeaderBg : context.primaryColor;
 
         return PopScope(
           canPop: false,
@@ -961,11 +968,18 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
           child: Directionality(
             textDirection: TextDirection.rtl,
             child: Scaffold(
-              backgroundColor: isDark ? Colors.black : null,
+              backgroundColor: context.appScaffoldBg,
               appBar: AppBar(
-                title: Text(widget.title),
+                title: Text(
+                  widget.title,
+                  style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFFFDE68A) : Colors.white,
+                  ),
+                ),
                 backgroundColor: appBarColor,
-                foregroundColor: Colors.white,
+                foregroundColor:
+                    isDark ? const Color(0xFFFDE68A) : Colors.white,
                 systemOverlayStyle: SystemUiOverlayStyle.light,
                 elevation: 0,
                 leading: IconButton(
@@ -999,13 +1013,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: isDark
-                              ? const [Color(0xFF0B131E), Color(0xFF152233)]
-                              : (_isSleepAthkar
-                                  ? const [Color(0xFFEEF2FF), Color(0xFFE0E7FF)]
-                                  : (widget.isMorning
-                                      ? const [Color(0xFFF0FDF4), Color(0xFFE6F4EA), Color(0xFFF0FDF4)]
-                                      : const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)])),
+                          colors: context.appBgGradient,
                         ),
                       ),
                       child: _buildContent(context),

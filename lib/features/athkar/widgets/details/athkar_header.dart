@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 
 class AthkarHeader extends StatelessWidget {
   final String title;
@@ -22,24 +24,33 @@ class AthkarHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final accentStart = isMorning
-        ? (isDark ? const Color(0xFF1B5E20) : const Color(0xFF2E7D32))
-        : (isDark ? const Color(0xFF1A237E) : const Color(0xFF3949AB));
-    final accentEnd = isMorning
-        ? (isDark ? const Color(0xFF2E7D32) : const Color(0xFF81C784))
-        : (isDark ? const Color(0xFF303F9F) : const Color(0xFF7986CB));
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [accentStart, accentEnd],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: context.appCardGradient,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: allDone
+              ? const Color(0xFF10B981)
+              : gold.withValues(alpha: isDark ? 0.55 : 0.75),
+          width: 1.35,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isDark ? Colors.black : gold).withValues(alpha: 0.14),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,22 +61,25 @@ class AthkarHeader extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
+                  color: gold.withValues(alpha: isDark ? 0.16 : 0.14),
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: gold.withValues(alpha: 0.55),
+                  ),
                 ),
                 child: Icon(
                   isSleep
                       ? Icons.bedtime_rounded
-                      : (isMorning ? Icons.wb_sunny_rounded : Icons.nights_stay),
-                  color: Colors.white,
+                      : (isMorning ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded),
+                  color: isDark ? goldLight : const Color(0xFF78350F),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: GoogleFonts.cairo(
+                    color: isDark ? goldLight : const Color(0xFF0F172A),
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -76,29 +90,31 @@ class AthkarHeader extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFF10B981)),
                   ),
-                  child: const Text(
-                    'مكتملة',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                  child: Text(
+                    'مكتملة ✓',
+                    style: GoogleFonts.cairo(
+                      color: const Color(0xFF10B981),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 10),
-          // Progress Bar
+          const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 8,
-              backgroundColor: Colors.white.withValues(alpha: 0.25),
-              color: Colors.white,
+              backgroundColor: isDark
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : const Color(0xFFE2E8F0),
+              color: allDone ? const Color(0xFF10B981) : gold,
             ),
           ),
           const SizedBox(height: 8),
@@ -107,18 +123,18 @@ class AthkarHeader extends StatelessWidget {
             children: [
               Text(
                 '${(progress * 100).toInt()}%',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                style: GoogleFonts.ibmPlexMono(
+                  color: isDark ? goldLight : const Color(0xFF78350F),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12.5,
                 ),
               ),
               Text(
                 '$totalCurrent / $totalTarget',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                style: GoogleFonts.ibmPlexMono(
+                  color: isDark ? Colors.white70 : const Color(0xFF475569),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12.5,
                 ),
               ),
             ],

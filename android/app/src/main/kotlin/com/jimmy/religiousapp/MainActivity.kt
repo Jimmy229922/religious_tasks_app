@@ -12,6 +12,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
     private var pendingAccountResult: MethodChannel.Result? = null
+    private var qiblaSensorHandler: QiblaSensorHandler? = null
 
     companion object {
         private const val REQUEST_CODE_PICK_ACCOUNT = 1009
@@ -56,6 +57,7 @@ class MainActivity : AudioServiceActivity() {
     @Suppress("DEPRECATION")
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        qiblaSensorHandler = QiblaSensorHandler(this, flutterEngine.dartExecutor.binaryMessenger)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "religious_tasks_app/native_adhan")
             .setMethodCallHandler { call, result ->

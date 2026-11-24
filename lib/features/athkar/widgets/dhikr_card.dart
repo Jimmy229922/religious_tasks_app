@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import 'package:religious_tasks_app/core/widgets/islamic_card_generator_dialog.dart';
 
@@ -43,28 +44,27 @@ class DhikrCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
+    const emeraldDone = Color(0xFF10B981);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final accent = isMorning
-        ? (isDark ? const Color(0xFF10B981) : const Color(0xFF0F766E))
-        : (isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5));
+    final accent = isDark ? goldLight : context.primaryColor;
 
     final isDone = item.current >= item.count;
     final progress = item.count == 0 ? 0.0 : item.current / item.count;
 
-    final surface = isDone
-        ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5))
-        : (trueBlackMode
-            ? Colors.black
-            : (isDark ? const Color(0xFF141A1E) : Colors.white));
+    final cardColors = isDone
+        ? (isDark
+            ? const [Color(0xFF0A2E25), Color(0xFF07211A)]
+            : const [Color(0xFFECFDF5), Color(0xFFD1FAE5)])
+        : context.appCardGradient;
 
     final border = isDone
-        ? (isDark ? Colors.teal.shade400 : Colors.teal.shade600)
-        : (trueBlackMode
-            ? Colors.white24
-            : (isDark ? Colors.white10 : accent.withValues(alpha: 0.22)));
+        ? emeraldDone
+        : gold.withValues(alpha: isDark ? 0.5 : 0.7);
 
     final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
-    final textMuted = isDark ? Colors.white70 : Colors.grey.shade700;
+    final textMuted = isDark ? Colors.white70 : const Color(0xFF475569);
     final rewardColor = isDark ? Colors.white70 : const Color(0xFF334155);
 
     final rewardText =
@@ -97,20 +97,24 @@ class DhikrCard extends StatelessWidget {
           );
         }
       },
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(22),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            colors: cardColors,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: border,
-            width: isDone ? 2 : 1.2,
+            width: isDone ? 1.8 : 1.25,
           ),
           boxShadow: [
             BoxShadow(
-              color: accent.withValues(alpha: isDone ? 0.2 : 0.08),
+              color: (isDone ? emeraldDone : gold).withValues(alpha: 0.12),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),

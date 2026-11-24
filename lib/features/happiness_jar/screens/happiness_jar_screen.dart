@@ -132,7 +132,9 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
       await prefs.setStringList(_favoritesKey, updated.toList());
     } catch (_) {}
     _showSnack(
-      added ? 'تم حفظ الرسالة في مفضلة السعادة ❤️' : 'تمت إزالة الرسالة من المفضلة',
+      added
+          ? 'تم حفظ الرسالة في مفضلة السعادة ❤️'
+          : 'تمت إزالة الرسالة من المفضلة',
     );
   }
 
@@ -269,19 +271,19 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
         .toList();
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0B131E) : const Color(0xFFF3F8F6),
+      backgroundColor: context.appScaffoldBg,
       appBar: AppBar(
         title: Text(
           'برطمان السعادة 💛',
           style: GoogleFonts.cairo(
             fontWeight: FontWeight.bold,
             fontSize: 18,
+            color: isDark ? const Color(0xFFFDE68A) : Colors.white,
           ),
         ),
         centerTitle: true,
-        backgroundColor: isDark ? const Color(0xFF0B131E) : _emerald,
-        foregroundColor: Colors.white,
+        backgroundColor: isDark ? context.appHeaderBg : _emerald,
+        foregroundColor: isDark ? const Color(0xFFFDE68A) : Colors.white,
         systemOverlayStyle: SystemUiOverlayStyle.light,
         elevation: 0,
         actions: [
@@ -292,109 +294,118 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
           ),
         ],
       ),
-      body: Directionality(
-        textDirection: TextDirection.rtl,
-        child: ListView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          children: [
-            // 1. Hero Interactive Jar Banner
-            _buildJarHeroCard(isDark),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: context.appBgGradient,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            children: [
+              // 1. Hero Interactive Jar Banner
+              _buildJarHeroCard(isDark),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // 2. Category Filter Chips
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                children: HappinessCategory.values.map((cat) {
-                  final selected = _selectedCategory == cat;
-                  return Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: ChoiceChip(
-                      selected: selected,
-                      selectedColor: _emerald,
-                      backgroundColor:
-                          isDark ? const Color(0xFF172231) : Colors.white,
-                      side: BorderSide(
-                        color: selected
-                            ? _gold
-                            : (isDark
-                                ? Colors.white12
-                                : _emerald.withValues(alpha: 0.2)),
-                      ),
-                      showCheckmark: false,
-                      label: Text(
-                        '${cat.emoji} ${cat.label}',
-                        style: GoogleFonts.cairo(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+              // 2. Category Filter Chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: HappinessCategory.values.map((cat) {
+                    final selected = _selectedCategory == cat;
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: ChoiceChip(
+                        selected: selected,
+                        selectedColor: _emerald,
+                        backgroundColor:
+                            isDark ? const Color(0xFF172231) : Colors.white,
+                        side: BorderSide(
                           color: selected
-                              ? Colors.white
+                              ? _gold
                               : (isDark
-                                  ? Colors.white70
-                                  : const Color(0xFF0F172A)),
+                                  ? Colors.white12
+                                  : _emerald.withValues(alpha: 0.2)),
                         ),
+                        showCheckmark: false,
+                        label: Text(
+                          '${cat.emoji} ${cat.label}',
+                          style: GoogleFonts.cairo(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: selected
+                                ? Colors.white
+                                : (isDark
+                                    ? Colors.white70
+                                    : const Color(0xFF0F172A)),
+                          ),
+                        ),
+                        onSelected: (_) {
+                          setState(() {
+                            _selectedCategory = cat;
+                            if (cat != HappinessCategory.all &&
+                                _drawnMessage.category != cat) {
+                              _drawnMessage = HappinessJarData.getRandomMessage(
+                                category: cat,
+                              );
+                            }
+                          });
+                        },
                       ),
-                      onSelected: (_) {
-                        setState(() {
-                          _selectedCategory = cat;
-                          if (cat != HappinessCategory.all &&
-                              _drawnMessage.category != cat) {
-                            _drawnMessage = HappinessJarData.getRandomMessage(
-                              category: cat,
-                            );
-                          }
-                        });
-                      },
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // 3. Drawn Message Card
-            _buildDrawnMessageCard(_drawnMessage, isDark),
-
-            const SizedBox(height: 18),
-
-            // 4. Bottom Switcher: Today's Message | Favorites | Daily Notification
-            Container(
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF172231) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.grey.shade200,
+                    );
+                  }).toList(),
                 ),
               ),
-              child: Row(
-                children: [
-                  _buildTabChip(0, 'رسالة اليوم ☀️', isDark),
-                  _buildTabChip(
-                    1,
-                    'المفضلة (${QuranTextFormatter.toArabicDigits(favorites.length.toString())})',
-                    isDark,
+
+              const SizedBox(height: 16),
+
+              // 3. Drawn Message Card
+              _buildDrawnMessageCard(_drawnMessage, isDark),
+
+              const SizedBox(height: 18),
+
+              // 4. Bottom Switcher: Today's Message | Favorites | Daily Notification
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF172231) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.grey.shade200,
                   ),
-                  _buildTabChip(2, 'الإشعار اليومي 🔔', isDark),
-                ],
+                ),
+                child: Row(
+                  children: [
+                    _buildTabChip(0, 'رسالة اليوم ☀️', isDark),
+                    _buildTabChip(
+                      1,
+                      'المفضلة (${QuranTextFormatter.toArabicDigits(favorites.length.toString())})',
+                      isDark,
+                    ),
+                    _buildTabChip(2, 'الإشعار اليومي 🔔', isDark),
+                  ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 14),
+              const SizedBox(height: 14),
 
-            if (_bottomSection == 0)
-              _buildTodayMessageSection(isDark)
-            else if (_bottomSection == 1)
-              _buildFavoritesSection(favorites, isDark)
-            else
-              _buildNotificationScheduleSection(isDark),
-          ],
+              if (_bottomSection == 0)
+                _buildTodayMessageSection(isDark)
+              else if (_bottomSection == 1)
+                _buildFavoritesSection(favorites, isDark)
+              else
+                _buildNotificationScheduleSection(isDark),
+            ],
+          ),
         ),
       ),
     );
@@ -433,8 +444,8 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
               clipBehavior: Clip.none,
               children: [
                 AnimatedBuilder(
-                  animation: Listenable.merge(
-                      [_shakeController, _floatController]),
+                  animation:
+                      Listenable.merge([_shakeController, _floatController]),
                   builder: (context, child) {
                     final shakeProgress = _shakeController.value;
                     final angle = math.sin(shakeProgress * math.pi * 6) *
@@ -455,11 +466,30 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
                       ),
                     );
                   },
-                  child: const SizedBox(
-                    width: 120,
+                  child: Container(
+                    width: 132,
                     height: 132,
-                    child: CustomPaint(
-                      painter: _HappinessJarPainter(),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _gold,
+                        width: 2.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _gold.withValues(alpha: 0.3),
+                          blurRadius: 18,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        isDark
+                            ? 'assets/images/happiness_jar.jpg'
+                            : 'assets/images/happiness_jar_light.jpg',
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                 ),
@@ -550,9 +580,7 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
                     )
                   : const Icon(Icons.volunteer_activism_rounded, size: 20),
               label: Text(
-                _isDrawing
-                    ? 'جاري سحب رسالتك...'
-                    : 'اسحب رسالة سعادة جديدة ✨',
+                _isDrawing ? 'جاري سحب رسالتك...' : 'اسحب رسالة سعادة جديدة ✨',
                 style: GoogleFonts.cairo(
                   fontSize: 14.5,
                   fontWeight: FontWeight.bold,
@@ -659,136 +687,139 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
                   ),
                 ],
               ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: _amber.withValues(alpha: isDark ? 0.2 : 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${message.category.emoji} ${message.category.label}',
-                    style: GoogleFonts.cairo(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.amberAccent : _amber,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  tooltip: isFav ? 'إزالة من المفضلة' : 'حفظ في المفضلة',
-                  onPressed: () => _toggleFavorite(message),
-                  icon: Icon(
-                    isFav
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    color: isFav
-                        ? Colors.pinkAccent
-                        : (isDark ? Colors.white54 : Colors.grey.shade500),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message.title,
-              style: GoogleFonts.cairo(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.tealAccent : _emeraldDark,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              message.body,
-              style: GoogleFonts.amiri(
-                fontSize: 21,
-                height: 1.7,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
-              ),
-            ),
-            if (message.reflection != null) ...[
-              const SizedBox(height: 14),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? _emerald.withValues(alpha: 0.16)
-                      : const Color(0xFFF0FDF9),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: _emerald.withValues(alpha: 0.24),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.spa_rounded,
-                      size: 18,
-                      color: isDark ? Colors.tealAccent : _emerald,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        message.reflection!,
-                        style: GoogleFonts.cairo(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.tealAccent : _emeraldDark,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _amber.withValues(alpha: isDark ? 0.2 : 0.12),
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: Text(
+                          '${message.category.emoji} ${message.category.label}',
+                          style: GoogleFonts.cairo(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.amberAccent : _amber,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: isFav ? 'إزالة من المفضلة' : 'حفظ في المفضلة',
+                        onPressed: () => _toggleFavorite(message),
+                        icon: Icon(
+                          isFav
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          color: isFav
+                              ? Colors.pinkAccent
+                              : (isDark
+                                  ? Colors.white54
+                                  : Colors.grey.shade500),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message.title,
+                    style: GoogleFonts.cairo(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.tealAccent : _emeraldDark,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    message.body,
+                    style: GoogleFonts.amiri(
+                      fontSize: 21,
+                      height: 1.7,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                  if (message.reflection != null) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? _emerald.withValues(alpha: 0.16)
+                            : const Color(0xFFF0FDF9),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _emerald.withValues(alpha: 0.24),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.spa_rounded,
+                            size: 18,
+                            color: isDark ? Colors.tealAccent : _emerald,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              message.reflection!,
+                              style: GoogleFonts.cairo(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color:
+                                    isDark ? Colors.tealAccent : _emeraldDark,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
+                  const SizedBox(height: 14),
+                  Divider(
+                    height: 1,
+                    color: isDark ? Colors.white10 : Colors.grey.shade200,
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildActionChipButton(
+                          isDark: isDark,
+                          icon: Icons.copy_rounded,
+                          label: 'نسخ',
+                          onTap: () => _copyMessage(message),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildActionChipButton(
+                          isDark: isDark,
+                          icon: Icons.share_rounded,
+                          label: 'مشاركة',
+                          onTap: () => _shareMessage(message),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildActionChipButton(
+                          isDark: isDark,
+                          icon: Icons.image_rounded,
+                          label: 'بطاقة',
+                          onTap: () => _openCardDialog(message),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-            const SizedBox(height: 14),
-            Divider(
-              height: 1,
-              color: isDark ? Colors.white10 : Colors.grey.shade200,
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildActionChipButton(
-                    isDark: isDark,
-                    icon: Icons.copy_rounded,
-                    label: 'نسخ',
-                    onTap: () => _copyMessage(message),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildActionChipButton(
-                    isDark: isDark,
-                    icon: Icons.share_rounded,
-                    label: 'مشاركة',
-                    onTap: () => _shareMessage(message),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildActionChipButton(
-                    isDark: isDark,
-                    icon: Icons.image_rounded,
-                    label: 'بطاقة',
-                    onTap: () => _openCardDialog(message),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -810,8 +841,7 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon,
-                size: 16, color: isDark ? Colors.tealAccent : _emerald),
+            Icon(icon, size: 16, color: isDark ? Colors.tealAccent : _emerald),
             const SizedBox(width: 5),
             Text(
               label,
@@ -880,8 +910,8 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
                   color: _amber.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.wb_sunny_rounded,
-                    color: _amber, size: 20),
+                child:
+                    const Icon(Icons.wb_sunny_rounded, color: _amber, size: 20),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -927,7 +957,8 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
             style: GoogleFonts.cairo(
               fontSize: 13.5,
               height: 1.65,
-              color: isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black87,
+              color:
+                  isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black87,
             ),
           ),
         ],
@@ -935,8 +966,7 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
     );
   }
 
-  Widget _buildFavoritesSection(
-      List<HappinessMessage> favorites, bool isDark) {
+  Widget _buildFavoritesSection(List<HappinessMessage> favorites, bool isDark) {
     if (favorites.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(24),
@@ -952,7 +982,8 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
         child: Column(
           children: [
             Icon(Icons.favorite_border_rounded,
-                size: 40, color: isDark ? Colors.white38 : Colors.grey.shade400),
+                size: 40,
+                color: isDark ? Colors.white38 : Colors.grey.shade400),
             const SizedBox(height: 8),
             Text(
               'لا توجد رسائل مفضلة بعد',
@@ -1086,7 +1117,8 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
                 value: _prefs.happinessJarEnabled,
                 activeTrackColor: _emerald,
                 activeThumbColor: Colors.white,
-                onChanged: _isUpdatingSchedule ? null : _toggleDailyNotification,
+                onChanged:
+                    _isUpdatingSchedule ? null : _toggleDailyNotification,
               ),
             ],
           ),
@@ -1097,9 +1129,8 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF1E2B3C)
-                    : const Color(0xFFF6FAF9),
+                color:
+                    isDark ? const Color(0xFF1E2B3C) : const Color(0xFFF6FAF9),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: _emerald.withValues(alpha: 0.25),
@@ -1168,126 +1199,4 @@ class _HappinessJarScreenState extends State<HappinessJarScreen>
       ),
     );
   }
-}
-
-class _HappinessJarPainter extends CustomPainter {
-  const _HappinessJarPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    // Warm outer glow
-    final glowPaint = Paint()
-      ..color = const Color(0xFFFDE68A).withValues(alpha: 0.22)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
-    canvas.drawCircle(Offset(w * 0.5, h * 0.58), w * 0.42, glowPaint);
-
-    // Jar body glass path
-    final bodyRect = RRect.fromRectAndCorners(
-      Rect.fromLTWH(w * 0.16, h * 0.24, w * 0.68, h * 0.68),
-      topLeft: const Radius.circular(22),
-      topRight: const Radius.circular(22),
-      bottomLeft: const Radius.circular(26),
-      bottomRight: const Radius.circular(26),
-    );
-    final glassFill = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withValues(alpha: 0.34),
-          Colors.white.withValues(alpha: 0.12),
-        ],
-      ).createShader(bodyRect.outerRect);
-    canvas.drawRRect(bodyRect, glassFill);
-
-    // Rolled colorful message scrolls inside the jar
-    final noteColors = [
-      const Color(0xFFFDE68A),
-      const Color(0xFFFDA4AF),
-      const Color(0xFFA7F3D0),
-      const Color(0xFFBAE6FD),
-      const Color(0xFFFCD34D),
-      const Color(0xFFDDD6FE),
-    ];
-    final noteOffsets = [
-      Offset(w * 0.34, h * 0.72),
-      Offset(w * 0.54, h * 0.74),
-      Offset(w * 0.44, h * 0.60),
-      Offset(w * 0.62, h * 0.58),
-      Offset(w * 0.32, h * 0.53),
-      Offset(w * 0.50, h * 0.45),
-    ];
-    final noteAngles = [-0.35, 0.28, -0.15, 0.42, 0.22, -0.3];
-
-    for (int i = 0; i < noteOffsets.length; i++) {
-      canvas.save();
-      canvas.translate(noteOffsets[i].dx, noteOffsets[i].dy);
-      canvas.rotate(noteAngles[i]);
-      final notePaint = Paint()..color = noteColors[i];
-      final noteRect = RRect.fromRectAndRadius(
-        const Rect.fromLTWH(-13, -7, 26, 14),
-        const Radius.circular(6),
-      );
-      canvas.drawRRect(noteRect, notePaint);
-      // Small golden ribbon tie in the center
-      final ribbonPaint = Paint()
-        ..color = const Color(0xFFB45309).withValues(alpha: 0.65)
-        ..strokeWidth = 2;
-      canvas.drawLine(const Offset(0, -7), const Offset(0, 7), ribbonPaint);
-      canvas.restore();
-    }
-
-    // Jar glass border
-    final glassStroke = Paint()
-      ..color = Colors.white.withValues(alpha: 0.7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2;
-    canvas.drawRRect(bodyRect, glassStroke);
-
-    // Glass reflection highlight
-    final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.35)
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(
-      Offset(w * 0.24, h * 0.34),
-      Offset(w * 0.24, h * 0.78),
-      highlightPaint,
-    );
-
-    // Jar neck
-    final neckRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(w * 0.28, h * 0.16, w * 0.44, h * 0.10),
-      const Radius.circular(6),
-    );
-    canvas.drawRRect(
-      neckRect,
-      Paint()..color = Colors.white.withValues(alpha: 0.28),
-    );
-    canvas.drawRRect(neckRect, glassStroke);
-
-    // Golden lid
-    final lidRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(w * 0.24, h * 0.08, w * 0.52, h * 0.10),
-      const Radius.circular(8),
-    );
-    final lidPaint = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFFFDE68A), Color(0xFFD4AF37), Color(0xFFB45309)],
-      ).createShader(lidRect.outerRect);
-    canvas.drawRRect(lidRect, lidPaint);
-
-    // Sparkle dots
-    final sparklePaint = Paint()..color = const Color(0xFFFEF08A);
-    canvas.drawCircle(Offset(w * 0.12, h * 0.26), 3.2, sparklePaint);
-    canvas.drawCircle(Offset(w * 0.89, h * 0.34), 2.8, sparklePaint);
-    canvas.drawCircle(Offset(w * 0.85, h * 0.18), 2.2, sparklePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

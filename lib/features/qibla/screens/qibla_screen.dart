@@ -11,23 +11,19 @@ import 'package:provider/provider.dart';
 import 'package:religious_tasks_app/core/services/location_service.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
+import 'package:religious_tasks_app/features/qibla/services/qibla_geodesic_service.dart';
+import 'package:religious_tasks_app/features/qibla/widgets/qibla_interactive_map.dart';
 import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
 
 class QiblaMath {
-  static double normalizeAngle(double angle) {
-    final normalized = ((angle % 360.0) + 360.0) % 360.0;
-    return normalized == 360.0 ? 0.0 : normalized;
-  }
+  static double normalizeAngle(double angle) =>
+      QiblaGeodesicService.normalizeAngle(angle);
 
-  /// Returns the shortest signed angular difference in [-180, 180)
-  /// Positive means clockwise (turn right), negative means counter-clockwise (turn left).
-  static double shortestSignedDelta(double fromDeg, double toDeg) {
-    return ((toDeg - fromDeg + 540.0) % 360.0) - 180.0;
-  }
+  static double shortestSignedDelta(double fromDeg, double toDeg) =>
+      QiblaGeodesicService.shortestSignedDelta(fromDeg, toDeg);
 
-  static bool isAligned(double signedDiffDeg, {double toleranceDeg = 4.0}) {
-    return signedDiffDeg.abs() <= toleranceDeg;
-  }
+  static bool isAligned(double signedDiffDeg, {double toleranceDeg = 4.0}) =>
+      QiblaGeodesicService.isAligned(signedDiffDeg, toleranceDeg: toleranceDeg);
 }
 
 enum _CompassAccuracyLevel { high, medium, low, unknown }
@@ -40,30 +36,67 @@ class QiblaScreen extends StatefulWidget {
   State<QiblaScreen> createState() => _QiblaScreenState();
 }
 
-class _QiblaScreenState extends State<QiblaScreen> {
+class _QiblaScreenState extends State<QiblaScreen> with WidgetsBindingObserver {
   Color get _emerald => context.primaryColor;
   static const Color _gold = Color(0xFFD4AF37);
+  static const Color _goldLight = Color(0xFFFDE68A);
   static const double _alignmentToleranceDeg = 4.0;
+
+  static const EventChannel _nativeSensorChannel =
+      EventChannel('religious_tasks_app/qibla_sensor');
+  static const MethodChannel _nativeControlChannel =
+      MethodChannel('religious_tasks_app/qibla_control');
 
   double? _smoothedHeading;
   double? _continuousHeading;
-  double? _accuracyValue;
+  double? _fallbackAccuracy;
+  int? _nativeAccuracyStatus;
+  double? _declinationDeg;
+  double? _magneticFieldUt;
+  bool _magneticInterference = false;
+  bool _isFlat = true;
   bool _wasAligned = false;
   bool _sensorUnavailable = false;
   bool _isRefreshingLocation = false;
+  bool _isInitialLoading = true;
+  int _validHeadingSamples = 0;
+  double? _locationAccuracyMeters;
 
   late Coordinates _activeCoordinates;
   String? _locationName;
 
-  StreamSubscription<CompassEvent>? _subscription;
+  StreamSubscription<dynamic>? _nativeSubscription;
+  StreamSubscription<CompassEvent>? _fallbackSubscription;
   Timer? _sensorTimeout;
+  Timer? _initialLoadTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _activeCoordinates = widget.coordinates;
     _syncLocationFromViewModel();
-    _initCompass();
+    _pushLocationToNativeSensor();
+    _startCompassListening();
+    _initialLoadTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted && _isInitialLoading) {
+        setState(() => _isInitialLoading = false);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _refreshGpsLocation();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _stopCompassListening();
+    } else if (state == AppLifecycleState.resumed) {
+      _pushLocationToNativeSensor();
+      _startCompassListening();
+    }
   }
 
   void _syncLocationFromViewModel() {
@@ -74,9 +107,17 @@ class _QiblaScreenState extends State<QiblaScreen> {
         _activeCoordinates = vmCoords;
       }
       _locationName = vm.locationName;
-    } catch (_) {
-      // Standalone usage without TasksViewModel in widget tree
-    }
+    } catch (_) {}
+  }
+
+  Future<void> _pushLocationToNativeSensor() async {
+    try {
+      await _nativeControlChannel.invokeMethod<void>('setLocation', {
+        'latitude': _activeCoordinates.latitude,
+        'longitude': _activeCoordinates.longitude,
+        'altitude': 0.0,
+      });
+    } catch (_) {}
   }
 
   Future<void> _refreshGpsLocation() async {
@@ -84,113 +125,199 @@ class _QiblaScreenState extends State<QiblaScreen> {
     setState(() => _isRefreshingLocation = true);
 
     try {
-      TasksViewModel? vm;
-      try {
-        vm = Provider.of<TasksViewModel>(context, listen: false);
-      } catch (_) {}
-
-      if (vm != null) {
-        await vm.refreshLocation();
+      final res = await LocationService().getHighAccuracyPosition(
+        requestPermission: true,
+      );
+      if (!mounted) return;
+      if (res.position != null) {
+        final pos = res.position!;
+        final coords = Coordinates(pos.latitude, pos.longitude);
+        final name = await LocationService().getLocationName(pos);
         if (!mounted) return;
         setState(() {
-          if (vm!.prayerTimes?.coordinates != null) {
-            _activeCoordinates = vm.prayerTimes!.coordinates;
-          }
-          _locationName = vm.locationName;
+          _activeCoordinates = coords;
+          _locationName = name;
+          _locationAccuracyMeters = pos.accuracy;
         });
+        await _pushLocationToNativeSensor();
       } else {
-        final res = await LocationService().getCurrentPosition(
-          requestPermission: true,
-        );
-        if (!mounted) return;
-        if (res.position != null) {
-          final coords = Coordinates(
-            res.position!.latitude,
-            res.position!.longitude,
-          );
-          final name = await LocationService().getLocationName(res.position!);
+        try {
+          final vm = Provider.of<TasksViewModel>(context, listen: false);
+          await vm.refreshLocation();
           if (!mounted) return;
           setState(() {
-            _activeCoordinates = coords;
-            _locationName = name;
+            if (vm.prayerTimes?.coordinates != null) {
+              _activeCoordinates = vm.prayerTimes!.coordinates;
+            }
+            _locationName = vm.locationName;
           });
-        }
+          await _pushLocationToNativeSensor();
+        } catch (_) {}
       }
     } finally {
       if (mounted) {
         setState(() => _isRefreshingLocation = false);
+        _checkInitialLoadComplete();
       }
     }
   }
 
-  void _initCompass() {
+  void _startCompassListening() {
+    _stopCompassListening();
+    _sensorTimeout = Timer(const Duration(seconds: 4), () {
+      if (mounted && _smoothedHeading == null) {
+        _startFallbackCompass();
+      }
+    });
+
+    try {
+      _nativeSubscription = _nativeSensorChannel.receiveBroadcastStream().listen(
+        (dynamic data) {
+          if (!mounted || data is! Map) return;
+          final trueHeading = (data['trueHeading'] as num?)?.toDouble();
+          if (trueHeading == null || trueHeading.isNaN) return;
+
+          _sensorTimeout?.cancel();
+          _nativeAccuracyStatus = (data['accuracyStatus'] as num?)?.toInt();
+          _declinationDeg = (data['declination'] as num?)?.toDouble();
+          _magneticFieldUt = (data['magneticFieldUt'] as num?)?.toDouble();
+          _magneticInterference = data['magneticInterference'] == true;
+          _isFlat = data['isFlat'] != false;
+
+          _processHeadingSample(trueHeading);
+        },
+        onError: (_) {
+          if (mounted) {
+            _sensorTimeout?.cancel();
+            _startFallbackCompass();
+          }
+        },
+      );
+    } catch (_) {
+      _startFallbackCompass();
+    }
+  }
+
+  void _startFallbackCompass() {
+    _fallbackSubscription?.cancel();
     final events = FlutterCompass.events;
     if (events == null) {
-      _sensorUnavailable = true;
+      if (mounted) {
+        setState(() => _sensorUnavailable = true);
+        _checkInitialLoadComplete();
+      }
       return;
     }
 
     _sensorTimeout = Timer(const Duration(seconds: 5), () {
       if (mounted && _smoothedHeading == null) {
         setState(() => _sensorUnavailable = true);
+        _checkInitialLoadComplete();
       }
     });
 
-    _subscription = events.listen((event) {
+    _fallbackSubscription = events.listen((event) {
       if (!mounted) return;
       final rawHeading = event.heading;
       if (rawHeading == null || rawHeading.isNaN) return;
 
       _sensorTimeout?.cancel();
-      final normalized = QiblaMath.normalizeAngle(rawHeading);
-
-      double nextSmoothed;
-      double nextContinuous;
-
-      if (_smoothedHeading == null || _continuousHeading == null) {
-        nextSmoothed = normalized;
-        nextContinuous = normalized;
-      } else {
-        final delta =
-            QiblaMath.shortestSignedDelta(_smoothedHeading!, normalized);
-        // Deadband to eliminate tiny stationary sensor jitter
-        if (delta.abs() < 0.25 && event.accuracy == _accuracyValue) {
-          return;
-        }
-        // Adaptive smoothing: faster response on large turns, steadier near target
-        final alpha = delta.abs() > 25.0 ? 0.35 : 0.20;
-        final step = delta * alpha;
-        nextSmoothed = QiblaMath.normalizeAngle(_smoothedHeading! + step);
-        nextContinuous = _continuousHeading! + step;
-      }
-
-      final qiblaDir = Qibla(_activeCoordinates).direction;
-      final diff = QiblaMath.shortestSignedDelta(nextSmoothed, qiblaDir);
-      final aligned = QiblaMath.isAligned(
-        diff,
-        toleranceDeg: _alignmentToleranceDeg,
-      );
-
-      if (aligned && !_wasAligned) {
-        HapticFeedback.mediumImpact();
-      }
-      _wasAligned = aligned;
-
-      setState(() {
-        _smoothedHeading = nextSmoothed;
-        _continuousHeading = nextContinuous;
-        _accuracyValue = event.accuracy;
-        _sensorUnavailable = false;
-      });
+      _fallbackAccuracy = event.accuracy;
+      _processHeadingSample(rawHeading);
     });
   }
 
+  void _stopCompassListening() {
+    _sensorTimeout?.cancel();
+    _nativeSubscription?.cancel();
+    _nativeSubscription = null;
+    _fallbackSubscription?.cancel();
+    _fallbackSubscription = null;
+  }
+
+  void _processHeadingSample(double rawHeading) {
+    final normalized = QiblaGeodesicService.normalizeAngle(rawHeading);
+
+    double nextSmoothed;
+    double nextContinuous;
+
+    if (_smoothedHeading == null || _continuousHeading == null) {
+      nextSmoothed = normalized;
+      nextContinuous = normalized;
+    } else {
+      final delta =
+          QiblaGeodesicService.shortestSignedDelta(_smoothedHeading!, normalized);
+      if (delta.abs() < 0.25) {
+        if (mounted) setState(() {});
+        return;
+      }
+      final alpha = delta.abs() > 25.0 ? 0.35 : 0.20;
+      final step = delta * alpha;
+      nextSmoothed = QiblaGeodesicService.normalizeAngle(_smoothedHeading! + step);
+      nextContinuous = _continuousHeading! + step;
+    }
+
+    final qiblaResult = QiblaGeodesicService.calculate(
+      _activeCoordinates.latitude,
+      _activeCoordinates.longitude,
+    );
+    final diff = QiblaGeodesicService.shortestSignedDelta(
+      nextSmoothed,
+      qiblaResult.bearingDeg,
+    );
+    final reliability = _isHeadingReliable(nextSmoothed);
+    final aligned = reliability &&
+        QiblaGeodesicService.isAligned(
+          diff,
+          toleranceDeg: _alignmentToleranceDeg,
+        );
+
+    if (aligned && !_wasAligned) {
+      HapticFeedback.mediumImpact();
+    }
+    _wasAligned = aligned;
+
+    _validHeadingSamples++;
+    setState(() {
+      _smoothedHeading = nextSmoothed;
+      _continuousHeading = nextContinuous;
+      _sensorUnavailable = false;
+    });
+    _checkInitialLoadComplete();
+  }
+
+  void _checkInitialLoadComplete() {
+    if (!_isInitialLoading || !mounted) return;
+    final sensorReady = _validHeadingSamples >= 3 || _sensorUnavailable;
+    if (!_isRefreshingLocation && sensorReady) {
+      _initialLoadTimer?.cancel();
+      setState(() => _isInitialLoading = false);
+    }
+  }
+
   _CompassAccuracyLevel _getAccuracyLevel() {
-    final acc = _accuracyValue;
+    if (_nativeAccuracyStatus != null) {
+      return switch (_nativeAccuracyStatus) {
+        3 => _CompassAccuracyLevel.high,
+        2 => _CompassAccuracyLevel.medium,
+        1 || 0 => _CompassAccuracyLevel.low,
+        _ => _CompassAccuracyLevel.unknown,
+      };
+    }
+    final acc = _fallbackAccuracy;
     if (acc == null || acc < 0) return _CompassAccuracyLevel.unknown;
     if (acc <= 18) return _CompassAccuracyLevel.high;
     if (acc <= 35) return _CompassAccuracyLevel.medium;
     return _CompassAccuracyLevel.low;
+  }
+
+  bool _isHeadingReliable(double? heading) {
+    if (heading == null || _sensorUnavailable || _magneticInterference || !_isFlat) {
+      return false;
+    }
+    final acc = _getAccuracyLevel();
+    return acc == _CompassAccuracyLevel.high ||
+        acc == _CompassAccuracyLevel.medium;
   }
 
   bool _isUsingFallbackMeccaCoords() {
@@ -199,25 +326,39 @@ class _QiblaScreenState extends State<QiblaScreen> {
     return latDiff < 0.002 && lngDiff < 0.002;
   }
 
+  String _getCompassStatusText(_CompassAccuracyLevel acc, double? heading) {
+    if (_isRefreshingLocation) return 'جاري تحديد الموقع';
+    if (_sensorUnavailable) return 'تعذر تحديد اتجاه الهاتف بدقة';
+    if (_magneticInterference) return 'يوجد تشويش مغناطيسي محتمل';
+    if (heading == null) return 'جاري تحديد الموقع';
+    if (acc == _CompassAccuracyLevel.low ||
+        acc == _CompassAccuracyLevel.unknown) {
+      return 'يرجى معايرة البوصلة';
+    }
+    return 'جاهز لتحديد القبلة';
+  }
+
   void _showCalibrationGuideDialog(bool isDark) {
     showDialog(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF162130) : Colors.white,
+          backgroundColor: isDark ? context.appHeaderBg : const Color(0xFFFFFDF8),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(22),
+            side: BorderSide(color: _gold.withValues(alpha: 0.6)),
           ),
           title: Row(
             children: [
-              Icon(Icons.explore_rounded, color: _emerald),
+              Icon(Icons.explore_rounded, color: isDark ? _goldLight : _emerald),
               const SizedBox(width: 8),
               Text(
-                "طريقة استخدام البوصلة",
+                "طريقة استخدام ومعايرة البوصلة",
                 style: GoogleFonts.cairo(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: 15.5,
+                  color: isDark ? _goldLight : const Color(0xFF0F172A),
                 ),
               ),
             ],
@@ -238,12 +379,12 @@ class _QiblaScreenState extends State<QiblaScreen> {
               const SizedBox(height: 10),
               _buildGuideStep(
                 "٣",
-                "إذا كانت الدقة منخفضة، حرّك الهاتف في الهواء على شكل رقم ٨ (♾️) عدة مرات.",
+                "حرّك الهاتف في الهواء على شكل رقم ٨ (♾️) عدة مرات لمعايرة الحساس.",
               ),
               const SizedBox(height: 10),
               _buildGuideStep(
                 "٤",
-                "أدِر جسمك والهاتف حتى يلتقي مؤشر الكعبة الذهبي مع المؤشر العلوي الثابت وتضيء الشاشة باللون الأخضر.",
+                "أدِر جسمك والهاتف حتى يلتقي مؤشر الكعبة الذهبي مع المؤشر العلوي الثابت.",
               ),
             ],
           ),
@@ -251,8 +392,8 @@ class _QiblaScreenState extends State<QiblaScreen> {
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _emerald,
-                foregroundColor: Colors.white,
+                backgroundColor: isDark ? _gold : _emerald,
+                foregroundColor: isDark ? const Color(0xFF041D16) : Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -276,8 +417,9 @@ class _QiblaScreenState extends State<QiblaScreen> {
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: _emerald.withValues(alpha: 0.15),
+            color: _gold.withValues(alpha: 0.18),
             shape: BoxShape.circle,
+            border: Border.all(color: _gold.withValues(alpha: 0.6)),
           ),
           child: Center(
             child: Text(
@@ -285,7 +427,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
               style: GoogleFonts.cairo(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: _emerald,
+                color: _gold,
               ),
             ),
           ),
@@ -303,48 +445,53 @@ class _QiblaScreenState extends State<QiblaScreen> {
 
   @override
   void dispose() {
-    _sensorTimeout?.cancel();
-    _subscription?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _initialLoadTimer?.cancel();
+    _stopCompassListening();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final qiblaDirection = Qibla(_activeCoordinates).direction;
+    final qiblaResult = QiblaGeodesicService.calculate(
+      _activeCoordinates.latitude,
+      _activeCoordinates.longitude,
+    );
+    final qiblaDirection = qiblaResult.bearingDeg;
     final heading = _smoothedHeading;
     final continuousHeading = _continuousHeading;
+    final accuracyLevel = _getAccuracyLevel();
+    final isReliable = _isHeadingReliable(heading);
 
     final double signedDiff = heading != null
-        ? QiblaMath.shortestSignedDelta(heading, qiblaDirection)
+        ? QiblaGeodesicService.shortestSignedDelta(heading, qiblaDirection)
         : 180.0;
-    final bool isAligned = heading != null &&
-        QiblaMath.isAligned(
+    final bool isAligned = isReliable &&
+        QiblaGeodesicService.isAligned(
           signedDiff,
           toleranceDeg: _alignmentToleranceDeg,
         );
 
-    final accuracyLevel = _getAccuracyLevel();
-    final needsCalibration = accuracyLevel == _CompassAccuracyLevel.low ||
-        accuracyLevel == _CompassAccuracyLevel.unknown;
+    final statusText = _getCompassStatusText(accuracyLevel, heading);
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor:
-            isDark ? const Color(0xFF0B131E) : const Color(0xFFF3F8F6),
+        backgroundColor: context.appScaffoldBg,
         appBar: AppBar(
           title: Text(
             "اتجاه القبلة",
             style: GoogleFonts.cairo(
               fontWeight: FontWeight.bold,
               fontSize: 18,
+              color: isDark ? _goldLight : Colors.white,
             ),
           ),
           centerTitle: true,
           elevation: 0,
-          backgroundColor: isDark ? const Color(0xFF0B131E) : _emerald,
-          foregroundColor: Colors.white,
+          backgroundColor: isDark ? context.appHeaderBg : _emerald,
+          foregroundColor: isDark ? _goldLight : Colors.white,
           systemOverlayStyle: SystemUiOverlayStyle.light,
           actions: [
             IconButton(
@@ -368,186 +515,210 @@ class _QiblaScreenState extends State<QiblaScreen> {
             ),
           ],
         ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-            child: Column(
-              children: [
-                // Location + Qibla Bearing + Accuracy Pill Row
-                _buildLocationAndAccuracyHeader(
-                  isDark: isDark,
-                  qiblaDirection: qiblaDirection,
-                  accuracyLevel: accuracyLevel,
-                ),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: context.appBgGradient,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SafeArea(
+            child: _isInitialLoading
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(
+                            color: isDark ? _goldLight : _emerald,
+                            strokeWidth: 3,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'جاري تحديد موقعك واتجاه القبلة بدقة...',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.cairo(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? _goldLight
+                                  : const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'يرجى إمساك الهاتف بشكل أفقي مستوٍ تماماً',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.cairo(
+                              fontSize: 12.5,
+                              color: isDark
+                                  ? Colors.white70
+                                  : const Color(0xFF475569),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+              child: Column(
+                children: [
+                  _buildLocationAndAccuracyHeader(
+                    isDark: isDark,
+                    qiblaDirection: qiblaDirection,
+                    accuracyLevel: accuracyLevel,
+                  ),
 
-                if (_isUsingFallbackMeccaCoords()) ...[
-                  const SizedBox(height: 10),
-                  InkWell(
-                    onTap: _refreshGpsLocation,
-                    borderRadius: BorderRadius.circular(14),
-                    child: Container(
+                  if (_isUsingFallbackMeccaCoords()) ...[
+                    const SizedBox(height: 10),
+                    InkWell(
+                      onTap: _refreshGpsLocation,
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.orange.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_off_rounded,
+                                color: Colors.orange, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                "لم يتم تحديد موقعك الدقيق بعد. اضغط هنا لتفعيل GPS.",
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark
+                                      ? Colors.orange.shade200
+                                      : Colors.orange.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  if (!_isFlat && heading != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                          horizontal: 14, vertical: 9),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.14),
+                        color: Colors.amber.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: Colors.orange.withValues(alpha: 0.5),
-                        ),
+                            color: Colors.amber.withValues(alpha: 0.55)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.location_off_rounded,
-                              color: Colors.orange, size: 20),
-                          const SizedBox(width: 10),
+                          const Icon(Icons.screen_lock_rotation_rounded,
+                              color: Colors.amber, size: 19),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              "لم يتم تحديد موقعك الدقيق بعد. اضغط هنا لتفعيل الموقع (GPS) لحساب زاوية القبلة بدقة.",
+                              "يرجى إمساك الهاتف بشكل أفقي مستوٍ تماماً (موازياً للأرض) للحصول على قراءة دقيقة.",
                               style: GoogleFonts.cairo(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.bold,
                                 color: isDark
-                                    ? Colors.orange.shade200
-                                    : Colors.orange.shade900,
+                                    ? _goldLight
+                                    : const Color(0xFF78350F),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
 
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-                // Live Directional Guidance Banner
-                _buildGuidanceBanner(
-                  isDark: isDark,
-                  heading: heading,
-                  signedDiff: signedDiff,
-                  isAligned: isAligned,
-                  qiblaDirection: qiblaDirection,
-                ),
-
-                const SizedBox(height: 22),
-
-                // Interactive Precision Compass
-                _buildCompassWidget(
-                  isDark: isDark,
-                  continuousHeading: continuousHeading,
-                  qiblaDirection: qiblaDirection,
-                  isAligned: isAligned,
-                ),
-
-                const SizedBox(height: 22),
-
-                // Telemetry Row (Phone Heading + Difference to Qibla)
-                if (heading != null)
-                  _buildTelemetryRow(
+                  _buildGuidanceBanner(
                     isDark: isDark,
                     heading: heading,
-                    qiblaDirection: qiblaDirection,
                     signedDiff: signedDiff,
                     isAligned: isAligned,
-                  )
-                else if (_sensorUnavailable)
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.orange.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: Text(
-                      "تعذر قراءة حساس البوصلة المغناطيسية على هذا الجهاز. يمكنك الاعتماد على زاوية القبلة الدقيقة (${QuranTextFormatter.toArabicDigits(qiblaDirection.toStringAsFixed(1))}° من الشمال).",
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.cairo(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: isDark
-                            ? Colors.orange.shade200
-                            : Colors.orange.shade900,
-                      ),
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: _emerald,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          "جاري قراءة حساس البوصلة...",
-                          style: GoogleFonts.cairo(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white70 : _emerald,
-                          ),
-                        ),
-                      ],
-                    ),
+                    isReliable: isReliable,
+                    qiblaDirection: qiblaDirection,
                   ),
 
-                const SizedBox(height: 14),
+                  const SizedBox(height: 20),
 
-                // Calibration Notice Card
-                Container(
-                  padding: const EdgeInsets.all(13),
-                  decoration: BoxDecoration(
-                    color: needsCalibration && heading != null
-                        ? Colors.amber.withValues(alpha: isDark ? 0.14 : 0.18)
-                        : (isDark ? const Color(0xFF172231) : Colors.white),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: needsCalibration && heading != null
-                          ? Colors.amber.withValues(alpha: 0.6)
-                          : (isDark
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : _emerald.withValues(alpha: 0.14)),
-                    ),
+                  _buildCompassWidget(
+                    isDark: isDark,
+                    continuousHeading: continuousHeading,
+                    qiblaDirection: qiblaDirection,
+                    isAligned: isAligned,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        needsCalibration && heading != null
-                            ? Icons.warning_amber_rounded
-                            : Icons.tips_and_updates_rounded,
-                        color: isDark
-                            ? Colors.amberAccent
-                            : Colors.amber.shade800,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          needsCalibration && heading != null
-                              ? "دقة الحساس منخفضة حالياً: حرّك الهاتف على شكل رقم 8 (♾️) لمعايرة البوصلة وابتعد عن المعادن."
-                              : "لأفضل دقة: ضع الهاتف أفقياً بموازاة الأرض وأدِره حتى ينطبق مؤشر الكعبة مع المثلث العلوي الثابت.",
-                          style: GoogleFonts.cairo(
-                            fontSize: 11.5,
-                            height: 1.4,
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.85)
-                                : const Color(0xFF334155),
-                          ),
+
+                  const SizedBox(height: 20),
+
+                  if (heading != null)
+                    _buildTelemetryRow(
+                      isDark: isDark,
+                      heading: heading,
+                      qiblaDirection: qiblaDirection,
+                      signedDiff: signedDiff,
+                      isAligned: isAligned,
+                    )
+                  else if (_sensorUnavailable)
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.orange.withValues(alpha: 0.4),
                         ),
                       ),
-                    ],
+                      child: Text(
+                        "تعذر قراءة حساس البوصلة على هذا الجهاز. يمكنك الاعتماد على زاوية القبلة الجغرافية (${QuranTextFormatter.toArabicDigits(qiblaDirection.toStringAsFixed(1))}° من الشمال الحقيقي) والخريطة التفاعلية أدناه.",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.cairo(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? Colors.orange.shade200
+                              : Colors.orange.shade900,
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 18),
+
+                  QiblaInteractiveMap(
+                    latitude: _activeCoordinates.latitude,
+                    longitude: _activeCoordinates.longitude,
+                    qiblaBearingDeg: qiblaDirection,
+                    deviceHeadingDeg: heading,
+                    isHeadingReliable: isReliable,
+                    isDark: isDark,
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 16),
+
+                  _buildAccuracyPanel(
+                    isDark: isDark,
+                    qiblaDirection: qiblaDirection,
+                    distanceKm: qiblaResult.distanceKm,
+                    statusText: statusText,
+                    accuracyLevel: accuracyLevel,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -560,12 +731,14 @@ class _QiblaScreenState extends State<QiblaScreen> {
     required double qiblaDirection,
     required _CompassAccuracyLevel accuracyLevel,
   }) {
-    final (accLabel, accColor) = switch (accuracyLevel) {
-      _CompassAccuracyLevel.high => ("دقة عالية", Colors.green),
-      _CompassAccuracyLevel.medium => ("دقة متوسطة", Colors.amber.shade700),
-      _CompassAccuracyLevel.low => ("معايرة مطلوبة", Colors.deepOrange),
-      _CompassAccuracyLevel.unknown => ("جاري الفحص", Colors.blueGrey),
-    };
+    final (accLabel, accColor) = _magneticInterference
+        ? ("تشويش مغناطيسي", Colors.deepOrange)
+        : switch (accuracyLevel) {
+            _CompassAccuracyLevel.high => ("دقة عالية", Colors.green),
+            _CompassAccuracyLevel.medium => ("دقة متوسطة", Colors.amber.shade700),
+            _CompassAccuracyLevel.low => ("معايرة مطلوبة", Colors.deepOrange),
+            _CompassAccuracyLevel.unknown => ("جاري الفحص", Colors.blueGrey),
+          };
 
     return Row(
       children: [
@@ -573,18 +746,19 @@ class _QiblaScreenState extends State<QiblaScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF172231) : Colors.white,
+              gradient: LinearGradient(colors: context.appCardGradient),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : _emerald.withValues(alpha: 0.16),
+                color: _gold.withValues(alpha: isDark ? 0.45 : 0.65),
               ),
             ),
             child: Row(
               children: [
-                Icon(Icons.location_on_rounded,
-                    color: _emerald, size: 17),
+                Icon(
+                  Icons.location_on_rounded,
+                  color: isDark ? _goldLight : _emerald,
+                  size: 17,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -596,6 +770,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                     style: GoogleFonts.cairo(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
                   ),
                 ),
@@ -609,7 +784,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
           decoration: BoxDecoration(
             color: accColor.withValues(alpha: isDark ? 0.18 : 0.12),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: accColor.withValues(alpha: 0.45)),
+            border: Border.all(color: accColor.withValues(alpha: 0.5)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -643,13 +818,13 @@ class _QiblaScreenState extends State<QiblaScreen> {
     required double? heading,
     required double signedDiff,
     required bool isAligned,
+    required bool isReliable,
     required double qiblaDirection,
   }) {
     final IconData icon;
     final String title;
     final String subtitle;
     final Color borderColor;
-    final Color bgColor;
     final Color accentTextColor;
 
     if (heading == null) {
@@ -657,16 +832,26 @@ class _QiblaScreenState extends State<QiblaScreen> {
       title =
           "زاوية القبلة: ${QuranTextFormatter.toArabicDigits(qiblaDirection.toStringAsFixed(1))}°";
       subtitle = "وجّه الهاتف أفقياً لبدء التحديد الفوري";
-      borderColor = isDark ? Colors.white12 : _emerald.withValues(alpha: 0.2);
-      bgColor = isDark ? const Color(0xFF172231) : Colors.white;
-      accentTextColor = isDark ? Colors.white : const Color(0xFF0F172A);
+      borderColor = _gold.withValues(alpha: isDark ? 0.45 : 0.65);
+      accentTextColor = isDark ? _goldLight : const Color(0xFF0F172A);
+    } else if (_magneticInterference) {
+      icon = Icons.warning_amber_rounded;
+      title = "يوجد تشويش مغناطيسي محتمل";
+      subtitle = "ابتعد عن المعادن والمغناطيس أو استخدم الخريطة أدناه";
+      borderColor = Colors.deepOrange;
+      accentTextColor = isDark ? Colors.orangeAccent : Colors.deepOrange.shade800;
+    } else if (!isReliable) {
+      icon = Icons.sync_problem_rounded;
+      title = "يرجى معايرة البوصلة";
+      subtitle = "حرّك الهاتف على شكل رقم 8 (♾️) لتحسين دقة الاتجاه";
+      borderColor = Colors.amber;
+      accentTextColor = isDark ? _goldLight : const Color(0xFF92400E);
     } else if (isAligned) {
       icon = Icons.check_circle_rounded;
       title = "أنت الآن متجه نحو القبلة 🕋";
-      subtitle = "الاتجاه صحيح ومطابق تماماً";
-      borderColor = Colors.green.shade500;
-      bgColor = isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5);
-      accentTextColor = isDark ? Colors.greenAccent : Colors.green.shade900;
+      subtitle = "قراءة الحساس موثوقة والاتجاه متطابق ضمن ±٤°";
+      borderColor = const Color(0xFF10B981);
+      accentTextColor = const Color(0xFF10B981);
     } else {
       final absDiff =
           QuranTextFormatter.toArabicDigits(signedDiff.abs().round().toString());
@@ -678,9 +863,8 @@ class _QiblaScreenState extends State<QiblaScreen> {
           ? "أدِر الهاتف لليمين $absDiff°"
           : "أدِر الهاتف لليسار $absDiff°";
       subtitle = "حتى يلتقي مؤشر الكعبة مع المثلث العلوي";
-      borderColor = _gold.withValues(alpha: 0.55);
-      bgColor = isDark ? const Color(0xFF172231) : Colors.white;
-      accentTextColor = isDark ? Colors.amberAccent : const Color(0xFF92400E);
+      borderColor = _gold.withValues(alpha: 0.65);
+      accentTextColor = isDark ? _goldLight : const Color(0xFF92400E);
     }
 
     return AnimatedContainer(
@@ -688,27 +872,26 @@ class _QiblaScreenState extends State<QiblaScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       decoration: BoxDecoration(
-        color: bgColor,
+        gradient: LinearGradient(
+          colors: isAligned
+              ? (isDark
+                  ? const [Color(0xFF0A2E25), Color(0xFF07211A)]
+                  : const [Color(0xFFECFDF5), Color(0xFFD1FAE5)])
+              : context.appCardGradient,
+        ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: borderColor,
-          width: isAligned ? 2 : 1.2,
+          width: isAligned ? 1.8 : 1.2,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: (isAligned ? Colors.green : Colors.black)
-                .withValues(alpha: isAligned ? 0.22 : 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
-              color: (isAligned ? Colors.green : _gold).withValues(alpha: 0.16),
+              color: (isAligned ? const Color(0xFF10B981) : _gold)
+                  .withValues(alpha: 0.16),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: accentTextColor, size: 24),
@@ -721,7 +904,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                 Text(
                   title,
                   style: GoogleFonts.cairo(
-                    fontSize: 15.5,
+                    fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: accentTextColor,
                   ),
@@ -730,12 +913,131 @@ class _QiblaScreenState extends State<QiblaScreen> {
                   subtitle,
                   style: GoogleFonts.cairo(
                     fontSize: 11.5,
-                    color: isAligned
-                        ? accentTextColor.withValues(alpha: 0.9)
-                        : (isDark ? Colors.white60 : Colors.grey.shade600),
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccuracyPanel({
+    required bool isDark,
+    required double qiblaDirection,
+    required double distanceKm,
+    required String statusText,
+    required _CompassAccuracyLevel accuracyLevel,
+  }) {
+    final locationAccText = _locationAccuracyMeters != null
+        ? '±${QuranTextFormatter.toArabicDigits(_locationAccuracyMeters!.round().toString())} متر'
+        : 'تقريبي';
+    final decText = _declinationDeg != null
+        ? 'الشمال الحقيقي (انحراف ${_declinationDeg!.toStringAsFixed(1)}°)'
+        : 'الشمال الحقيقي';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: context.appCardGradient),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _gold.withValues(alpha: isDark ? 0.45 : 0.65),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.verified_user_outlined,
+                  size: 18, color: isDark ? _goldLight : _emerald),
+              const SizedBox(width: 8),
+              Text(
+                'بيانات الدقة وحالة البوصلة',
+                style: GoogleFonts.cairo(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? _goldLight : const Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _buildInfoRow(
+            'اتجاه القبلة:',
+            '${QuranTextFormatter.toArabicDigits(qiblaDirection.toStringAsFixed(2))}° ($decText)',
+            isDark,
+          ),
+          _buildInfoRow(
+            'المسافة للكعبة:',
+            '${QuranTextFormatter.toArabicDigits(distanceKm.toStringAsFixed(0))} كم',
+            isDark,
+          ),
+          _buildInfoRow(
+            'الموقع الحالي:',
+            _locationName ?? 'غير محدد',
+            isDark,
+          ),
+          _buildInfoRow(
+            'دقة الموقع التقريبية:',
+            locationAccText,
+            isDark,
+          ),
+          _buildInfoRow(
+            'حالة البوصلة:',
+            statusText,
+            isDark,
+          ),
+          if (_magneticFieldUt != null)
+            _buildInfoRow(
+              'المجال المغناطيسي:',
+              '${_magneticFieldUt!.toStringAsFixed(1)} µT',
+              isDark,
+            ),
+          if (accuracyLevel == _CompassAccuracyLevel.low ||
+              accuracyLevel == _CompassAccuracyLevel.unknown ||
+              _magneticInterference) ...[
+            const SizedBox(height: 8),
+            Text(
+              '💡 للمعايرة: حرّك الهاتف على شكل رقم 8 (♾️) وابتعد عن أي معادن أو أغطية مغناطيسية.',
+              style: GoogleFonts.cairo(
+                fontSize: 11.5,
+                color: isDark ? _goldLight : const Color(0xFF78350F),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$label ',
+            style: GoogleFonts.cairo(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white70 : const Color(0xFF475569),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.cairo(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
             ),
           ),
         ],
@@ -758,7 +1060,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
     return Center(
       child: Column(
         children: [
-          // Fixed Top Reference Notch ("أمام الهاتف")
           Column(
             children: [
               Container(
@@ -766,9 +1067,12 @@ class _QiblaScreenState extends State<QiblaScreen> {
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                 decoration: BoxDecoration(
                   color: isAligned
-                      ? Colors.green
-                      : (isDark ? const Color(0xFF1E293B) : _emerald),
+                      ? const Color(0xFF10B981)
+                      : (isDark ? context.appHeaderBg : _emerald),
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isAligned ? const Color(0xFF10B981) : _gold,
+                  ),
                 ),
                 child: Text(
                   "أمام الهاتف",
@@ -783,18 +1087,16 @@ class _QiblaScreenState extends State<QiblaScreen> {
               Icon(
                 Icons.arrow_drop_down_rounded,
                 size: 32,
-                color: isAligned ? Colors.greenAccent.shade400 : _gold,
+                color: isAligned ? const Color(0xFF10B981) : _gold,
               ),
             ],
           ),
-
           SizedBox(
             width: 304,
             height: 304,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Alignment Glow Ring
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 280),
                   width: 300,
@@ -803,30 +1105,20 @@ class _QiblaScreenState extends State<QiblaScreen> {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: isAligned
-                          ? Colors.green.withValues(alpha: 0.85)
-                          : _gold.withValues(alpha: isDark ? 0.35 : 0.45),
+                          ? const Color(0xFF10B981)
+                          : _gold.withValues(alpha: isDark ? 0.5 : 0.65),
                       width: isAligned ? 3.5 : 2,
                     ),
-                    boxShadow: isAligned
-                        ? [
-                            BoxShadow(
-                              color: Colors.green.withValues(alpha: 0.35),
-                              blurRadius: 28,
-                              spreadRadius: 6,
-                            ),
-                          ]
-                        : [
-                            BoxShadow(
-                              color: Colors.black
-                                  .withValues(alpha: isDark ? 0.35 : 0.08),
-                              blurRadius: 18,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isAligned ? const Color(0xFF10B981) : _gold)
+                            .withValues(alpha: isAligned ? 0.35 : 0.14),
+                        blurRadius: isAligned ? 26 : 16,
+                        spreadRadius: isAligned ? 4 : 0,
+                      ),
+                    ],
                   ),
                 ),
-
-                // Smoothly Rotating Compass Dial (North stays locked to Earth's North)
                 TweenAnimationBuilder<double>(
                   tween: Tween<double>(begin: dialRad, end: dialRad),
                   duration: const Duration(milliseconds: 90),
@@ -836,8 +1128,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
                   },
                   child: _buildCompassDial(isDark),
                 ),
-
-                // Smoothly Rotating True-0°-Centered Qibla Needle
                 TweenAnimationBuilder<double>(
                   tween: Tween<double>(begin: qiblaRad, end: qiblaRad),
                   duration: const Duration(milliseconds: 90),
@@ -847,16 +1137,14 @@ class _QiblaScreenState extends State<QiblaScreen> {
                   },
                   child: _buildQiblaNeedle(isAligned, isDark),
                 ),
-
-                // Center Pivot Cap
                 Container(
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isAligned
-                        ? Colors.green
-                        : (isDark ? const Color(0xFF0F172A) : _emerald),
+                        ? const Color(0xFF10B981)
+                        : (isDark ? const Color(0xFF041D16) : _emerald),
                     border: Border.all(color: _gold, width: 3),
                     boxShadow: const [
                       BoxShadow(color: Colors.black26, blurRadius: 6),
@@ -872,7 +1160,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
   }
 
   Widget _buildCompassDial(bool isDark) {
-    final dialBg = isDark ? const Color(0xFF131E2D) : Colors.white;
+    final dialBg = isDark ? context.appCardGradient.first : const Color(0xFFFFFDF8);
     return Container(
       width: 286,
       height: 286,
@@ -955,7 +1243,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
 
   Widget _buildQiblaNeedle(bool isAligned, bool isDark) {
     final needleColor = isAligned
-        ? (isDark ? Colors.greenAccent.shade400 : Colors.green.shade600)
+        ? const Color(0xFF10B981)
         : _gold;
 
     return SizedBox(
@@ -971,16 +1259,17 @@ class _QiblaScreenState extends State<QiblaScreen> {
               isAligned: isAligned,
             ),
           ),
-          // Kaaba Emblem aligned cleanly along top center (0 deg)
           Positioned(
             top: 46,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: isAligned ? Colors.green.shade700 : const Color(0xFF0F172A),
+                color: isAligned
+                    ? const Color(0xFF065F46)
+                    : const Color(0xFF041D16),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: isAligned ? Colors.greenAccent : _gold,
+                  color: isAligned ? const Color(0xFF10B981) : _gold,
                   width: 1.5,
                 ),
                 boxShadow: const [
@@ -1014,7 +1303,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
             value:
                 "${QuranTextFormatter.toArabicDigits(heading.toStringAsFixed(0))}°",
             icon: Icons.screen_rotation_alt_rounded,
-            color: _emerald,
+            color: isDark ? _goldLight : _emerald,
           ),
         ),
         const SizedBox(width: 10),
@@ -1039,7 +1328,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
             icon: isAligned
                 ? Icons.check_circle_rounded
                 : Icons.straighten_rounded,
-            color: isAligned ? Colors.green : Colors.orange,
+            color: isAligned ? const Color(0xFF10B981) : Colors.orange,
           ),
         ),
       ],
@@ -1056,12 +1345,10 @@ class _QiblaScreenState extends State<QiblaScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF172231) : Colors.white,
+        gradient: LinearGradient(colors: context.appCardGradient),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : color.withValues(alpha: 0.2),
+          color: _gold.withValues(alpha: isDark ? 0.45 : 0.65),
         ),
       ),
       child: Column(
@@ -1073,13 +1360,14 @@ class _QiblaScreenState extends State<QiblaScreen> {
             style: GoogleFonts.cairo(
               fontSize: 15,
               fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
             ),
           ),
           Text(
             label,
             style: GoogleFonts.cairo(
               fontSize: 10.5,
-              color: isDark ? Colors.white54 : Colors.grey.shade600,
+              color: isDark ? Colors.white60 : const Color(0xFF475569),
             ),
           ),
         ],
@@ -1098,16 +1386,13 @@ class _CompassDialPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // Inner decorative circle
     final innerRingPaint = Paint()
-      ..color = (isDark ? Colors.white : const Color(0xFF0F766E))
-          .withValues(alpha: 0.12)
+      ..color = const Color(0xFFD4AF37).withValues(alpha: 0.22)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
     canvas.drawCircle(center, radius * 0.62, innerRingPaint);
     canvas.drawCircle(center, radius * 0.34, innerRingPaint);
 
-    // Subtle crosshairs
     final crossPaint = Paint()
       ..color = (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06)
       ..strokeWidth = 1;
@@ -1122,7 +1407,6 @@ class _CompassDialPainter extends CustomPainter {
       crossPaint,
     );
 
-    // 72 Degree Ticks (every 5 degrees)
     for (int deg = 0; deg < 360; deg += 5) {
       final isCardinal = deg % 90 == 0;
       final isMajor = deg % 30 == 0;
@@ -1179,11 +1463,10 @@ class _QiblaNeedlePainter extends CustomPainter {
     final cx = size.width / 2;
     final cy = size.height / 2;
 
-    // Sharp forward Qibla pointer pointing straight UP (0 degrees)
     final needlePath = Path()
-      ..moveTo(cx, 12) // Tip right near outer bezel
+      ..moveTo(cx, 12)
       ..lineTo(cx + 12, cy - 10)
-      ..lineTo(cx, cy + 28) // Counterweight tail
+      ..lineTo(cx, cy + 28)
       ..lineTo(cx - 12, cy - 10)
       ..close();
 
@@ -1197,7 +1480,6 @@ class _QiblaNeedlePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawPath(needlePath, fillPaint);
 
-    // Subtle center spine highlight
     final spinePaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.35)
       ..strokeWidth = 1.5;

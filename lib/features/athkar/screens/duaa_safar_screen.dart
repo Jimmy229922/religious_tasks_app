@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 
 class DuaaSafarItem {
@@ -86,23 +87,34 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const accentColor = Color(0xFF0288D1); // Azure Blue for Travel
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
+    const emeraldDone = Color(0xFF10B981);
+    const accentColor = Color(0xFF0F766E);
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: context.appScaffoldBg,
         appBar: AppBar(
           title: const Text(
             'دعاء السفر',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          backgroundColor: isDark ? const Color(0xFF1E1E1E) : accentColor,
-          foregroundColor: Colors.white,
+          backgroundColor:
+              isDark ? context.appHeaderBg : context.primaryColor,
+          foregroundColor: isDark ? goldLight : Colors.white,
           systemOverlayStyle: SystemUiOverlayStyle.light,
           elevation: 0,
         ),
         body: Container(
-          color: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: context.appBgGradient,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -112,17 +124,21 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: isDark
-                        ? [const Color(0xFF0D47A1), const Color(0xFF006064)]
-                        : [const Color(0xFF0288D1), const Color(0xFF00ACC1)],
+                        ? const [Color(0xFF0A241D), Color(0xFF0F2D24)]
+                        : const [Color(0xFFFFFDF8), Color(0xFFF6EED9)],
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
                   ),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: gold.withValues(alpha: isDark ? 0.55 : 0.75),
+                    width: 1.35,
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: accentColor.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+                      color: gold.withValues(alpha: isDark ? 0.14 : 0.2),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
                     )
                   ],
                 ),
@@ -130,14 +146,17 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(
-                        color: Colors.white24,
+                      decoration: BoxDecoration(
+                        color: gold.withValues(alpha: isDark ? 0.18 : 0.16),
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: gold.withValues(alpha: 0.6),
+                        ),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.flight_takeoff_rounded,
-                        color: Colors.white,
-                        size: 36,
+                        color: isDark ? goldLight : const Color(0xFF78350F),
+                        size: 30,
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -145,10 +164,10 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'أدعية وأذكار السفر',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isDark ? goldLight : const Color(0xFF0F172A),
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -157,7 +176,9 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
                           Text(
                             'حصّن نفسك وأهلك بأدعية السفر المأثورة عن النبي ﷺ',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
+                              color: isDark
+                                  ? Colors.white70
+                                  : const Color(0xFF475569),
                               fontSize: 12,
                             ),
                           ),
@@ -178,23 +199,35 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? (isDone ? const Color(0xFF1A2634) : const Color(0xFF1E1E1E))
-                        : (isDone ? const Color(0xFFE1F5FE) : Colors.white),
-                    borderRadius: BorderRadius.circular(18),
+                    gradient: isDone
+                        ? LinearGradient(
+                            colors: isDark
+                                ? const [Color(0xFF0A2E25), Color(0xFF07211A)]
+                                : const [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          )
+                        : LinearGradient(
+                            colors: isDark
+                                ? const [Color(0xFF0E211E), Color(0xFF0A171C)]
+                                : const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isDone
-                          ? accentColor
-                          : (isDark ? Colors.white10 : Colors.black12),
-                      width: isDone ? 2 : 1,
+                          ? emeraldDone
+                          : gold.withValues(alpha: isDark ? 0.45 : 0.65),
+                      width: isDone ? 1.6 : 1.2,
                     ),
                     boxShadow: [
-                      if (!isDark)
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
+                      BoxShadow(
+                        color: (isDark ? Colors.black : gold)
+                            .withValues(alpha: 0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
                     ],
                   ),
                   child: Padding(
@@ -202,7 +235,6 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Card Header Row
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -212,7 +244,9 @@ class _DuaaSafarScreenState extends State<DuaaSafarScreen> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: isDark ? const Color(0xFF4FC3F7) : accentColor,
+                                  color: isDark
+                                      ? goldLight
+                                      : const Color(0xFF78350F),
                                 ),
                               ),
                             ),

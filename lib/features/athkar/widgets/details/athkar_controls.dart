@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 
 class AthkarControls extends StatelessWidget {
   final bool isMorning;
@@ -30,25 +32,67 @@ class AthkarControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
     final isDark = isNightMode;
-    final surface = isDark ? Colors.black : Colors.white;
-    final border = isDark ? Colors.white24 : Colors.black12;
-    final textPrimary = isDark ? Colors.white : Colors.black87;
-    final textMuted = isDark ? Colors.white70 : Colors.black54;
-    final accent = isMorning
-        ? (isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32))
-        : (isDark ? const Color(0xFF9FA8DA) : const Color(0xFF3949AB));
-    final chipBackground =
-        isDark ? const Color(0xFF141414) : const Color(0xFFF2F4F2);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final textMuted = isDark ? Colors.white70 : const Color(0xFF475569);
+    final accent = isDark ? goldLight : context.primaryColor;
+    final chipBackground = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.85);
+    final border = gold.withValues(alpha: isDark ? 0.42 : 0.6);
     final percent = (fontScale * 100).round();
 
+    Widget buildPill(String label, bool selected, VoidCallback onTap) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: selected
+                ? LinearGradient(
+                    colors: isDark
+                        ? const [Color(0xFF92400E), Color(0xFFD4AF37)]
+                        : const [Color(0xFFFDE68A), Color(0xFFE5B84B)],
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                  )
+                : null,
+            color: selected ? null : chipBackground,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? gold : border,
+              width: selected ? 1.3 : 1.0,
+            ),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.cairo(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: selected
+                  ? (isDark ? Colors.white : const Color(0xFF451A03))
+                  : textMuted,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: border),
+        gradient: LinearGradient(
+          colors: context.appCardGradient,
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: border, width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,72 +101,52 @@ class AthkarControls extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              ChoiceChip(
-                label: const Text('غير المكتملة'),
-                selected: !showCompleted,
-                onSelected: (_) => onToggleShowCompleted(false),
-                selectedColor: accent.withValues(alpha: isDark ? 0.25 : 0.18),
-                backgroundColor: chipBackground,
-                labelStyle: TextStyle(
-                  color: !showCompleted ? accent : textMuted,
-                  fontWeight: FontWeight.w600,
-                ),
-                shape: StadiumBorder(
-                  side: BorderSide(
-                    color: !showCompleted ? accent : border,
-                  ),
-                ),
+              buildPill(
+                'غير المكتملة',
+                !showCompleted,
+                () => onToggleShowCompleted(false),
               ),
-              ChoiceChip(
-                label: const Text('الكل'),
-                selected: showCompleted,
-                onSelected: (_) => onToggleShowCompleted(true),
-                selectedColor: accent.withValues(alpha: isDark ? 0.25 : 0.18),
-                backgroundColor: chipBackground,
-                labelStyle: TextStyle(
-                  color: showCompleted ? accent : textMuted,
-                  fontWeight: FontWeight.w600,
-                ),
-                shape: StadiumBorder(
-                  side: BorderSide(
-                    color: showCompleted ? accent : border,
-                  ),
-                ),
+              buildPill(
+                'الكل',
+                showCompleted,
+                () => onToggleShowCompleted(true),
               ),
-              ChoiceChip(
-                label: const Text('وضع التركيز'),
-                selected: focusMode,
-                onSelected: (_) => onToggleFocusMode(),
-                selectedColor: accent.withValues(alpha: isDark ? 0.25 : 0.18),
-                backgroundColor: chipBackground,
-                labelStyle: TextStyle(
-                  color: focusMode ? accent : textMuted,
-                  fontWeight: FontWeight.w600,
-                ),
-                shape: StadiumBorder(
-                  side: BorderSide(
-                    color: focusMode ? accent : border,
-                  ),
-                ),
+              buildPill(
+                'وضع التركيز',
+                focusMode,
+                onToggleFocusMode,
               ),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Icon(Icons.text_fields, color: accent),
+              Icon(Icons.text_fields_rounded, color: accent, size: 19),
               const SizedBox(width: 8),
               Text(
                 'حجم الخط',
-                style: TextStyle(
+                style: GoogleFonts.cairo(
                   color: textPrimary,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
                 ),
               ),
               const Spacer(),
-              Text(
-                '$percent%',
-                style: TextStyle(color: textMuted, fontSize: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: gold.withValues(alpha: isDark ? 0.16 : 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: border),
+                ),
+                child: Text(
+                  '$percent%',
+                  style: GoogleFonts.ibmPlexMono(
+                    color: isDark ? goldLight : const Color(0xFF78350F),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -132,7 +156,7 @@ class AthkarControls extends StatelessWidget {
               _buildFontButton(
                 icon: Icons.remove,
                 onTap: () => onStepFont(-0.05),
-                accent: accent,
+                accent: isDark ? goldLight : const Color(0xFF78350F),
                 surface: chipBackground,
                 border: border,
               ),
@@ -140,10 +164,10 @@ class AthkarControls extends StatelessWidget {
               Expanded(
                 child: SliderTheme(
                   data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: accent,
-                    inactiveTrackColor: accent.withValues(alpha: 0.25),
-                    thumbColor: accent,
-                    overlayColor: accent.withValues(alpha: 0.12),
+                    activeTrackColor: gold,
+                    inactiveTrackColor: gold.withValues(alpha: 0.25),
+                    thumbColor: isDark ? goldLight : gold,
+                    overlayColor: gold.withValues(alpha: 0.14),
                   ),
                   child: Slider(
                     value: fontScale,
@@ -158,7 +182,7 @@ class AthkarControls extends StatelessWidget {
               _buildFontButton(
                 icon: Icons.add,
                 onTap: () => onStepFont(0.05),
-                accent: accent,
+                accent: isDark ? goldLight : const Color(0xFF78350F),
                 surface: chipBackground,
                 border: border,
               ),

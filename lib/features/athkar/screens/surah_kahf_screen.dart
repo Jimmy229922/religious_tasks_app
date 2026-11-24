@@ -485,10 +485,9 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const goldLight = Color(0xFFFDE68A);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgGradient = isDark
-        ? const [Color(0xFF0B131E), Color(0xFF152233)]
-        : const [Color(0xFFF0FDF4), Color(0xFFE6F4EA), Color(0xFFF0FDF4)];
+    final bgGradient = context.appBgGradient;
 
     final accent = context.primaryColor;
     final absolutePageNumber = _kahfStartPage + _currentPageIndex;
@@ -498,6 +497,7 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: context.appScaffoldBg,
         appBar: AppBar(
           centerTitle: false,
           titleSpacing: 0,
@@ -514,6 +514,7 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
                   style: GoogleFonts.cairo(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
+                    color: isDark ? goldLight : Colors.white,
                   ),
                 ),
               ),
@@ -532,8 +533,8 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
             ],
           ),
           elevation: 0,
-          backgroundColor: isDark ? const Color(0xFF0B131E) : accent,
-          foregroundColor: Colors.white,
+          backgroundColor: isDark ? const Color(0xFF0A241D) : accent,
+          foregroundColor: isDark ? goldLight : Colors.white,
           systemOverlayStyle: SystemUiOverlayStyle.light,
           actions: [
             if (_savedBookmarkedVerse != null && _savedBookmarkedPage != null)

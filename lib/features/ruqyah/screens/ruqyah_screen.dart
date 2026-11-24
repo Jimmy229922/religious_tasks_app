@@ -35,20 +35,29 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgGradient = isDark
-        ? const [Color(0xFF0B131E), Color(0xFF152233)]
-        : const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)];
+    final bgGradient = context.appBgGradient;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: context.appScaffoldBg,
         appBar: AppBar(
           title: Text(
-            "الرقية الشرعية المكتوبة 📖",
-            style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18),
+            "الرقية الشرعية المكتوبة",
+            style: GoogleFonts.cairo(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: isDark ? goldLight : Colors.white,
+            ),
           ),
           centerTitle: true,
+          backgroundColor:
+              isDark ? context.appHeaderBg : context.primaryColor,
+          foregroundColor: isDark ? goldLight : Colors.white,
+          elevation: 0,
           actions: [
             IconButton(
               icon: const Icon(Icons.format_size_rounded),
@@ -94,17 +103,25 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                               color: isSelected
-                                  ? Colors.white
+                                  ? (isDark
+                                      ? Colors.white
+                                      : const Color(0xFF451A03))
                                   : (isDark
-                                      ? Colors.tealAccent.shade100
-                                      : Colors.teal.shade900),
+                                      ? Colors.white70
+                                      : const Color(0xFF334155)),
                             ),
                           ),
                           selected: isSelected,
-                          selectedColor: Colors.teal,
+                          selectedColor:
+                              isDark ? const Color(0xFF92400E) : goldLight,
                           backgroundColor: isDark
-                              ? Colors.teal.withValues(alpha: 0.15)
-                              : Colors.teal.withValues(alpha: 0.1),
+                              ? const Color(0xFF0E211E)
+                              : const Color(0xFFFFFDF8),
+                          side: BorderSide(
+                            color: isSelected
+                                ? gold
+                                : gold.withValues(alpha: isDark ? 0.35 : 0.55),
+                          ),
                           onSelected: (_) => _onCategoryChanged(cat),
                         ),
                       );
@@ -127,17 +144,17 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: context.primaryColor.withValues(alpha: 0.1),
+                      color: gold.withValues(alpha: isDark ? 0.14 : 0.12),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: context.primaryColor.withValues(alpha: 0.25),
+                        color: gold.withValues(alpha: 0.45),
                       ),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.info_outline_rounded,
-                          color: context.primaryColor,
+                          color: isDark ? goldLight : const Color(0xFF78350F),
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -149,7 +166,7 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
                               fontWeight: FontWeight.w600,
                               color: isDark
                                   ? Colors.white70
-                                  : context.primaryDarkColor,
+                                  : const Color(0xFF334155),
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -159,7 +176,7 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
                         Icon(
                           Icons.open_in_new_rounded,
                           size: 15,
-                          color: context.primaryColor,
+                          color: isDark ? goldLight : const Color(0xFF78350F),
                         ),
                       ],
                     ),
@@ -177,16 +194,20 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
                   itemCount: _selectedCategory.items.length,
                   itemBuilder: (context, index) {
                     final item = _selectedCategory.items[index];
-                    return Card(
+                    return Container(
                       margin: const EdgeInsets.only(bottom: 14),
-                      elevation: 2,
-                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                      shape: RoundedRectangleBorder(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isDark
+                              ? const [Color(0xFF0E211E), Color(0xFF0A171C)]
+                              : const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
                         borderRadius: BorderRadius.circular(18),
-                        side: BorderSide(
-                          color: isDark
-                              ? Colors.white10
-                              : Colors.teal.withValues(alpha: 0.18),
+                        border: Border.all(
+                          color: gold.withValues(alpha: isDark ? 0.45 : 0.65),
+                          width: 1.2,
                         ),
                       ),
                       child: Padding(

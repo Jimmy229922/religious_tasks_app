@@ -144,199 +144,238 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFFDE68A);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradientColors = isDark
-        ? const [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)]
-        : const [Color(0xFFF0FDFA), Color(0xFFE0F2F1), Color(0xFFCCFBF1)];
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F3D3E);
+    final gradientColors = context.appBgGradient;
+    final titleColor = isDark ? goldLight : const Color(0xFF0F3D3E);
     final subtitleColor =
-        isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF115E59);
+        isDark ? Colors.white.withValues(alpha: 0.88) : const Color(0xFF78350F);
     final mutedColor =
-        isDark ? Colors.white.withValues(alpha: 0.75) : const Color(0xFF334155);
+        isDark ? Colors.white.withValues(alpha: 0.7) : const Color(0xFF475569);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
         body: SizedBox.expand(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradientColors,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: gradientColors,
+              ),
             ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 24.0, horizontal: 20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 10),
-
-                  // Center Logo & Title Block
-                  Column(
-                    children: [
-                      Container(
-                        width: 152,
-                        height: 152,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                          border: Border.all(
-                            color: const Color(0xFFD4AF37), // Metallic Gold
-                            width: 2.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black
-                                  .withValues(alpha: isDark ? 0.3 : 0.1),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
-                            ),
-                            BoxShadow(
-                              color: const Color(0xFFD4AF37)
-                                  .withValues(alpha: 0.3),
-                              blurRadius: 15,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: ClipOval(
-                          child: ColoredBox(
-                            color: Colors.white,
-                            child: Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Image.asset(
-                                'assets/icon/app_icon.png',
-                                fit: BoxFit.contain,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _SplashLatticePainter(
+                      color: gold.withValues(alpha: isDark ? 0.08 : 0.14),
+                    ),
+                  ),
+                ),
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 24.0, horizontal: 20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 10),
+                        Column(
+                          children: [
+                            Container(
+                              width: 152,
+                              height: 152,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isDark
+                                    ? const Color(0xFF0A241D)
+                                    : Colors.white,
+                                border: Border.all(
+                                  color: gold,
+                                  width: 2.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black
+                                        .withValues(alpha: isDark ? 0.35 : 0.1),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                  BoxShadow(
+                                    color: gold.withValues(alpha: 0.28),
+                                    blurRadius: 18,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: ClipOval(
+                                child: Image.asset(
+                                  isDark
+                                      ? 'assets/icon/app_icon_dark.jpg'
+                                      : 'assets/icon/app_icon_light.jpg',
+                                  fit: BoxFit.cover,
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        kAppName,
-                        style: GoogleFonts.arefRuqaa(
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          color: titleColor,
-                          shadows: isDark
-                              ? const [
-                                  Shadow(
-                                    color: Colors.black38,
-                                    offset: Offset(0, 3),
-                                    blurRadius: 8,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'رفيقك اليومي في الطاعات والأذكار',
-                        style: TextStyle(
-                          color: subtitleColor,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Loading Indicator
-                      SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            isDark ? Colors.white : Colors.teal.shade700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'جاري تحميل البيانات... يرجى الانتظار',
-                        style: TextStyle(
-                          color: mutedColor,
-                          fontSize: 13,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Daily Ayah / Quote Glass Card
-                      if (_dailyQuote.isNotEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 16),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.12)
-                                : Colors.white.withValues(alpha: 0.85),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: isDark
-                                  ? Colors.white.withValues(alpha: 0.2)
-                                  : Colors.teal.withValues(alpha: 0.25),
-                              width: 1,
+                            const SizedBox(height: 20),
+                            Text(
+                              kAppName,
+                              style: GoogleFonts.arefRuqaa(
+                                fontSize: 36,
+                                fontWeight: FontWeight.bold,
+                                color: titleColor,
+                                shadows: isDark
+                                    ? const [
+                                        Shadow(
+                                          color: Colors.black45,
+                                          offset: Offset(0, 3),
+                                          blurRadius: 8,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
                             ),
-                            boxShadow: isDark
-                                ? null
-                                : [
+                            const SizedBox(height: 6),
+                            Text(
+                              'رفيقك اليومي في الطاعات والأذكار',
+                              style: GoogleFonts.cairo(
+                                color: subtitleColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  isDark ? goldLight : context.primaryColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'جاري تحميل البيانات... يرجى الانتظار',
+                              style: GoogleFonts.cairo(
+                                color: mutedColor,
+                                fontSize: 12.5,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 24),
+                            if (_dailyQuote.isNotEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 16),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: isDark
+                                        ? const [
+                                            Color(0xFF0E211E),
+                                            Color(0xFF0A171C),
+                                          ]
+                                        : const [
+                                            Color(0xFFFFFDF8),
+                                            Color(0xFFF8F0DB),
+                                          ],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: gold.withValues(
+                                        alpha: isDark ? 0.5 : 0.7),
+                                    width: 1.25,
+                                  ),
+                                  boxShadow: [
                                     BoxShadow(
-                                      color:
-                                          Colors.teal.withValues(alpha: 0.08),
+                                      color: (isDark ? Colors.black : gold)
+                                          .withValues(alpha: 0.12),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     ),
                                   ],
-                          ),
-                          child: Text(
-                            _dailyQuote,
-                            style: GoogleFonts.amiri(
-                              color: titleColor,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              height: 1.6,
+                                ),
+                                child: Text(
+                                  _dailyQuote,
+                                  style: GoogleFonts.amiri(
+                                    color: isDark
+                                        ? goldLight
+                                        : const Color(0xFF0F3D3E),
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.6,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                          ],
+                        ),
+                        Column(
+                          children: [
+                            Text(
+                              _version,
+                              style: TextStyle(
+                                color: mutedColor,
+                                fontSize: 13,
+                              ),
                             ),
-                            textAlign: TextAlign.center,
-                          ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '© 2026 جميع الحقوق محفوظة - أحمد جمال',
+                              style: GoogleFonts.cairo(
+                                color: mutedColor.withValues(alpha: 0.8),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
-                    ],
+                      ],
+                    ),
                   ),
-
-                  // Footer
-                  Column(
-                    children: [
-                      Text(
-                        _version,
-                        style: TextStyle(
-                          color: mutedColor,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '© 2026 جميع الحقوق محفوظة - أحمد جمال',
-                        style: TextStyle(
-                          color: mutedColor.withValues(alpha: 0.8),
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
       ),
-    ),
     );
   }
+}
+
+class _SplashLatticePainter extends CustomPainter {
+  final Color color;
+  const _SplashLatticePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    const step = 32.0;
+    for (double x = 0; x <= size.width + step; x += step) {
+      for (double y = 0; y <= size.height + step; y += step) {
+        final path = Path()
+          ..moveTo(x, y - 9)
+          ..lineTo(x + 9, y)
+          ..lineTo(x, y + 9)
+          ..lineTo(x - 9, y)
+          ..close();
+        canvas.drawPath(path, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SplashLatticePainter oldDelegate) =>
+      oldDelegate.color != color;
 }
