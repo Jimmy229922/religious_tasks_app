@@ -166,8 +166,10 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) =>
-                    const RuqyahScreen(initialCategoryId: 'children'),
+                builder: (_) => const RuqyahScreen(
+                  initialCategoryId: 'children',
+                  singleCategoryOnly: true,
+                ),
               ),
             ),
           ),
@@ -211,8 +213,10 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) =>
-                    const VariousAthkarScreen(initialCategoryId: 'daily_life'),
+                builder: (_) => const VariousAthkarScreen(
+                  initialCategoryId: 'daily_life',
+                  singleCategoryOnly: true,
+                ),
               ),
             ),
           ),
@@ -224,8 +228,10 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) =>
-                    const VariousAthkarScreen(initialCategoryId: 'mosque'),
+                builder: (_) => const VariousAthkarScreen(
+                  initialCategoryId: 'mosque',
+                  singleCategoryOnly: true,
+                ),
               ),
             ),
           ),

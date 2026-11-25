@@ -87,6 +87,8 @@ flutter:
     - assets/icon/
     - assets/data/quran.json
     - assets/data/quran_pages_mapping.json
+    - assets/mushaf_qcf/fonts/
+    - assets/mushaf_qcf/layout/
 
   fonts:
     - family: Cairo

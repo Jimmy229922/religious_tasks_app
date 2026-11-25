@@ -37,7 +37,12 @@ class VariousDhikrItem {
 
 class VariousAthkarScreen extends StatefulWidget {
   final String? initialCategoryId;
-  const VariousAthkarScreen({super.key, this.initialCategoryId});
+  final bool singleCategoryOnly;
+  const VariousAthkarScreen({
+    super.key,
+    this.initialCategoryId,
+    this.singleCategoryOnly = false,
+  });
 
   @override
   State<VariousAthkarScreen> createState() => _VariousAthkarScreenState();
@@ -272,13 +277,14 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
       orElse: () => _categories.first,
     );
 
-    // Filter items based on search query
     List<VariousDhikrItem> visibleItems;
     if (_searchQuery.isEmpty) {
       visibleItems = selectedCategory.items;
     } else {
-      visibleItems = _categories
-          .expand((c) => c.items)
+      final searchPool = widget.singleCategoryOnly
+          ? selectedCategory.items
+          : _categories.expand((c) => c.items);
+      visibleItems = searchPool
           .where((item) =>
               item.title.contains(_searchQuery) ||
               item.text.contains(_searchQuery) ||
@@ -292,7 +298,9 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
         backgroundColor: context.appScaffoldBg,
         appBar: AppBar(
           title: Text(
-            "أذكار متنوعة وحصن المسلم",
+            widget.singleCategoryOnly
+                ? selectedCategory.title
+                : "أذكار متنوعة وحصن المسلم",
             style: GoogleFonts.cairo(
               fontWeight: FontWeight.bold,
               fontSize: 18,
@@ -394,8 +402,8 @@ class _VariousAthkarScreenState extends State<VariousAthkarScreen> {
                 ),
               ),
 
-              // Category Selector Choice Chips (only when search is empty)
-              if (_searchQuery.isEmpty)
+              // Category Selector Choice Chips (only when search is empty and not single-category)
+              if (_searchQuery.isEmpty && !widget.singleCategoryOnly)
                 Container(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: SingleChildScrollView(

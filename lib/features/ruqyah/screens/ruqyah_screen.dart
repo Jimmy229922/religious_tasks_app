@@ -7,7 +7,12 @@ import 'package:religious_tasks_app/features/ruqyah/data/ruqyah_data.dart';
 
 class RuqyahScreen extends StatefulWidget {
   final String? initialCategoryId;
-  const RuqyahScreen({super.key, this.initialCategoryId});
+  final bool singleCategoryOnly;
+  const RuqyahScreen({
+    super.key,
+    this.initialCategoryId,
+    this.singleCategoryOnly = false,
+  });
 
   @override
   State<RuqyahScreen> createState() => _RuqyahScreenState();
@@ -46,7 +51,9 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
         backgroundColor: context.appScaffoldBg,
         appBar: AppBar(
           title: Text(
-            "الرقية الشرعية المكتوبة",
+            widget.singleCategoryOnly
+                ? _selectedCategory.title
+                : "الرقية الشرعية المكتوبة",
             style: GoogleFonts.cairo(
               fontWeight: FontWeight.bold,
               fontSize: 18,
@@ -84,40 +91,40 @@ class _RuqyahScreenState extends State<RuqyahScreen> {
           ),
           child: Column(
             children: [
-              // Category Selector Chips
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  child: Row(
-                    children: RuqyahData.categories.map((cat) {
-                      final isSelected = _selectedCategory.id == cat.id;
-                      return Padding(
-                        padding: const EdgeInsets.only(left: 8.0),
-                        child: ChoiceChip(
-                          label: Text(
-                            cat.title,
-                            style: GoogleFonts.cairo(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              color: isSelected
-                                  ? (isDark
-                                      ? Colors.white
-                                      : const Color(0xFF451A03))
-                                  : (isDark
-                                      ? Colors.white70
-                                      : const Color(0xFF334155)),
+              if (!widget.singleCategoryOnly)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: RuqyahData.categories.map((cat) {
+                        final isSelected = _selectedCategory.id == cat.id;
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: ChoiceChip(
+                            label: Text(
+                              cat.title,
+                              style: GoogleFonts.cairo(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: isSelected
+                                    ? (isDark
+                                        ? Colors.white
+                                        : const Color(0xFF451A03))
+                                    : (isDark
+                                        ? Colors.white70
+                                        : const Color(0xFF334155)),
+                              ),
                             ),
-                          ),
-                          selected: isSelected,
-                          selectedColor:
-                              isDark ? const Color(0xFF92400E) : goldLight,
-                          backgroundColor: isDark
-                              ? const Color(0xFF0E211E)
-                              : const Color(0xFFFFFDF8),
-                          side: BorderSide(
+                            selected: isSelected,
+                            selectedColor:
+                                isDark ? const Color(0xFF92400E) : goldLight,
+                            backgroundColor: isDark
+                                ? const Color(0xFF0E211E)
+                                : const Color(0xFFFFFDF8),
+                            side: BorderSide(
                             color: isSelected
                                 ? gold
                                 : gold.withValues(alpha: isDark ? 0.35 : 0.55),
