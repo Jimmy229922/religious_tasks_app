@@ -94,7 +94,11 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
             icon: Icons.menu_book_rounded,
             color: const Color(0xFF6A1B9A),
             onTap: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => const QuranIndexScreen())),
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const QuranIndexScreen(openLastReadOnStart: true),
+                )),
           ),
           AppFeatureItem(
             title: "متابع الختمة",

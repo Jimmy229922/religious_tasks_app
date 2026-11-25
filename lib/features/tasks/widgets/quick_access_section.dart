@@ -87,7 +87,9 @@ class _QuickAccessSectionState extends State<QuickAccessSection> {
       iconColor: isDark ? const Color(0xFF2DD4BF) : emeraldPrimary,
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const QuranIndexScreen()),
+        MaterialPageRoute(
+          builder: (_) => const QuranIndexScreen(openLastReadOnStart: true),
+        ),
       ).then((_) => _loadKhatmahPlan()),
     );
 

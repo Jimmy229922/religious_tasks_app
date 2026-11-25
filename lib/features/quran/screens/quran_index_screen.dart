@@ -9,7 +9,12 @@ import 'package:religious_tasks_app/features/quran/data/quran_repository.dart';
 import 'package:religious_tasks_app/features/quran/screens/quran_surah_reader_screen.dart';
 
 class QuranIndexScreen extends StatefulWidget {
-  const QuranIndexScreen({super.key});
+  final bool openLastReadOnStart;
+
+  const QuranIndexScreen({
+    super.key,
+    this.openLastReadOnStart = false,
+  });
 
   @override
   State<QuranIndexScreen> createState() => _QuranIndexScreenState();
@@ -25,24 +30,78 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
   String? _lastReadVerseNum;
   int? _lastReadPageNum;
 
+  int? _savedPageBookmark;
+  int? _savedPageSurahNum;
+  String? _savedPageSurahName;
+
+  int? _savedVersePage;
+  String? _savedVerseNum;
+  int? _savedVerseSurahNum;
+  String? _savedVerseSurahName;
+
   @override
   void initState() {
     super.initState();
-    // Pre-cache Quran JSON in background for instant surah opening
     QuranRepository.loadQuran();
     _loadLastReadBookmark();
+    if (widget.openLastReadOnStart) {
+      _tryAutoOpenLastReadPage();
+    }
+  }
+
+  void _tryAutoOpenLastReadPage() {
+    final prefs = StorageService.instance.prefs;
+    final lastPage = prefs.getInt('last_read_page_number');
+    if (lastPage == null || lastPage < 1 || lastPage > 604) return;
+    final lastSurahNum = prefs.getInt('last_read_surah_number') ?? 1;
+    final targetSurah = QuranData.surahs.firstWhere(
+      (s) => s.number == lastSurahNum,
+      orElse: () => QuranData.surahs.first,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => QuranSurahReaderScreen(
+            surah: targetSurah,
+            initialPage: lastPage,
+          ),
+        ),
+      ).then((_) {
+        if (mounted) _loadLastReadBookmark();
+      });
+    });
   }
 
   void _loadLastReadBookmark() {
     final prefs = StorageService.instance.prefs;
-    final globalSurahNum = prefs.getInt('quran_global_bookmark_surah_number') ?? prefs.getInt('last_read_surah_number');
-    final globalSurahName = prefs.getString('quran_global_bookmark_surah_name') ?? prefs.getString('last_read_surah_name');
+    final pageBm = prefs.getInt('quran_page_bookmark_number');
+    final pageBmSurahNum = prefs.getInt('quran_page_bookmark_surah_number');
+    final pageBmSurahName = prefs.getString('quran_page_bookmark_surah_name');
+
+    final verseBmPage = prefs.getInt('quran_verse_bookmark_page');
+    final verseBmNum = prefs.getString('quran_verse_bookmark_verse');
+    final verseBmSurahNum = prefs.getInt('quran_verse_bookmark_surah_number');
+    final verseBmSurahName = prefs.getString('quran_verse_bookmark_surah_name');
+
+    final globalSurahNum = prefs.getInt('quran_global_bookmark_surah_number');
+    final globalSurahName = prefs.getString('quran_global_bookmark_surah_name');
     final globalVerse = prefs.getString('quran_global_bookmark_verse');
     final globalPage = prefs.getInt('quran_global_bookmark_page');
 
     setState(() {
-      _lastReadSurahNum = globalSurahNum;
-      _lastReadSurahName = globalSurahName;
+      _savedPageBookmark = pageBm;
+      _savedPageSurahNum = pageBmSurahNum;
+      _savedPageSurahName = pageBmSurahName;
+
+      _savedVersePage = verseBmPage;
+      _savedVerseNum = verseBmNum;
+      _savedVerseSurahNum = verseBmSurahNum;
+      _savedVerseSurahName = verseBmSurahName;
+
+      _lastReadSurahNum = pageBmSurahNum ?? verseBmSurahNum ?? globalSurahNum;
+      _lastReadSurahName = pageBmSurahName ?? verseBmSurahName ?? globalSurahName;
       _lastReadVerseNum = globalVerse;
       _lastReadPageNum = globalPage;
     });
@@ -93,117 +152,114 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
                   child: _buildQuranDomeHeader(context, isDark, accent),
                 ),
-                // Single Unified Global Reading Bookmark Banner
-                if (_lastReadSurahNum != null && _lastReadSurahName != null)
-                  GestureDetector(
-                    onTap: () {
-                      final surah = QuranData.surahs.firstWhere(
-                        (s) => s.number == _lastReadSurahNum,
-                        orElse: () => QuranData.surahs.first,
-                      );
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => QuranSurahReaderScreen(
-                            surah: surah,
-                            initialPage: _lastReadPageNum,
-                          ),
-                        ),
-                      ).then((_) => _loadLastReadBookmark());
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.fromLTRB(12, 10, 12, 2),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: isDark
-                              ? const [Color(0xFF0E211E), Color(0xFF0A171C)]
-                              : const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)],
-                          begin: Alignment.centerRight,
-                          end: Alignment.centerLeft,
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: _gold.withValues(alpha: isDark ? 0.6 : 0.75),
-                          width: 1.35,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _gold.withValues(alpha: 0.14),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: _gold.withValues(alpha: 0.18),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: _gold.withValues(alpha: 0.65),
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.bookmark_rounded,
-                              color: isDark ? _goldLight : const Color(0xFFB45309),
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
+                if (_savedPageBookmark != null ||
+                    (_savedVersePage != null && _savedVerseNum != null))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                    child: Row(
+                      children: [
+                        if (_savedPageBookmark != null)
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "موقف القراءة الحالي لجميع المصحف",
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark
-                                        ? _goldLight
-                                        : const Color(0xFF78350F),
+                            child: _buildSavedBookmarkCard(
+                              context: context,
+                              isDark: isDark,
+                              accent: accent,
+                              icon: Icons.menu_book_rounded,
+                              iconColor: isDark
+                                  ? Colors.tealAccent
+                                  : Colors.teal.shade700,
+                              label: "الصفحة المحفوظة",
+                              subtitle:
+                                  "${_savedPageSurahName != null ? '$_savedPageSurahName • ' : ''}ص ${QuranTextFormatter.toArabicDigits(_savedPageBookmark!.toString())}",
+                              actionLabel: "فتح",
+                              compact: _savedVersePage != null &&
+                                  _savedVerseNum != null,
+                              onTap: () {
+                                final surah = QuranData.surahs.firstWhere(
+                                  (s) => s.number == (_savedPageSurahNum ?? 1),
+                                  orElse: () => QuranData.surahs.first,
+                                );
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => QuranSurahReaderScreen(
+                                      surah: surah,
+                                      initialPage: _savedPageBookmark,
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  "سورة $_lastReadSurahName ${_lastReadPageNum != null ? '• ص (${QuranTextFormatter.toArabicDigits(_lastReadPageNum!.toString())})' : ''} ${_lastReadVerseNum != null ? '• الآية (${QuranTextFormatter.toArabicDigits(_lastReadVerseNum!)})' : ''}",
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark
-                                        ? Colors.white
-                                        : const Color(0xFF0F172A),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                                ).then((_) => _loadLastReadBookmark());
+                              },
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 11, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isDark ? _gold : accent,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              "متابعة",
-                              style: GoogleFonts.cairo(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: isDark
-                                    ? const Color(0xFF041D16)
-                                    : Colors.white,
-                              ),
+                        if (_savedPageBookmark != null &&
+                            _savedVersePage != null &&
+                            _savedVerseNum != null)
+                          const SizedBox(width: 8),
+                        if (_savedVersePage != null && _savedVerseNum != null)
+                          Expanded(
+                            child: _buildSavedBookmarkCard(
+                              context: context,
+                              isDark: isDark,
+                              accent: accent,
+                              icon: Icons.format_quote_rounded,
+                              iconColor:
+                                  isDark ? _goldLight : const Color(0xFFB45309),
+                              label: "الآية المحفوظة",
+                              subtitle:
+                                  "${_savedVerseSurahName != null ? '$_savedVerseSurahName • ' : ''}ص ${QuranTextFormatter.toArabicDigits(_savedVersePage!.toString())} • آية ${QuranTextFormatter.toArabicDigits(_savedVerseNum!)}",
+                              actionLabel: "فتح",
+                              compact: _savedPageBookmark != null,
+                              onTap: () {
+                                final surah = QuranData.surahs.firstWhere(
+                                  (s) => s.number == (_savedVerseSurahNum ?? 1),
+                                  orElse: () => QuranData.surahs.first,
+                                );
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => QuranSurahReaderScreen(
+                                      surah: surah,
+                                      initialPage: _savedVersePage,
+                                    ),
+                                  ),
+                                ).then((_) => _loadLastReadBookmark());
+                              },
                             ),
                           ),
-                        ],
-                      ),
+                      ],
+                    ),
+                  ),
+                if (_savedPageBookmark == null &&
+                    (_savedVersePage == null || _savedVerseNum == null) &&
+                    _lastReadSurahNum != null &&
+                    _lastReadSurahName != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                    child: _buildSavedBookmarkCard(
+                      context: context,
+                      isDark: isDark,
+                      accent: accent,
+                      icon: Icons.bookmark_rounded,
+                      iconColor: isDark ? _goldLight : const Color(0xFFB45309),
+                      label: "موقف القراءة الحالي لجميع المصحف",
+                      subtitle:
+                          "سورة $_lastReadSurahName ${_lastReadPageNum != null ? '• ص (${QuranTextFormatter.toArabicDigits(_lastReadPageNum!.toString())})' : ''} ${_lastReadVerseNum != null ? '• الآية (${QuranTextFormatter.toArabicDigits(_lastReadVerseNum!)})' : ''}",
+                      actionLabel: "متابعة",
+                      onTap: () {
+                        final surah = QuranData.surahs.firstWhere(
+                          (s) => s.number == _lastReadSurahNum,
+                          orElse: () => QuranData.surahs.first,
+                        );
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => QuranSurahReaderScreen(
+                              surah: surah,
+                              initialPage: _lastReadPageNum,
+                            ),
+                          ),
+                        ).then((_) => _loadLastReadBookmark());
+                      },
                     ),
                   ),
 
@@ -312,6 +368,121 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSavedBookmarkCard({
+    required BuildContext context,
+    required bool isDark,
+    required Color accent,
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String subtitle,
+    required String actionLabel,
+    required VoidCallback onTap,
+    bool compact = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 10 : 14,
+          vertical: 9,
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? const [Color(0xFF0E211E), Color(0xFF0A171C)]
+                : const [Color(0xFFFFFDF8), Color(0xFFF8F0DB)],
+            begin: Alignment.centerRight,
+            end: Alignment.centerLeft,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _gold.withValues(alpha: isDark ? 0.6 : 0.75),
+            width: 1.25,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _gold.withValues(alpha: 0.14),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(compact ? 6 : 8),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.16),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: iconColor.withValues(alpha: 0.55),
+                ),
+              ),
+              child: Icon(
+                icon,
+                color: iconColor,
+                size: compact ? 15 : 18,
+              ),
+            ),
+            SizedBox(width: compact ? 8 : 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.cairo(
+                      fontSize: compact ? 9.5 : 10.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? _goldLight : const Color(0xFF78350F),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.cairo(
+                      fontSize: compact ? 11.5 : 13,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (!compact)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isDark ? _gold : accent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  actionLabel,
+                  style: GoogleFonts.cairo(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFF041D16) : Colors.white,
+                  ),
+                ),
+              )
+            else
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 13,
+                color: _gold,
+              ),
+          ],
         ),
       ),
     );
@@ -579,6 +750,11 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
+              _SurahRevelationBadge(
+                isMakki: surah.type == "مكية",
+              ),
+              const SizedBox(width: 10),
               Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 15,
@@ -587,6 +763,32 @@ class _QuranIndexScreenState extends State<QuranIndexScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SurahRevelationBadge extends StatelessWidget {
+  final bool isMakki;
+
+  const _SurahRevelationBadge({
+    required this.isMakki,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: isMakki ? "سورة مكية" : "سورة مدنية",
+      child: Image.asset(
+        isMakki
+            ? 'assets/images/makkah_icon.png'
+            : 'assets/images/madinah_icon.png',
+        width: 38,
+        height: 38,
+        cacheWidth: 96,
+        cacheHeight: 96,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
       ),
     );
   }

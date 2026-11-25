@@ -771,7 +771,9 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
             isDark: isDark,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const QuranIndexScreen()),
+              MaterialPageRoute(
+                builder: (_) => const QuranIndexScreen(openLastReadOnStart: true),
+              ),
             ),
           ),
         ),

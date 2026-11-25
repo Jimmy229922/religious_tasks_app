@@ -50,6 +50,24 @@ class QuranPageMapping {
     return 1;
   }
 
+  /// Calculates the Hizb (1..60) for a given page number (1..604)
+  static int getHizbForPage(int page) {
+    if (page < 1) return 1;
+    if (page > 604) return 60;
+    const pageToHizb = [
+      1, 11, 22, 32, 42, 51, 62, 72, 82, 92,
+      102, 112, 121, 132, 142, 151, 162, 173, 182, 192,
+      201, 212, 222, 231, 242, 252, 262, 272, 282, 292,
+      302, 312, 322, 332, 342, 352, 362, 371, 382, 392,
+      402, 413, 422, 431, 442, 451, 462, 472, 482, 491,
+      502, 513, 522, 531, 542, 553, 562, 572, 582, 591
+    ];
+    for (int h = pageToHizb.length - 1; h >= 0; h--) {
+      if (page >= pageToHizb[h]) return h + 1;
+    }
+    return 1;
+  }
+
   /// Exact Madani Mushaf page boundary ranges dataset for pages 1 to 604
   static MushafPageRange getPageRange(int pageNumber) {
     final page = pageNumber.clamp(1, 604);

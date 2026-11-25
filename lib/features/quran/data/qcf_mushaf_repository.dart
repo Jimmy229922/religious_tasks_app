@@ -432,7 +432,12 @@ class QcfMushafRepository {
     int? onlySurahNumber,
     List<int>? allowedPages,
   }) {
-    for (final target in <int>[pageNumber - 1, pageNumber + 1]) {
+    for (final target in <int>[
+      pageNumber - 1,
+      pageNumber + 1,
+      pageNumber - 2,
+      pageNumber + 2,
+    ]) {
       if (target < 1 || target > 604) continue;
       if (allowedPages != null && !allowedPages.contains(target)) continue;
       if (getCachedPage(target, onlySurahNumber: onlySurahNumber) == null) {

@@ -3,7 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:religious_tasks_app/features/quran/data/qcf_mushaf_repository.dart';
+import 'package:religious_tasks_app/features/quran/data/quran_page_mapping.dart';
+import 'package:religious_tasks_app/features/quran/theme/mushaf_reader_theme.dart';
 import 'package:religious_tasks_app/features/quran/widgets/mushaf_page_scroll_physics.dart';
+import 'package:religious_tasks_app/features/quran/widgets/mushaf_page_side_indicator.dart';
 import 'package:religious_tasks_app/features/quran/widgets/qcf_mushaf_page_widget.dart';
 import 'package:religious_tasks_app/features/quran/widgets/qcf_opening_page_frame.dart';
 
@@ -324,13 +327,13 @@ void main() {
     }
   });
 
-  test('MushafPageScrollPhysics provides weighted, non-bouncing paging feel', () {
+  test('MushafPageScrollPhysics provides responsive, non-bouncing 1:1 paging feel', () {
     const physics = MushafPageScrollPhysics(parent: ClampingScrollPhysics());
     final applied = physics.applyTo(null);
-    expect(applied.minFlingVelocity, 420.0);
-    expect(applied.dragStartDistanceMotionThreshold, 6.0);
-    expect(applied.spring.stiffness, 165.0);
-    expect(applied.spring.damping, greaterThan(25.0));
+    expect(applied.minFlingVelocity, 300.0);
+    expect(applied.dragStartDistanceMotionThreshold, 4.0);
+    expect(applied.spring.stiffness, 280.0);
+    expect(applied.spring.damping, greaterThan(30.0));
 
     final metrics = FixedScrollMetrics(
       minScrollExtent: 0,
@@ -340,6 +343,196 @@ void main() {
       axisDirection: AxisDirection.left,
       devicePixelRatio: 2.0,
     );
-    expect(applied.applyPhysicsToUserOffset(metrics, 100.0), closeTo(94.0, 0.01));
+    expect(applied.applyPhysicsToUserOffset(metrics, 100.0), closeTo(100.0, 0.01));
+  });
+
+  testWidgets('Single tap bubbles to parent GestureDetector when onTapVerse is null',
+      (tester) async {
+    final map = jsonDecode(
+      File('assets/mushaf_qcf/layout/page_003.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
+    final pageData = QcfMushafPageData.fromJson(map, fontFamily: 'Roboto');
+
+    int parentTapCount = 0;
+    int longPressCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => parentTapCount++,
+            child: SizedBox(
+              width: 390,
+              height: 760,
+              child: QcfMushafPageWidget(
+                pageData: pageData,
+                highlightedVerseKey: null,
+                isDark: false,
+                accentColor: const Color(0xFF0F766E),
+                onTapVerse: null,
+                onLongPressVerse: (_, __) => longPressCount++,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(QcfMushafPageWidget));
+    await tester.pumpAndSettle();
+    expect(parentTapCount, 1);
+    expect(longPressCount, 0);
+  });
+
+  test('QuranPageMapping.getHizbForPage returns accurate 1..60 Hizb across all 604 pages', () {
+    expect(QuranPageMapping.getHizbForPage(0), 1);
+    expect(QuranPageMapping.getHizbForPage(1), 1);
+    expect(QuranPageMapping.getHizbForPage(10), 1);
+    expect(QuranPageMapping.getHizbForPage(11), 2);
+    expect(QuranPageMapping.getHizbForPage(22), 3);
+    expect(QuranPageMapping.getHizbForPage(121), 13);
+    expect(QuranPageMapping.getHizbForPage(292), 30);
+    expect(QuranPageMapping.getHizbForPage(293), 30);
+    expect(QuranPageMapping.getHizbForPage(301), 30);
+    expect(QuranPageMapping.getHizbForPage(302), 31);
+    expect(QuranPageMapping.getHizbForPage(590), 59);
+    expect(QuranPageMapping.getHizbForPage(591), 60);
+    expect(QuranPageMapping.getHizbForPage(604), 60);
+    expect(QuranPageMapping.getHizbForPage(999), 60);
+
+    int prevHizb = 1;
+    final seen = <int>{};
+    for (int p = 1; p <= 604; p++) {
+      final h = QuranPageMapping.getHizbForPage(p);
+      expect(h, greaterThanOrEqualTo(prevHizb));
+      expect(h, lessThanOrEqualTo(60));
+      seen.add(h);
+      prevHizb = h;
+    }
+    expect(seen.length, 60);
+  });
+
+  testWidgets('MushafPageSideIndicator displays right/left page side and Hizb without blocking taps',
+      (tester) async {
+    int tapCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: Stack(
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => tapCount++,
+                  child: const SizedBox.expand(),
+                ),
+                const Positioned(
+                  top: 20,
+                  left: 0,
+                  right: 0,
+                  child: MushafPageSideIndicator(
+                    pageNumber: 293,
+                    isDark: false,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.text('يمين المصحف'), findsNothing);
+    expect(find.text('الحزب ٣٠'), findsNothing);
+
+    await tester.tap(find.byType(MushafPageSideIndicator));
+    await tester.pump();
+    expect(tapCount, 1);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: Stack(
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => tapCount++,
+                  child: const SizedBox.expand(),
+                ),
+                const Positioned(
+                  top: 20,
+                  left: 0,
+                  right: 0,
+                  child: MushafPageSideIndicator(
+                    pageNumber: 302,
+                    isDark: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.text('يسار المصحف'), findsNothing);
+    expect(find.text('الحزب ٣١'), findsNothing);
+
+    expect(File(MushafPageSideIndicator.rightPageAsset).existsSync(), isTrue);
+    expect(File(MushafPageSideIndicator.leftPageAsset).existsSync(), isTrue);
+    expect(
+      MushafPageSideIndicator.assetForPage(1),
+      MushafPageSideIndicator.rightPageAsset,
+    );
+    expect(
+      MushafPageSideIndicator.assetForPage(2),
+      MushafPageSideIndicator.leftPageAsset,
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: MushafPageSideIndicator(
+              pageNumber: 294,
+              isDark: false,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsOneWidget);
+  });
+
+  test('MushafReaderTheme provides refined Light and Dark palettes and status bar brightness', () {
+    expect(MushafReaderTheme.light.headerBackground, const Color(0xD9F5EFE3));
+    expect(MushafReaderTheme.light.primaryText, const Color(0xFF382C20));
+    expect(MushafReaderTheme.light.indicatorBackground, const Color(0xFFFFF9ED));
+    expect(MushafReaderTheme.light.indicatorBorder, const Color(0xFFC9A86A));
+    expect(
+      MushafReaderTheme.light.statusBarOverlayStyle.statusBarIconBrightness,
+      Brightness.dark,
+    );
+
+    expect(MushafReaderTheme.dark.headerBackground, const Color(0xD9121A22));
+    expect(MushafReaderTheme.dark.primaryText, const Color(0xFFF5EBD8));
+    expect(MushafReaderTheme.dark.indicatorBackground, const Color(0xFF202A32));
+    expect(MushafReaderTheme.dark.indicatorBorder, const Color(0xFFA9894C));
+    expect(
+      MushafReaderTheme.dark.statusBarOverlayStyle.statusBarIconBrightness,
+      Brightness.light,
+    );
+    expect(File('assets/images/makkah_icon.png').existsSync(), isTrue);
+    expect(File('assets/images/madinah_icon.png').existsSync(), isTrue);
   });
 }

@@ -826,7 +826,8 @@ class AppNotificationService {
     tz_data.initializeTimeZones();
     try {
       final dynamic res = await FlutterTimezone.getLocalTimezone();
-      final String timeZoneName = (res is String ? res : res.name.toString()).trim();
+      final String timeZoneName =
+          (res is String ? res : res.name.toString()).trim();
 
       try {
         tz.setLocalLocation(tz.getLocation(timeZoneName));
@@ -982,7 +983,7 @@ class AppNotificationService {
         DateTime(candidate.year, candidate.month, candidate.day),
       );
       final title = '💛 برطمان السعادة • ${msg.title}';
-      final collapsedBody = msg.notificationPreview;
+      final fullBody = msg.body;
       final expandedBody = msg.reflection != null
           ? '${msg.body}\n\n✨ ${msg.reflection}'
           : msg.body;
@@ -990,7 +991,7 @@ class AppNotificationService {
       await _safeZonedSchedule(
         _happinessJarNotificationStartId + scheduledCount,
         title,
-        collapsedBody,
+        fullBody,
         candidate,
         _buildHappinessJarNotificationDetails(
           title: title,
@@ -1011,7 +1012,7 @@ class AppNotificationService {
     await _ensureInitialized();
     final msg = HappinessJarData.getRandomMessage();
     final title = '💛 برطمان السعادة • ${msg.title}';
-    final collapsedBody = msg.notificationPreview;
+    final fullBody = msg.body;
     final expandedBody = msg.reflection != null
         ? '${msg.body}\n\n✨ ${msg.reflection}'
         : msg.body;
@@ -1020,7 +1021,7 @@ class AppNotificationService {
       await _plugin.show(
         891,
         title,
-        collapsedBody,
+        fullBody,
         _buildHappinessJarNotificationDetails(
           title: title,
           expandedBody: expandedBody,
@@ -1031,7 +1032,7 @@ class AppNotificationService {
       await _plugin.show(
         891,
         title,
-        collapsedBody,
+        fullBody,
         _buildHappinessJarNotificationDetails(
           title: title,
           expandedBody: expandedBody,

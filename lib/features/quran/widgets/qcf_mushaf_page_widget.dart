@@ -6,15 +6,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import 'package:religious_tasks_app/features/quran/data/qcf_mushaf_repository.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_data.dart';
+import 'package:religious_tasks_app/features/quran/data/quran_page_mapping.dart';
 import 'package:religious_tasks_app/features/quran/widgets/qcf_opening_page_frame.dart';
 
 class QcfMushafPageWidget extends StatefulWidget {
   final QcfMushafPageData pageData;
   final String? highlightedVerseKey;
   final bool isPageBookmarked;
+  final double topInset;
   final bool isDark;
   final Color accentColor;
-  final void Function(int surahNumber, int ayahNumber) onTapVerse;
+  final void Function(int surahNumber, int ayahNumber)? onTapVerse;
   final void Function(int surahNumber, int ayahNumber)? onLongPressVerse;
 
   const QcfMushafPageWidget({
@@ -22,9 +24,10 @@ class QcfMushafPageWidget extends StatefulWidget {
     required this.pageData,
     required this.highlightedVerseKey,
     this.isPageBookmarked = false,
+    this.topInset = 0.0,
     required this.isDark,
     required this.accentColor,
-    required this.onTapVerse,
+    this.onTapVerse,
     this.onLongPressVerse,
   });
 
@@ -78,6 +81,9 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
     final arabicJuz = QuranTextFormatter.toArabicDigits(
       widget.pageData.juz.toString(),
     );
+    final arabicHizb = QuranTextFormatter.toArabicDigits(
+      QuranPageMapping.getHizbForPage(widget.pageData.pageNumber).toString(),
+    );
     final pageNumber = widget.pageData.pageNumber;
     final isOpeningPage = pageNumber == 1 || pageNumber == 2;
     final lines = isOpeningPage
@@ -118,7 +124,11 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
     );
 
     return RepaintBoundary(
-      child: Container(
+      child: Stack(
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: widget.topInset),
+            child: Container(
         decoration: BoxDecoration(
           color: paperColor,
           border: Border(
@@ -151,28 +161,13 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
                     color: metaColor,
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (widget.isPageBookmarked) ...[
-                      Icon(
-                        Icons.bookmark_rounded,
-                        size: 15,
-                        color: isDark
-                            ? const Color(0xFFFBBF24)
-                            : const Color(0xFFB45309),
-                      ),
-                      const SizedBox(width: 4),
-                    ],
-                    Text(
-                      'الجزء $arabicJuz',
-                      style: GoogleFonts.cairo(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: metaColor,
-                      ),
-                    ),
-                  ],
+                Text(
+                  'الجزء $arabicJuz | الحزب $arabicHizb',
+                  style: GoogleFonts.cairo(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: metaColor,
+                  ),
                 ),
               ],
             ),
@@ -225,6 +220,18 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
             ),
           ],
         ),
+      ),
+          ),
+          if (widget.isPageBookmarked)
+            Positioned(
+              top: 0,
+              left: 38,
+              child: MushafBookmarkRibbon(
+                isDark: isDark,
+                height: widget.topInset + 130,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -286,16 +293,25 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
     );
   }
 
-  GestureRecognizer _createRecognizer(int surahNumber, int ayahNumber) {
-    final longPress = widget.onLongPressVerse;
-    final recognizer = longPress != null
-        ? _QcfTapAndLongPressRecognizer(
-            onTap: () => widget.onTapVerse(surahNumber, ayahNumber),
-            onLongPress: () => longPress(surahNumber, ayahNumber),
-          )
-        : (TapGestureRecognizer()
-          ..onTap = () => widget.onTapVerse(surahNumber, ayahNumber));
-    _recognizers.add(recognizer);
+  GestureRecognizer? _createRecognizer(int surahNumber, int ayahNumber) {
+    final onTap = widget.onTapVerse;
+    final onLongPress = widget.onLongPressVerse;
+    GestureRecognizer? recognizer;
+    if (onTap != null && onLongPress != null) {
+      recognizer = _QcfTapAndLongPressRecognizer(
+        onTap: () => onTap(surahNumber, ayahNumber),
+        onLongPress: () => onLongPress(surahNumber, ayahNumber),
+      );
+    } else if (onTap != null) {
+      recognizer = TapGestureRecognizer()
+        ..onTap = () => onTap(surahNumber, ayahNumber);
+    } else if (onLongPress != null) {
+      recognizer = LongPressGestureRecognizer()
+        ..onLongPress = () => onLongPress(surahNumber, ayahNumber);
+    }
+    if (recognizer != null) {
+      _recognizers.add(recognizer);
+    }
     return recognizer;
   }
 
@@ -339,7 +355,9 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
               isDark: widget.isDark,
               isSelected: isSelected,
               highlightBg: highlightBg,
-              onTap: () => widget.onTapVerse(word.surahNumber, word.ayahNumber),
+              onTap: widget.onTapVerse == null
+                  ? null
+                  : () => widget.onTapVerse!(word.surahNumber, word.ayahNumber),
               onLongPress: widget.onLongPressVerse == null
                   ? null
                   : () =>
@@ -381,7 +399,9 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
               isDark: widget.isDark,
               isSelected: isSelected,
               highlightBg: highlightBg,
-              onTap: () => widget.onTapVerse(word.surahNumber, word.ayahNumber),
+              onTap: widget.onTapVerse == null
+                  ? null
+                  : () => widget.onTapVerse!(word.surahNumber, word.ayahNumber),
               onLongPress: widget.onLongPressVerse == null
                   ? null
                   : () =>
@@ -587,7 +607,7 @@ class _QcfOrnamentBadge extends StatelessWidget {
   final bool isDark;
   final bool isSelected;
   final Color highlightBg;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
   const _QcfOrnamentBadge({
@@ -781,4 +801,59 @@ class _QcfTapAndLongPressRecognizer extends OneSequenceGestureRecognizer {
     _reset();
     super.dispose();
   }
+}
+
+class MushafBookmarkRibbon extends StatelessWidget {
+  final bool isDark;
+  final double height;
+
+  const MushafBookmarkRibbon({
+    super.key,
+    required this.isDark,
+    this.height = 155,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: RepaintBoundary(
+        child: CustomPaint(
+          size: Size(26, height),
+          painter: _MushafBookmarkRibbonPainter(isDark: isDark),
+        ),
+      ),
+    );
+  }
+}
+
+class _MushafBookmarkRibbonPainter extends CustomPainter {
+  final bool isDark;
+
+  const _MushafBookmarkRibbonPainter({required this.isDark});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final ribbonPath = Path()
+      ..moveTo(0, 0)
+      ..lineTo(w, 0)
+      ..lineTo(w, h)
+      ..lineTo(w / 2, h - 12)
+      ..lineTo(0, h)
+      ..close();
+
+    final fillPaint = Paint()
+      ..color = isDark
+          ? const Color(0xFFE57373).withValues(alpha: 0.38)
+          : const Color(0xFFD9534F).withValues(alpha: 0.42)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(ribbonPath, fillPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MushafBookmarkRibbonPainter oldDelegate) =>
+      oldDelegate.isDark != isDark;
 }
