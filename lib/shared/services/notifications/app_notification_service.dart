@@ -144,18 +144,18 @@ class AppNotificationService {
 
   Future<void> init() async {
     await _ensureInitialized();
-    await syncRecurringSchedules();
+    await syncRecurringSchedules(forceReschedule: false);
     await reschedulePrayerNotificationsFromSavedLocation();
   }
 
-  Future<void> syncRecurringSchedules() async {
+  Future<void> syncRecurringSchedules({bool forceReschedule = true}) async {
     await _ensureInitialized();
     final preferences = await _preferencesService.load();
     await scheduleMorningEveningAthkar(settings: preferences);
     await scheduleDhikrNotifications(
-        settings: preferences, forceReschedule: true);
+        settings: preferences, forceReschedule: forceReschedule);
     await scheduleSalawatNotifications(
-        settings: preferences, forceReschedule: true);
+        settings: preferences, forceReschedule: forceReschedule);
     await scheduleHappinessJarNotifications(settings: preferences);
   }
 
@@ -354,14 +354,15 @@ class AppNotificationService {
         final tzPrayerTime = tz.TZDateTime.from(prayerTime, tz.local);
         if (tzPrayerTime.isBefore(now)) continue;
 
-        // 1. Reminder (5 min before) - Only if it's not Sunrise
         if (key != 'sunrise') {
+          final reminderMinutes = preferences.preAdhanReminderMinutes;
           final reminderTime =
-              tzPrayerTime.subtract(const Duration(minutes: 5));
+              tzPrayerTime.subtract(Duration(minutes: reminderMinutes));
           if (reminderTime.isAfter(now)) {
+            final unit = reminderMinutes >= 11 ? 'دَقِيقَةً' : 'دَقَائِقَ';
             await _safeZonedSchedule(
               baseId + suffix,
-              '${AppStrings.remainingTimeTitle} $name',
+              'تَبَقَّى $reminderMinutes $unit عَلَى صَلَاةِ $name',
               AppStrings.prepareForPrayer,
               reminderTime,
               reminderDetails,
@@ -421,9 +422,14 @@ class AppNotificationService {
     }
 
     if (!preferences.hourlyDhikrEnabled) {
-      await _cancelAllDhikrNotifications();
+      final wasActive = sharedPrefs.getBool('dhikr_alarms_active_v1') ?? true;
+      if (wasActive) {
+        await _cancelAllDhikrNotifications();
+        await sharedPrefs.setBool('dhikr_alarms_active_v1', false);
+      }
       return;
     }
+    await sharedPrefs.setBool('dhikr_alarms_active_v1', true);
 
     if (shouldInitCycle) {
       final now = tz.TZDateTime.now(tz.local);
@@ -432,7 +438,6 @@ class AppNotificationService {
       await sharedPrefs.setInt(
           'saved_dhikr_interval', preferences.hourlyDhikrIntervalMinutes);
 
-      await AndroidAlarmManager.cancel(_dhikrAlarmId);
       await _cancelAllDhikrNotifications();
     }
 
@@ -482,8 +487,7 @@ class AppNotificationService {
 
   Future<void> _cancelAllDhikrNotifications() async {
     try {
-      // Loop through potential IDs instead of querying which can be flaky
-      for (int i = 0; i < 100; i++) {
+      for (int i = 0; i < 64; i++) {
         await _plugin.cancel(_dhikrNotificationStartId + i);
       }
     } catch (e) {
@@ -611,9 +615,14 @@ class AppNotificationService {
         savedStartTime == null || intervalChanged || forceReschedule;
 
     if (!preferences.salawatReminderEnabled) {
-      await _cancelAllSalawatNotifications();
+      final wasActive = sharedPrefs.getBool('salawat_alarms_active_v1') ?? true;
+      if (wasActive) {
+        await _cancelAllSalawatNotifications();
+        await sharedPrefs.setBool('salawat_alarms_active_v1', false);
+      }
       return;
     }
+    await sharedPrefs.setBool('salawat_alarms_active_v1', true);
 
     if (shouldInitCycle) {
       final now = tz.TZDateTime.now(tz.local);
@@ -659,7 +668,7 @@ class AppNotificationService {
 
   Future<void> _cancelAllSalawatNotifications() async {
     try {
-      for (int i = 0; i < 100; i++) {
+      for (int i = 0; i < 64; i++) {
         await _plugin.cancel(_salawatNotificationStartId + i);
         await _cancelNativeAdhan(_salawatNotificationStartId + i);
       }

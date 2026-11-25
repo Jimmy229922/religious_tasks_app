@@ -22,10 +22,13 @@ class AppUpdateService {
         if (githubToken != null) 'Authorization': 'token $githubToken',
       };
 
-      final response = await http.get(url, headers: headers);
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        if (data is! Map || data['tag_name'] is! String) return null;
         final latestTag = data['tag_name'] as String;
 
         debugPrint(

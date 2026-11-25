@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -45,6 +46,14 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
   late bool _isCompleted;
 
   bool _showControls = false;
+  final ValueNotifier<bool> _showControlsNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<int> _currentPageNotifier = ValueNotifier<int>(1);
+  final ValueNotifier<String> _currentSurahNameNotifier =
+      ValueNotifier<String>("");
+  Timer? _saveLastReadDebounce;
+  int? _pendingLastReadPage;
+  int? _pendingLastReadSurahNum;
+  String? _pendingLastReadSurahName;
 
   int? _savedPageBookmark;
   String? _savedPageSurahName;
@@ -111,6 +120,8 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
       prefs.setInt('last_read_surah_number', meta.number);
       prefs.setString('last_read_surah_name', meta.name);
     }
+    _currentPageNotifier.value = _currentPage;
+    _currentSurahNameNotifier.value = _currentSurahName;
     _loadGlobalBookmark();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
@@ -125,6 +136,7 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
         _currentPage = pages.first;
       }
     });
+    _currentPageNotifier.value = _currentPage;
     if (initialIndex > 0 && _pageController.hasClients) {
       _pageController.jumpToPage(initialIndex);
     }
@@ -137,6 +149,20 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
 
   @override
   void dispose() {
+    _saveLastReadDebounce?.cancel();
+    if (_pendingLastReadPage != null && !widget.singleSurahOnly) {
+      final prefs = StorageService.instance.prefs;
+      prefs.setInt('last_read_page_number', _pendingLastReadPage!);
+      if (_pendingLastReadSurahNum != null) {
+        prefs.setInt('last_read_surah_number', _pendingLastReadSurahNum!);
+      }
+      if (_pendingLastReadSurahName != null) {
+        prefs.setString('last_read_surah_name', _pendingLastReadSurahName!);
+      }
+    }
+    _showControlsNotifier.dispose();
+    _currentPageNotifier.dispose();
+    _currentSurahNameNotifier.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _pageController.dispose();
     super.dispose();
@@ -144,9 +170,8 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
 
   void _toggleControls() {
     final next = !_showControls;
-    setState(() {
-      _showControls = next;
-    });
+    _showControls = next;
+    _showControlsNotifier.value = next;
     SystemChrome.setEnabledSystemUIMode(
       next ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky,
     );
@@ -826,14 +851,6 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final accent = context.primaryColor;
-    final currentJuz = QuranPageMapping.getJuzForPage(_currentPage);
-    final arabicPageNum = QuranTextFormatter.toArabicDigits(_currentPage.toString());
-    final arabicJuzNum = QuranTextFormatter.toArabicDigits(currentJuz.toString());
-    final singleSurahIdx = _surahPages.indexOf(_currentPage);
-    final subtitleText = widget.singleSurahOnly
-        ? "الجزء $arabicJuzNum • صفحة $arabicPageNum (${QuranTextFormatter.toArabicDigits(((singleSurahIdx == -1 ? 0 : singleSurahIdx) + 1).toString())} من ${QuranTextFormatter.toArabicDigits(_surahPages.length.toString())})"
-        : "الجزء $arabicJuzNum • الصفحة $arabicPageNum من ٦٠٤";
-
     final paperColor = isDark ? const Color(0xFF121820) : const Color(0xFFFBF7EE);
     final readerTheme = MushafReaderTheme.of(isDark);
 
@@ -874,15 +891,23 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
                     final nextSurahName = widget.singleSurahOnly
                         ? widget.surah.name
                         : (cached?.surahName ?? meta.name);
-                    setState(() {
-                      _currentPage = newPage;
-                      _currentSurahName = nextSurahName;
-                    });
+                    _currentPage = newPage;
+                    _currentSurahName = nextSurahName;
+                    _currentPageNotifier.value = newPage;
+                    _currentSurahNameNotifier.value = nextSurahName;
                     if (!widget.singleSurahOnly) {
-                      final prefs = StorageService.instance.prefs;
-                      prefs.setInt('last_read_page_number', newPage);
-                      prefs.setInt('last_read_surah_number', meta.number);
-                      prefs.setString('last_read_surah_name', nextSurahName);
+                      _pendingLastReadPage = newPage;
+                      _pendingLastReadSurahNum = meta.number;
+                      _pendingLastReadSurahName = nextSurahName;
+                      _saveLastReadDebounce?.cancel();
+                      _saveLastReadDebounce =
+                          Timer(const Duration(milliseconds: 500), () {
+                        final prefs = StorageService.instance.prefs;
+                        prefs.setInt('last_read_page_number', newPage);
+                        prefs.setInt('last_read_surah_number', meta.number);
+                        prefs.setString('last_read_surah_name', nextSurahName);
+                        _pendingLastReadPage = null;
+                      });
                     }
                     QcfMushafRepository.prefetchAdjacentPages(
                       newPage,
@@ -899,9 +924,9 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
                             _currentPage == newPage &&
                             !widget.singleSurahOnly &&
                             _currentSurahName != content.surahName) {
-                          setState(() {
-                            _currentSurahName = content.surahName;
-                          });
+                          _currentSurahName = content.surahName;
+                          _currentSurahNameNotifier.value = content.surahName;
+                          _pendingLastReadSurahName = content.surahName;
                         }
                       });
                     }
@@ -992,144 +1017,186 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
                 ),
               ),
             ),
-            if (_showControls)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Material(
-                      color: readerTheme.headerBackground,
-                      elevation: 0,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: readerTheme.divider,
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        child: SafeArea(
-                          bottom: false,
-                          child: SizedBox(
-                            height: kToolbarHeight,
-                            child: Row(
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.arrow_back_ios_new_rounded,
-                                    color: readerTheme.actionIcon,
-                                    size: 20,
+            ValueListenableBuilder<bool>(
+              valueListenable: _showControlsNotifier,
+              builder: (_, showControls, __) {
+                if (!showControls) return const SizedBox.shrink();
+                return ValueListenableBuilder<int>(
+                  valueListenable: _currentPageNotifier,
+                  builder: (_, currentPage, __) {
+                    final currentJuz =
+                        QuranPageMapping.getJuzForPage(currentPage);
+                    final arabicPageNum = QuranTextFormatter.toArabicDigits(
+                      currentPage.toString(),
+                    );
+                    final arabicJuzNum = QuranTextFormatter.toArabicDigits(
+                      currentJuz.toString(),
+                    );
+                    final singleSurahIdx = _surahPages.indexOf(currentPage);
+                    final subtitleText = widget.singleSurahOnly
+                        ? "الجزء $arabicJuzNum • صفحة $arabicPageNum (${QuranTextFormatter.toArabicDigits(((singleSurahIdx == -1 ? 0 : singleSurahIdx) + 1).toString())} من ${QuranTextFormatter.toArabicDigits(_surahPages.length.toString())})"
+                        : "الجزء $arabicJuzNum • الصفحة $arabicPageNum من ٦٠٤";
+                    return Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Material(
+                            color: readerTheme.headerBackground,
+                            elevation: 0,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: readerTheme.divider,
+                                    width: 1,
                                   ),
-                                  onPressed: () => Navigator.pop(context),
                                 ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                              ),
+                              child: SafeArea(
+                                bottom: false,
+                                child: SizedBox(
+                                  height: kToolbarHeight,
+                                  child: Row(
                                     children: [
-                                      FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: AlignmentDirectional.centerStart,
-                                        child: Text(
-                                          "سورة ${_currentSurahName.isNotEmpty ? _currentSurahName : widget.surah.name}",
-                                          maxLines: 1,
-                                          style: GoogleFonts.cairo(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15.5,
-                                            color: readerTheme.primaryText,
-                                          ),
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.arrow_back_ios_new_rounded,
+                                          color: readerTheme.actionIcon,
+                                          size: 20,
+                                        ),
+                                        onPressed: () => Navigator.pop(context),
+                                      ),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              alignment: AlignmentDirectional
+                                                  .centerStart,
+                                              child: ValueListenableBuilder<
+                                                  String>(
+                                                valueListenable:
+                                                    _currentSurahNameNotifier,
+                                                builder: (_, surahName, __) =>
+                                                    Text(
+                                                  "سورة ${surahName.isNotEmpty ? surahName : widget.surah.name}",
+                                                  maxLines: 1,
+                                                  style: GoogleFonts.cairo(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 15.5,
+                                                    color:
+                                                        readerTheme.primaryText,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              alignment: AlignmentDirectional
+                                                  .centerStart,
+                                              child: Text(
+                                                subtitleText,
+                                                maxLines: 1,
+                                                style: GoogleFonts.cairo(
+                                                  fontSize: 11,
+                                                  color:
+                                                      readerTheme.secondaryText,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: AlignmentDirectional.centerStart,
-                                        child: Text(
-                                          subtitleText,
-                                          maxLines: 1,
-                                          style: GoogleFonts.cairo(
-                                            fontSize: 11,
-                                            color: readerTheme.secondaryText,
-                                          ),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        icon: Icon(
+                                          (_savedPageBookmark != null ||
+                                                  _savedVerseBookmarkPage !=
+                                                      null)
+                                              ? Icons.bookmark_rounded
+                                              : Icons.bookmark_add_outlined,
+                                          color: (_savedPageBookmark != null ||
+                                                  _savedVerseBookmarkPage !=
+                                                      null)
+                                              ? readerTheme.activeBookmark
+                                              : readerTheme.actionIcon,
                                         ),
+                                        tooltip: "حفظ موضع القراءة",
+                                        onPressed: () =>
+                                            _showBookmarkOptionsSheet(
+                                                context, isDark),
+                                      ),
+                                      if (!widget.singleSurahOnly)
+                                        IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          icon: Icon(
+                                            Icons.menu_book_rounded,
+                                            color: readerTheme.actionIcon,
+                                          ),
+                                          tooltip: "الانتقال لصفحة",
+                                          onPressed: () =>
+                                              _showJumpToPageDialog(context),
+                                        ),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        icon: Icon(
+                                          Icons.style_rounded,
+                                          color: readerTheme.actionIcon,
+                                        ),
+                                        tooltip: "صانع البطاقات الإيمانية",
+                                        onPressed: () async {
+                                          final fullText = await QuranRepository
+                                              .getSurahFullText(
+                                            widget.surah.number,
+                                          );
+                                          if (!context.mounted) return;
+                                          showDialog(
+                                            context: context,
+                                            builder: (_) =>
+                                                IslamicCardGeneratorDialog(
+                                              title: "سورة ${widget.surah.name}",
+                                              content: fullText,
+                                              subtitle:
+                                                  "${widget.surah.type} • ${widget.surah.ayahCount} آية",
+                                            ),
+                                          );
+                                        },
                                       ),
                                     ],
                                   ),
                                 ),
-                                IconButton(
-                                  visualDensity: VisualDensity.compact,
-                                  icon: Icon(
-                                    (_savedPageBookmark != null ||
-                                            _savedVerseBookmarkPage != null)
-                                        ? Icons.bookmark_rounded
-                                        : Icons.bookmark_add_outlined,
-                                    color: (_savedPageBookmark != null ||
-                                            _savedVerseBookmarkPage != null)
-                                        ? readerTheme.activeBookmark
-                                        : readerTheme.actionIcon,
-                                  ),
-                                  tooltip: "حفظ موضع القراءة",
-                                  onPressed: () =>
-                                      _showBookmarkOptionsSheet(context, isDark),
-                                ),
-                                if (!widget.singleSurahOnly)
-                                  IconButton(
-                                    visualDensity: VisualDensity.compact,
-                                    icon: Icon(
-                                      Icons.menu_book_rounded,
-                                      color: readerTheme.actionIcon,
-                                    ),
-                                    tooltip: "الانتقال لصفحة",
-                                    onPressed: () => _showJumpToPageDialog(context),
-                                  ),
-                                IconButton(
-                                  visualDensity: VisualDensity.compact,
-                                  icon: Icon(
-                                    Icons.style_rounded,
-                                    color: readerTheme.actionIcon,
-                                  ),
-                                  tooltip: "صانع البطاقات الإيمانية",
-                                  onPressed: () async {
-                                    final fullText =
-                                        await QuranRepository.getSurahFullText(
-                                      widget.surah.number,
-                                    );
-                                    if (!context.mounted) return;
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) => IslamicCardGeneratorDialog(
-                                        title: "سورة ${widget.surah.name}",
-                                        content: fullText,
-                                        subtitle:
-                                            "${widget.surah.type} • ${widget.surah.ayahCount} آية",
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          MushafPageSideIndicator(
+                            pageNumber: currentPage,
+                            isDark: isDark,
+                            pageController: widget.singleSurahOnly
+                                ? null
+                                : _pageController,
+                            pageIndexOffset: 1,
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    MushafPageSideIndicator(
-                      pageNumber: _currentPage,
-                      isDark: isDark,
-                      pageController:
-                          widget.singleSurahOnly ? null : _pageController,
-                      pageIndexOffset: 1,
-                    ),
-                  ],
-                ),
-              ),
-            if (_showControls &&
-                widget.singleSurahOnly &&
-                widget.onMarkCompleted != null)
-              Positioned(
+                    );
+                  },
+                );
+              },
+            ),
+            if (widget.singleSurahOnly && widget.onMarkCompleted != null)
+              ValueListenableBuilder<bool>(
+                valueListenable: _showControlsNotifier,
+                builder: (_, showControls, child) =>
+                    showControls ? child! : const SizedBox.shrink(),
+                child: Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
@@ -1191,6 +1258,7 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
                   ),
                 ),
               ),
+            ),
           ],
         ),
       ),

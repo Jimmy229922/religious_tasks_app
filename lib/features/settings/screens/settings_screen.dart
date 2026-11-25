@@ -444,6 +444,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _reschedulePrayers();
   }
 
+  Future<void> _updatePreAdhanReminderMinutes(int minutes) async {
+    setState(() {
+      _prefs = _prefs.copyWith(preAdhanReminderMinutes: minutes);
+    });
+    await _prefsService.setPreAdhanReminderMinutes(minutes);
+    _reschedulePrayers();
+    if (!mounted) return;
+    final unit = minutes >= 11 ? "دقيقة" : "دقائق";
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          "تم ضبط التنبيه قبل الأذان بـ ${QuranTextFormatter.toArabicDigits(minutes.toString())} $unit",
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: _emerald,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<void> _updateSelectedMoazzen(String moazzenId) async {
     setState(() {
       _selectedMoazzenId = moazzenId;
@@ -929,6 +951,76 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     icon: Icons.notifications_off_rounded,
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              Divider(
+                height: 1,
+                color: isDark ? Colors.white10 : Colors.grey.shade200,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                "التنبيه قبل الأذان",
+                style: GoogleFonts.cairo(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: NotificationPreferencesService
+                    .preAdhanReminderOptions
+                    .map((minutes) {
+                  final isSelected =
+                      _prefs.preAdhanReminderMinutes == minutes;
+                  final unit = minutes >= 11 ? "دقيقة" : "دقائق";
+                  final label =
+                      "${QuranTextFormatter.toArabicDigits(minutes.toString())} $unit";
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        left: minutes == 15 ? 0 : 8,
+                      ),
+                      child: InkWell(
+                        onTap: () => _updatePreAdhanReminderMinutes(minutes),
+                        borderRadius: BorderRadius.circular(14),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 10, horizontal: 6),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? _emerald
+                                : (isDark
+                                    ? const Color(0xFF1E2B3C)
+                                    : const Color(0xFFF1F5F9)),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isSelected ? _gold : Colors.transparent,
+                              width: 1.3,
+                            ),
+                          ),
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                label,
+                                style: GoogleFonts.cairo(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : (isDark
+                                          ? Colors.white70
+                                          : const Color(0xFF1E293B)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 16),
               Divider(

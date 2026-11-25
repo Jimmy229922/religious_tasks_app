@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_data.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_page_mapping.dart';
@@ -43,41 +44,56 @@ class MushafPageContent {
 
 class QuranRepository {
   static List<dynamic>? _quranJsonData;
+  static Future<List<dynamic>>? _quranLoadFuture;
   static Map<String, dynamic>? _pageMappingJson;
+  static Future<Map<String, dynamic>>? _mappingLoadFuture;
   static final Map<int, String> _surahTextCache = {};
   static final Map<int, MushafPageContent> _pageCache = {};
   static final Map<String, MushafPageContent> _filteredSurahPageCache = {};
 
   /// Loads and validates the full Quran JSON from assets/data/quran.json
-  static Future<List<dynamic>> loadQuran() async {
-    if (_quranJsonData != null) return _quranJsonData!;
+  static Future<List<dynamic>> loadQuran() {
+    if (_quranJsonData != null) return Future<List<dynamic>>.value(_quranJsonData!);
+    if (_quranLoadFuture != null) return _quranLoadFuture!;
 
-    final text = await rootBundle.loadString('assets/data/quran.json');
-    final surahs = jsonDecode(text) as List<dynamic>;
+    _quranLoadFuture = () async {
+      final text = await rootBundle.loadString(
+        'assets/data/quran.json',
+        cache: false,
+      );
+      final surahs = await compute(_decodeAndValidateQuranJson, text);
+      _quranJsonData = surahs;
+      return surahs;
+    }().whenComplete(() {
+      _quranLoadFuture = null;
+    });
 
-    final ayahCount = surahs.fold<int>(
-      0,
-      (total, surah) => total + (surah['verses'] as List).length,
-    );
-
-    if (surahs.length != 114 || ayahCount != 6236) {
-      throw const FormatException('Incomplete Quran data');
-    }
-
-    _quranJsonData = surahs;
-    return surahs;
+    return _quranLoadFuture!;
   }
 
   /// Loads the official 604 Madani page mapping JSON
-  static Future<Map<String, dynamic>> loadPageMapping() async {
-    if (_pageMappingJson != null) return _pageMappingJson!;
-    try {
-      final text = await rootBundle.loadString('assets/data/quran_pages_mapping.json');
-      _pageMappingJson = jsonDecode(text) as Map<String, dynamic>;
-      return _pageMappingJson!;
-    } catch (_) {
-      return {};
+  static Future<Map<String, dynamic>> loadPageMapping() {
+    if (_pageMappingJson != null) {
+      return Future<Map<String, dynamic>>.value(_pageMappingJson!);
     }
+    if (_mappingLoadFuture != null) return _mappingLoadFuture!;
+
+    _mappingLoadFuture = () async {
+      try {
+        final text = await rootBundle.loadString(
+          'assets/data/quran_pages_mapping.json',
+          cache: false,
+        );
+        _pageMappingJson = jsonDecode(text) as Map<String, dynamic>;
+        return _pageMappingJson!;
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }().whenComplete(() {
+      _mappingLoadFuture = null;
+    });
+
+    return _mappingLoadFuture!;
   }
 
   /// Gets the complete text for a specific surah by number (1 to 114)
@@ -463,4 +479,16 @@ class QuranRepository {
     }
     return pageContent;
   }
+}
+
+List<dynamic> _decodeAndValidateQuranJson(String text) {
+  final surahs = jsonDecode(text) as List<dynamic>;
+  final ayahCount = surahs.fold<int>(
+    0,
+    (total, surah) => total + (surah['verses'] as List).length,
+  );
+  if (surahs.length != 114 || ayahCount != 6236) {
+    throw const FormatException('Incomplete Quran data');
+  }
+  return surahs;
 }

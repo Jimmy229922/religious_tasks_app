@@ -37,12 +37,28 @@ class QcfMushafPageWidget extends StatefulWidget {
 
 class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
   final List<GestureRecognizer> _recognizers = <GestureRecognizer>[];
+  final Map<String, GestureRecognizer?> _ayahRecognizers =
+      <String, GestureRecognizer?>{};
 
   void _disposeRecognizers() {
     for (final recognizer in _recognizers) {
       recognizer.dispose();
     }
     _recognizers.clear();
+    _ayahRecognizers.clear();
+  }
+
+  GestureRecognizer? _recognizerForAyah(int surahNumber, int ayahNumber) {
+    if (widget.onTapVerse == null && widget.onLongPressVerse == null) {
+      return null;
+    }
+    final key = '$surahNumber:$ayahNumber';
+    if (_ayahRecognizers.containsKey(key)) {
+      return _ayahRecognizers[key];
+    }
+    final recognizer = _createRecognizer(surahNumber, ayahNumber);
+    _ayahRecognizers[key] = recognizer;
+    return recognizer;
   }
 
   @override
@@ -336,12 +352,8 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
     for (int i = 0; i < line.words.length; i++) {
       final word = line.words[i];
       final isSelected = widget.highlightedVerseKey == word.verseKey;
-      final recognizer = _createRecognizer(word.surahNumber, word.ayahNumber);
-      final isDivine = QcfMushafWord.isWordDivineReference(
-        word,
-        prevWord: i > 0 ? line.words[i - 1] : null,
-        nextWord: i + 1 < line.words.length ? line.words[i + 1] : null,
-      );
+      final recognizer = _recognizerForAyah(word.surahNumber, word.ayahNumber);
+      final isDivine = word.isDivineReference;
       final wordTextColor = isDivine ? divineNameColor : inkColor;
       final bg = isSelected ? highlightBg : null;
 
@@ -698,28 +710,12 @@ class _QcfOrnamentBadge extends StatelessWidget {
                 ),
               ),
             ),
-            ShaderMask(
-              blendMode: BlendMode.srcIn,
-              shaderCallback: (bounds) {
-                return const RadialGradient(
-                  center: Alignment.center,
-                  radius: 0.50,
-                  colors: <Color>[
-                    Color(0xFF000000),
-                    Color(0xFF000000),
-                    Color(0xFF6B4A20),
-                    Color(0xFF6B4A20),
-                  ],
-                  stops: <double>[0.0, 0.36, 0.42, 1.0],
-                ).createShader(bounds);
-              },
-              child: Text(
-                glyph,
-                textDirection: TextDirection.rtl,
-                style: baseStyle.copyWith(
-                  color: const Color(0xFFFFFFFF),
-                  fontWeight: FontWeight.w600,
-                ),
+            Text(
+              glyph,
+              textDirection: TextDirection.rtl,
+              style: baseStyle.copyWith(
+                color: const Color(0xFF6B4A20),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],

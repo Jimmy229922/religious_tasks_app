@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_data.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_page_mapping.dart';
@@ -82,6 +83,7 @@ class QcfMushafWord {
   final int wordIndex;
   final String arabicWord;
   final String glyph;
+  final bool? _precomputedDivine;
 
   const QcfMushafWord({
     required this.surahNumber,
@@ -89,7 +91,8 @@ class QcfMushafWord {
     required this.wordIndex,
     required this.arabicWord,
     required this.glyph,
-  });
+    bool? precomputedDivine,
+  }) : _precomputedDivine = precomputedDivine;
 
   String get verseKey => '$surahNumber:$ayahNumber';
   String get locationKey => '$surahNumber:$ayahNumber:$wordIndex';
@@ -117,7 +120,7 @@ class QcfMushafWord {
 
   bool get isDivineName => _divineNameRegex.hasMatch(_normalizedWord);
 
-  bool get isDivineReference => isWordDivineReference(this);
+  bool get isDivineReference => _precomputedDivine ?? isWordDivineReference(this);
 
   static bool isWordDivineReference(
     QcfMushafWord word, {
@@ -197,16 +200,37 @@ class QcfMushafLine {
 
   factory QcfMushafLine.fromJson(Map<String, dynamic> json) {
     final rawWords = json['words'] as List<dynamic>? ?? const [];
+    final baseWords = rawWords
+        .whereType<Map<String, dynamic>>()
+        .map(QcfMushafWord.fromJson)
+        .toList(growable: false);
+    final words = List<QcfMushafWord>.generate(
+      baseWords.length,
+      (i) {
+        final w = baseWords[i];
+        final isDiv = QcfMushafWord.isWordDivineReference(
+          w,
+          prevWord: i > 0 ? baseWords[i - 1] : null,
+          nextWord: i + 1 < baseWords.length ? baseWords[i + 1] : null,
+        );
+        return QcfMushafWord(
+          surahNumber: w.surahNumber,
+          ayahNumber: w.ayahNumber,
+          wordIndex: w.wordIndex,
+          arabicWord: w.arabicWord,
+          glyph: w.glyph,
+          precomputedDivine: isDiv,
+        );
+      },
+      growable: false,
+    );
     return QcfMushafLine(
       lineNumber: json['line'] as int? ?? 1,
       type: json['type'] as String? ?? 'text',
       text: json['text'] as String? ?? '',
       surahCode: json['surah'] as String?,
       qpcV1: json['qpcV1'] as String?,
-      words: rawWords
-          .whereType<Map<String, dynamic>>()
-          .map(QcfMushafWord.fromJson)
-          .toList(growable: false),
+      words: words,
     );
   }
 }
@@ -326,6 +350,8 @@ class QcfMushafRepository {
   static final Set<String> _loadedFontFamilies = <String>{};
   static final Map<String, Future<void>> _inFlightFonts =
       <String, Future<void>>{};
+  static final Map<String, Future<QcfMushafPageData>> _inFlightPages =
+      <String, Future<QcfMushafPageData>>{};
   static final LinkedHashMap<String, QcfMushafPageData> _pageCache =
       LinkedHashMap<String, QcfMushafPageData>();
 
@@ -369,8 +395,13 @@ class QcfMushafRepository {
 
   static Future<void> ensurePageFontsLoaded(int pageNumber) async {
     final page = pageNumber.clamp(1, 604);
+    final family = fontFamilyFor(page);
+    if (_loadedFontFamilies.contains(family) &&
+        _loadedFontFamilies.contains(basmalaFontFamily)) {
+      return;
+    }
     await Future.wait(<Future<void>>[
-      _ensureFontRegistered(fontFamilyFor(page), fontAssetPathFor(page)),
+      _ensureFontRegistered(family, fontAssetPathFor(page)),
       _ensureFontRegistered(
         basmalaFontFamily,
         'assets/mushaf_qcf/fonts/QCF_BSML.ttf',
@@ -411,20 +442,35 @@ class QcfMushafRepository {
       return cached;
     }
 
-    await ensurePageFontsLoaded(page);
-    final layoutJson = await rootBundle.loadString(layoutAssetPathFor(page));
-    final decoded = jsonDecode(layoutJson) as Map<String, dynamic>;
-    final pageData = QcfMushafPageData.fromJson(
-      decoded,
-      fontFamily: fontFamilyFor(page),
-      onlySurahNumber: onlySurahNumber,
-    );
+    final existing = _inFlightPages[key];
+    if (existing != null) return existing;
 
-    if (_pageCache.length >= _maxCacheSize) {
-      _pageCache.remove(_pageCache.keys.first);
-    }
-    _pageCache[key] = pageData;
-    return pageData;
+    final future = () async {
+      await ensurePageFontsLoaded(page);
+      final layoutJson = await rootBundle.loadString(
+        layoutAssetPathFor(page),
+        cache: false,
+      );
+      final pageData = await compute(
+        _parseQcfPageData,
+        _QcfParseArgs(
+          layoutJson: layoutJson,
+          fontFamily: fontFamilyFor(page),
+          onlySurahNumber: onlySurahNumber,
+        ),
+      );
+
+      if (_pageCache.length >= _maxCacheSize) {
+        _pageCache.remove(_pageCache.keys.first);
+      }
+      _pageCache[key] = pageData;
+      return pageData;
+    }().whenComplete(() {
+      _inFlightPages.remove(key);
+    });
+
+    _inFlightPages[key] = future;
+    return future;
   }
 
   static void prefetchAdjacentPages(
@@ -435,8 +481,6 @@ class QcfMushafRepository {
     for (final target in <int>[
       pageNumber - 1,
       pageNumber + 1,
-      pageNumber - 2,
-      pageNumber + 2,
     ]) {
       if (target < 1 || target > 604) continue;
       if (allowedPages != null && !allowedPages.contains(target)) continue;
@@ -445,4 +489,25 @@ class QcfMushafRepository {
       }
     }
   }
+}
+
+class _QcfParseArgs {
+  final String layoutJson;
+  final String fontFamily;
+  final int? onlySurahNumber;
+
+  const _QcfParseArgs({
+    required this.layoutJson,
+    required this.fontFamily,
+    this.onlySurahNumber,
+  });
+}
+
+QcfMushafPageData _parseQcfPageData(_QcfParseArgs args) {
+  final decoded = jsonDecode(args.layoutJson) as Map<String, dynamic>;
+  return QcfMushafPageData.fromJson(
+    decoded,
+    fontFamily: args.fontFamily,
+    onlySurahNumber: args.onlySurahNumber,
+  );
 }

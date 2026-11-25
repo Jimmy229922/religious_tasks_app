@@ -20,6 +20,7 @@ class GlobalChallengeService {
 
   /// Start listening to real-time changes on the global_challenges table
   void subscribeToChallenge() {
+    _channel?.unsubscribe();
     _channel = _supabase
         .channel('public:global_challenges')
         .onPostgresChanges(
@@ -27,7 +28,7 @@ class GlobalChallengeService {
           schema: 'public',
           table: 'global_challenges',
           callback: (payload) {
-            if (payload.newRecord.isNotEmpty) {
+            if (payload.newRecord.isNotEmpty && !_countController.isClosed) {
               _countController.add(payload.newRecord);
             }
           },
@@ -45,8 +46,11 @@ class GlobalChallengeService {
           .from('global_challenges')
           .select()
           .eq('id', 'tasbih_challenge')
-          .single();
-      _countController.add(data);
+          .single()
+          .timeout(const Duration(seconds: 12));
+      if (!_countController.isClosed) {
+        _countController.add(data);
+      }
     } catch (e) {
       debugPrint('Error fetching challenge status: $e');
     }
@@ -58,7 +62,9 @@ class GlobalChallengeService {
     if (!hasAuthenticatedSession) return false;
 
     try {
-      await _supabase.rpc('increment_challenge', params: {'amount': amount});
+      await _supabase
+          .rpc('increment_challenge', params: {'amount': amount})
+          .timeout(const Duration(seconds: 12));
       await fetchCurrentStatus();
       return true;
     } catch (e) {
@@ -69,6 +75,6 @@ class GlobalChallengeService {
 
   void dispose() {
     _channel?.unsubscribe();
-    _countController.close();
+    _channel = null;
   }
 }

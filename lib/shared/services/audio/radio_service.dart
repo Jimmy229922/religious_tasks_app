@@ -229,21 +229,42 @@ class RadioService {
   AudioPlayer get player => _player;
   Stream<IcyMetadata?> get icyMetadataStream => _player.icyMetadataStream;
 
+  bool _isInitialized = false;
+  Future<void>? _initFuture;
+  StreamSubscription<PlaybackEvent>? _playbackSub;
+
   Future<void> setVolume(double volume) async {
     await _player.setVolume(volume.clamp(0.0, 1.0));
   }
 
-  Future<void> init() async {
-    await JustAudioBackground.init(
-      androidNotificationChannelId: 'com.jimmy.religiousapp.channel.audio',
-      androidNotificationChannelName: 'راديو القرآن الكريم',
-      androidNotificationOngoing: true,
-    );
+  Future<void> init() {
+    if (_isInitialized) return Future<void>.value();
+    if (_initFuture != null) return _initFuture!;
+    _initFuture = () async {
+      await JustAudioBackground.init(
+        androidNotificationChannelId: 'com.jimmy.religiousapp.channel.audio',
+        androidNotificationChannelName: 'راديو القرآن الكريم',
+        androidNotificationOngoing: true,
+      );
 
-    _player.playbackEventStream.listen((event) {},
+      _playbackSub ??= _player.playbackEventStream.listen(
+        (event) {},
         onError: (Object e, StackTrace stackTrace) {
-      debugPrint('A stream error occurred: $e');
+          debugPrint('A stream error occurred: $e');
+        },
+      );
+      _isInitialized = true;
+    }().whenComplete(() {
+      _initFuture = null;
     });
+    return _initFuture!;
+  }
+
+  Future<void> dispose() async {
+    await _playbackSub?.cancel();
+    _playbackSub = null;
+    await _player.dispose();
+    _isInitialized = false;
   }
 
   void resume() {
@@ -253,7 +274,8 @@ class RadioService {
   }
 
   Future<void> playStation(RadioStation station) async {
-    final urlsToTry = <String>[
+    await init();
+    final urlsToTry = <String>{
       station.url,
       if (station.fallbackUrl != null && station.fallbackUrl != station.url)
         station.fallbackUrl!,
@@ -261,7 +283,7 @@ class RadioService {
         station.url.replaceAll('backup.qurango.net', 'qurango.net')
       else if (station.url.contains('qurango.net'))
         station.url.replaceAll('qurango.net', 'backup.qurango.net'),
-    ];
+    }.toList(growable: false);
 
     Object? lastError;
 
@@ -287,12 +309,12 @@ class RadioService {
           ),
         );
 
-        await _player.stop();
+        await _player.stop().timeout(const Duration(seconds: 8));
         // preload: false guarantees ExoPlayer starts Shoutcast/Icecast streaming immediately without blocking
         await _player
             .setAudioSource(source, preload: false)
             .timeout(const Duration(seconds: 15));
-        await _player.play();
+        await _player.play().timeout(const Duration(seconds: 10));
         return; // Success!
       } catch (e) {
         debugPrint("Failed to play stream URL $url: $e");

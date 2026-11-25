@@ -17,6 +17,7 @@ class NotificationPreferencesService {
   ];
   static const List<int> dhikrIntervalOptions = [5, 10, 15, 60, 90, 120];
   static const List<int> salawatIntervalOptions = [15, 30, 45, 60, 90, 120];
+  static const List<int> preAdhanReminderOptions = [5, 10, 15];
 
   static const String adhanSoundTypeKey = 'adhan_sound_type_v1';
   static const String hourlyDhikrEnabledKey = 'hourly_dhikr_enabled_v1';
@@ -37,6 +38,8 @@ class NotificationPreferencesService {
   static const String happinessJarEnabledKey = 'happiness_jar_enabled_v1';
   static const String happinessJarHourKey = 'happiness_jar_hour_v1';
   static const String happinessJarMinuteKey = 'happiness_jar_minute_v1';
+  static const String preAdhanReminderMinutesKey =
+      'pre_adhan_reminder_minutes_v1';
 
   Future<NotificationPreferences> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -106,7 +109,18 @@ class NotificationPreferencesService {
       happinessJarMinute:
           (prefs.getInt(happinessJarMinuteKey) ?? defaults.happinessJarMinute)
               .clamp(0, 59),
+      preAdhanReminderMinutes: preAdhanReminderOptions
+              .contains(prefs.getInt(preAdhanReminderMinutesKey))
+          ? prefs.getInt(preAdhanReminderMinutesKey)!
+          : defaults.preAdhanReminderMinutes,
     );
+  }
+
+  Future<void> setPreAdhanReminderMinutes(int minutes) async {
+    final prefs = await SharedPreferences.getInstance();
+    final safeMinutes =
+        preAdhanReminderOptions.contains(minutes) ? minutes : 5;
+    await prefs.setInt(preAdhanReminderMinutesKey, safeMinutes);
   }
 
   Future<void> setAdhanEnabled(String prayerKey, bool value) async {

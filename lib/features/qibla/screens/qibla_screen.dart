@@ -58,6 +58,7 @@ class _QiblaScreenState extends State<QiblaScreen> with WidgetsBindingObserver {
   bool _wasAligned = false;
   bool _sensorUnavailable = false;
   bool _isRefreshingLocation = false;
+  DateTime? _lastHeadingUiUpdate;
   bool _isInitialLoading = true;
   int _validHeadingSamples = 0;
   double? _locationAccuracyMeters;
@@ -216,15 +217,20 @@ class _QiblaScreenState extends State<QiblaScreen> with WidgetsBindingObserver {
       }
     });
 
-    _fallbackSubscription = events.listen((event) {
-      if (!mounted) return;
-      final rawHeading = event.heading;
-      if (rawHeading == null || rawHeading.isNaN) return;
+    _fallbackSubscription = events.listen(
+      (event) {
+        if (!mounted) return;
+        final rawHeading = event.heading;
+        if (rawHeading == null || rawHeading.isNaN) return;
 
-      _sensorTimeout?.cancel();
-      _fallbackAccuracy = event.accuracy;
-      _processHeadingSample(rawHeading);
-    });
+        _sensorTimeout?.cancel();
+        _fallbackAccuracy = event.accuracy;
+        _processHeadingSample(rawHeading);
+      },
+      onError: (_) {
+        if (mounted) setState(() => _sensorUnavailable = true);
+      },
+    );
   }
 
   void _stopCompassListening() {
@@ -248,7 +254,6 @@ class _QiblaScreenState extends State<QiblaScreen> with WidgetsBindingObserver {
       final delta =
           QiblaGeodesicService.shortestSignedDelta(_smoothedHeading!, normalized);
       if (delta.abs() < 0.25) {
-        if (mounted) setState(() {});
         return;
       }
       final alpha = delta.abs() > 25.0 ? 0.35 : 0.20;
@@ -278,6 +283,15 @@ class _QiblaScreenState extends State<QiblaScreen> with WidgetsBindingObserver {
     _wasAligned = aligned;
 
     _validHeadingSamples++;
+    final now = DateTime.now();
+    if (_smoothedHeading != null &&
+        _lastHeadingUiUpdate != null &&
+        now.difference(_lastHeadingUiUpdate!).inMilliseconds < 40) {
+      _smoothedHeading = nextSmoothed;
+      _continuousHeading = nextContinuous;
+      return;
+    }
+    _lastHeadingUiUpdate = now;
     setState(() {
       _smoothedHeading = nextSmoothed;
       _continuousHeading = nextContinuous;

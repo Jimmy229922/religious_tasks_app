@@ -265,7 +265,7 @@ class BackupService {
         'owner_id': ownerId,
         'backup_data': jsonStr,
         'updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'owner_id');
+      }, onConflict: 'owner_id').timeout(const Duration(seconds: 15));
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(
@@ -292,7 +292,8 @@ class BackupService {
           .from('app_backups')
           .select('backup_data, updated_at')
           .eq('owner_id', ownerId)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 15));
 
       if (response != null && response['backup_data'] != null) {
         final backupJson = response['backup_data'].toString();
@@ -345,10 +346,16 @@ class BackupService {
 
       final supabase = Supabase.instance.client;
       try {
-        await supabase.rpc('delete_user_account');
+        await supabase
+            .rpc('delete_user_account')
+            .timeout(const Duration(seconds: 15));
       } catch (e) {
         debugPrint("RPC delete_user_account fallback: $e");
-        await supabase.from('app_backups').delete().eq('owner_id', ownerId);
+        await supabase
+            .from('app_backups')
+            .delete()
+            .eq('owner_id', ownerId)
+            .timeout(const Duration(seconds: 15));
       }
       await unlinkGoogleAccount();
       return true;

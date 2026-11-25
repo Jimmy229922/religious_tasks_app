@@ -46,15 +46,19 @@ class IslamicHomeDashboard extends StatefulWidget {
 class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _goldLight = Color(0xFFFDE68A);
+  static final intl.DateFormat _clockFormat = intl.DateFormat('hh:mm a', 'ar');
+  static final intl.DateFormat _shortTimeFormat =
+      intl.DateFormat('hh:mm', 'ar');
   late Timer _timer;
-  DateTime _now = DateTime.now();
+  final ValueNotifier<DateTime> _nowNotifier =
+      ValueNotifier<DateTime>(DateTime.now());
 
   @override
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
-        setState(() => _now = DateTime.now());
+        _nowNotifier.value = DateTime.now();
       }
     });
   }
@@ -62,6 +66,7 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
   @override
   void dispose() {
     _timer.cancel();
+    _nowNotifier.dispose();
     super.dispose();
   }
 
@@ -75,9 +80,9 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
     return null;
   }
 
-  String _formatCountdownArabic(DateTime? target) {
+  String _formatCountdownArabic(DateTime? target, DateTime now) {
     if (target == null) return 'جاري الحساب...';
-    final diff = target.difference(_now);
+    final diff = target.difference(now);
     final safe = diff.isNegative ? Duration.zero : diff;
     final h = safe.inHours;
     final m = safe.inMinutes % 60;
@@ -88,11 +93,11 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
     return 'بعد $m دقيقة و $s ثانية';
   }
 
-  String _shortCountdown(TaskItem task) {
+  String _shortCountdown(TaskItem task, DateTime now) {
     final dt = _prayerDateTime(task, widget.vm.prayerTimes);
     if (dt == null) return '--:--:--';
-    final target = dt.isBefore(_now) ? dt.add(const Duration(days: 1)) : dt;
-    final diff = target.difference(_now);
+    final target = dt.isBefore(now) ? dt.add(const Duration(days: 1)) : dt;
+    final diff = target.difference(now);
     final safe = diff.isNegative ? Duration.zero : diff;
     final h = safe.inHours.toString().padLeft(2, '0');
     final m = (safe.inMinutes % 60).toString().padLeft(2, '0');
@@ -107,14 +112,13 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
     final accent = context.primaryColor;
     final hijri = HijriCalendar.now();
     final hijriStr = '${hijri.hDay} ${hijri.longMonthName} ${hijri.hYear} هـ';
-    final timeStr = intl.DateFormat('hh:mm a', 'ar').format(_now);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildDomeHeader(context, isDark, accent),
         const SizedBox(height: 10),
-        _buildLocationDateBar(context, vm, isDark, accent, timeStr, hijriStr),
+        _buildLocationDateBar(context, vm, isDark, accent, hijriStr),
         const SizedBox(height: 12),
         _buildNextPrayerHeroCard(context, vm, isDark, accent),
         const SizedBox(height: 14),
@@ -189,7 +193,8 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: _gold.withValues(alpha: isDark ? 0.8 : 0.9),
+                              color:
+                                  _gold.withValues(alpha: isDark ? 0.8 : 0.9),
                               width: 1.6,
                             ),
                             boxShadow: [
@@ -207,6 +212,8 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                                   ? 'assets/icon/app_icon_dark.jpg'
                                   : 'assets/icon/app_icon_light.jpg',
                               fit: BoxFit.cover,
+                              cacheWidth: 200,
+                              cacheHeight: 200,
                             ),
                           ),
                         ),
@@ -216,11 +223,13 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                           style: GoogleFonts.arefRuqaa(
                             fontSize: 27,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? _goldLight : const Color(0xFF0F3D3E),
+                            color:
+                                isDark ? _goldLight : const Color(0xFF0F3D3E),
                             shadows: isDark
                                 ? [
                                     Shadow(
-                                      color: Colors.black.withValues(alpha: 0.45),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.45),
                                       blurRadius: 6,
                                       offset: const Offset(0, 2),
                                     ),
@@ -303,7 +312,6 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
     TasksViewModel vm,
     bool isDark,
     Color accent,
-    String timeStr,
     String hijriStr,
   ) {
     return Container(
@@ -349,7 +357,8 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                           fontSize: 11.5,
                           height: 1.35,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          color:
+                              isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
                     ),
@@ -387,12 +396,17 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            timeStr,
-                            style: GoogleFonts.ibmPlexMono(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? _goldLight : context.primaryDarkColor,
+                          ValueListenableBuilder<DateTime>(
+                            valueListenable: _nowNotifier,
+                            builder: (_, now, __) => Text(
+                              _clockFormat.format(now),
+                              style: GoogleFonts.ibmPlexMono(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark
+                                    ? _goldLight
+                                    : context.primaryDarkColor,
+                              ),
                             ),
                           ),
                           Text(
@@ -401,7 +415,9 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.cairo(
                               fontSize: 10,
-                              color: isDark ? Colors.white70 : const Color(0xFF475569),
+                              color: isDark
+                                  ? Colors.white70
+                                  : const Color(0xFF475569),
                             ),
                           ),
                         ],
@@ -429,9 +445,7 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
     bool isDark,
     Color accent,
   ) {
-    final nextName =
-        vm.nextPrayerName.isNotEmpty ? vm.nextPrayerName : 'الفجر';
-    final countdownText = _formatCountdownArabic(vm.nextPrayerTime);
+    final nextName = vm.nextPrayerName.isNotEmpty ? vm.nextPrayerName : 'الفجر';
 
     return InkWell(
       onTap: () {
@@ -464,10 +478,13 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
             ),
           ],
           image: DecorationImage(
-            image: AssetImage(
-              isDark
-                  ? 'assets/images/prayer_hero_dark.png'
-                  : 'assets/images/prayer_hero_light.png',
+            image: ResizeImage(
+              AssetImage(
+                isDark
+                    ? 'assets/images/prayer_hero_dark.png'
+                    : 'assets/images/prayer_hero_light.png',
+              ),
+              width: 900,
             ),
             fit: BoxFit.cover,
           ),
@@ -545,12 +562,15 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                       color: isDark ? _goldLight : const Color(0xFFB45309),
                     ),
                     const SizedBox(width: 5),
-                    Text(
-                      countdownText,
-                      style: GoogleFonts.cairo(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? _goldLight : const Color(0xFF78350F),
+                    ValueListenableBuilder<DateTime>(
+                      valueListenable: _nowNotifier,
+                      builder: (_, now, __) => Text(
+                        _formatCountdownArabic(vm.nextPrayerTime, now),
+                        style: GoogleFonts.cairo(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? _goldLight : const Color(0xFF78350F),
+                        ),
                       ),
                     ),
                   ],
@@ -617,10 +637,8 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
             task.name.contains(vm.nextPrayerName);
         final done = task.isCompleted;
         final dt = _prayerDateTime(task, vm.prayerTimes);
-        final timeLabel =
-            dt != null ? intl.DateFormat('hh:mm', 'ar').format(dt) : '--:--';
+        final timeLabel = dt != null ? _shortTimeFormat.format(dt) : '--:--';
         final shortName = task.name.replaceFirst('صلاة ', '').trim();
-        final countdown = _shortCountdown(task);
 
         return Expanded(
           child: Padding(
@@ -639,7 +657,8 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
               ),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 240),
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 3),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 3),
                 decoration: BoxDecoration(
                   gradient: isNext
                       ? LinearGradient(
@@ -678,7 +697,9 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                       color: done
                           ? const Color(0xFF10B981)
                           : (isNext
-                              ? (isDark ? Colors.white : const Color(0xFF78350F))
+                              ? (isDark
+                                  ? Colors.white
+                                  : const Color(0xFF78350F))
                               : (isDark ? _goldLight : accent)),
                     ),
                     const SizedBox(height: 4),
@@ -724,19 +745,22 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                       fit: BoxFit.scaleDown,
                       child: Directionality(
                         textDirection: TextDirection.ltr,
-                        child: Text(
-                          countdown,
-                          maxLines: 1,
-                          style: GoogleFonts.ibmPlexMono(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: isNext
-                                ? (isDark
-                                    ? _goldLight
-                                    : const Color(0xFF78350F))
-                                : (isDark
-                                    ? _goldLight.withValues(alpha: 0.85)
-                                    : const Color(0xFFB45309)),
+                        child: ValueListenableBuilder<DateTime>(
+                          valueListenable: _nowNotifier,
+                          builder: (_, now, __) => Text(
+                            _shortCountdown(task, now),
+                            maxLines: 1,
+                            style: GoogleFonts.ibmPlexMono(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: isNext
+                                  ? (isDark
+                                      ? _goldLight
+                                      : const Color(0xFF78350F))
+                                  : (isDark
+                                      ? _goldLight.withValues(alpha: 0.85)
+                                      : const Color(0xFFB45309)),
+                            ),
                           ),
                         ),
                       ),
@@ -756,7 +780,7 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
     bool isDark,
     Color accent,
   ) {
-    final isMorning = AthkarTimeHelper.isMorningWindow(_now);
+    final isMorning = AthkarTimeHelper.isMorningWindow(_nowNotifier.value);
     return Row(
       children: [
         Expanded(
@@ -772,7 +796,8 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const QuranIndexScreen(openLastReadOnStart: true),
+                builder: (_) =>
+                    const QuranIndexScreen(openLastReadOnStart: true),
               ),
             ),
           ),
@@ -782,7 +807,8 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
           child: _buildGoldFeatureTile(
             context: context,
             title: 'أذكار الصباح\nوالمساء',
-            icon: isMorning ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded,
+            icon:
+                isMorning ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded,
             iconColor: const Color(0xFFF59E0B),
             imageAsset: isDark
                 ? 'assets/images/athkar_icon_dark.jpg'

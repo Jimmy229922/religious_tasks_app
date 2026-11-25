@@ -43,6 +43,12 @@ class _QiblaInteractiveMapState extends State<QiblaInteractiveMap> {
   double _currentZoom = 16.0;
 
   @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(covariant QiblaInteractiveMap oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_followHeading &&

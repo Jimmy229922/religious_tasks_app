@@ -77,11 +77,11 @@ void main() async {
     debugPrint("Notification init failed: $e");
   });
 
-  try {
-    await RadioService().init();
-  } catch (e) {
-    debugPrint("Radio service init failed: $e");
-  }
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    RadioService().init().catchError((e) {
+      debugPrint("Radio service init failed: $e");
+    });
+  });
 
   runApp(
     MultiProvider(
