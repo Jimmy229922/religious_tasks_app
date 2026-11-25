@@ -10,6 +10,7 @@ import 'package:religious_tasks_app/features/athkar/data/surah_kahf_data.dart';
 import 'package:religious_tasks_app/features/quran/data/qcf_mushaf_repository.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_repository.dart';
 import 'package:religious_tasks_app/features/quran/widgets/ayah_tafsir_sheet.dart';
+import 'package:religious_tasks_app/features/quran/widgets/mushaf_page_scroll_physics.dart';
 import 'package:religious_tasks_app/features/quran/widgets/qcf_mushaf_page_widget.dart';
 
 class SurahKahfScreen extends StatefulWidget {
@@ -505,7 +506,10 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
               child: SafeArea(
                 child: PageView.builder(
                   controller: _pageController,
-                  physics: const BouncingScrollPhysics(),
+                  allowImplicitScrolling: true,
+                  physics: const MushafPageScrollPhysics(
+                    parent: ClampingScrollPhysics(),
+                  ),
                   itemCount: _kahfTotalPages,
                   onPageChanged: (pageIndex) {
                     setState(() {

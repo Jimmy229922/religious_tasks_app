@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:religious_tasks_app/features/quran/data/qcf_mushaf_repository.dart';
+import 'package:religious_tasks_app/features/quran/widgets/mushaf_page_scroll_physics.dart';
 import 'package:religious_tasks_app/features/quran/widgets/qcf_mushaf_page_widget.dart';
 import 'package:religious_tasks_app/features/quran/widgets/qcf_opening_page_frame.dart';
 
@@ -321,5 +322,24 @@ void main() {
         expect(find.byType(SingleChildScrollView), findsNothing);
       }
     }
+  });
+
+  test('MushafPageScrollPhysics provides weighted, non-bouncing paging feel', () {
+    const physics = MushafPageScrollPhysics(parent: ClampingScrollPhysics());
+    final applied = physics.applyTo(null);
+    expect(applied.minFlingVelocity, 420.0);
+    expect(applied.dragStartDistanceMotionThreshold, 6.0);
+    expect(applied.spring.stiffness, 165.0);
+    expect(applied.spring.damping, greaterThan(25.0));
+
+    final metrics = FixedScrollMetrics(
+      minScrollExtent: 0,
+      maxScrollExtent: 1000,
+      pixels: 500,
+      viewportDimension: 390,
+      axisDirection: AxisDirection.left,
+      devicePixelRatio: 2.0,
+    );
+    expect(applied.applyPhysicsToUserOffset(metrics, 100.0), closeTo(94.0, 0.01));
   });
 }

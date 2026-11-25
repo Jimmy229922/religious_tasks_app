@@ -834,8 +834,8 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        height: 118,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        height: 136,
+        padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: context.appCardGradient,
@@ -847,58 +847,55 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
             color: _gold.withValues(alpha: isDark ? 0.45 : 0.65),
             width: 1.2,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: (isDark ? Colors.black : _gold).withValues(alpha: 0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: _gold.withValues(alpha: 0.07),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (imageAsset != null)
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _gold.withValues(alpha: 0.75),
-                    width: 1.4,
-                  ),
-                ),
-                child: ClipOval(
-                  child: Image.asset(
-                    imageAsset,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: iconColor.withValues(alpha: isDark ? 0.16 : 0.14),
-                  border: Border.all(
-                    color: _gold.withValues(alpha: 0.45),
-                  ),
-                ),
-                child: Icon(icon, size: 24, color: iconColor),
+            Expanded(
+              flex: 8,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
+                child: imageAsset != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.asset(
+                          imageAsset,
+                          fit: BoxFit.contain,
+                          cacheWidth: 360,
+                        ),
+                      )
+                    : Center(
+                        child: Icon(icon, size: 42, color: iconColor),
+                      ),
               ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.cairo(
-                fontSize: 12,
-                height: 1.25,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
+            ),
+            Expanded(
+              flex: 2,
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.cairo(
+                      fontSize: 11,
+                      height: 1.15,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
