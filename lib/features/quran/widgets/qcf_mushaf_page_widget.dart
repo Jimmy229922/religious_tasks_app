@@ -232,20 +232,26 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'سورة ${widget.pageData.surahName}',
-                        style: GoogleFonts.cairo(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: metaColor,
+                      Flexible(
+                        child: Text(
+                          'سورة ${widget.pageData.surahName}',
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: metaColor,
+                          ),
                         ),
                       ),
-                      Text(
-                        'الجزء $arabicJuz | الحزب $arabicHizb',
-                        style: GoogleFonts.cairo(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: metaColor,
+                      Flexible(
+                        child: Text(
+                          'الجزء $arabicJuz | الحزب $arabicHizb',
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: metaColor,
+                          ),
                         ),
                       ),
                     ],

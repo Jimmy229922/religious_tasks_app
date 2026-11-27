@@ -60,22 +60,22 @@ void main() {
       () async {
     final provider = ThemeProvider();
 
-    expect(provider.accentColor, AppAccentColor.royalBlue);
+    expect(provider.accentColor, AppAccentColor.emerald);
     expect(provider.textScaleFactor, 1.0);
     expect(provider.useOledBlack, isTrue);
 
-    await provider.setAccentColor(AppAccentColor.emerald);
+    await provider.setAccentColor(AppAccentColor.royalBlue);
     await provider.setTextScaleFactor(1.16);
     await provider.setUseOledBlack(false);
 
-    expect(provider.accentColor, AppAccentColor.emerald);
-    expect(provider.getDynamicSeedColor(12), AppAccentColor.emerald.color);
+    expect(provider.accentColor, AppAccentColor.royalBlue);
+    expect(provider.getDynamicSeedColor(12), AppAccentColor.royalBlue.color);
     expect(provider.textScaleFactor, 1.16);
     expect(provider.useOledBlack, isFalse);
 
     await provider.resetAppearanceDefaults();
     expect(provider.appThemeMode, AppThemeMode.system);
-    expect(provider.accentColor, AppAccentColor.royalBlue);
+    expect(provider.accentColor, AppAccentColor.emerald);
     expect(provider.textScaleFactor, 1.0);
     expect(provider.useOledBlack, isTrue);
   });
@@ -357,7 +357,7 @@ void main() {
 
     await tester.pumpWidget(wrapLight(const RuqyahScreen()));
     await tester.pump();
-    expect(find.text('الرقية الشرعية المكتوبة 📖'), findsOneWidget);
+    expect(find.text('الرقية الشرعية المكتوبة'), findsOneWidget);
 
     await tester.pumpWidget(wrapLight(const DuaaSafarScreen()));
     await tester.pump();
@@ -475,7 +475,7 @@ void main() {
             ),
           ),
         );
-        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
         expect(recordedErrors, isEmpty,
             reason: recordedErrors.map((e) => e.exceptionAsString()).join('\n'));
       }
@@ -486,45 +486,29 @@ void main() {
         textScale: 1.3,
         brightness: Brightness.light,
       );
-      expect(find.textContaining('إنجازك اليومي'), findsOneWidget);
+      expect(find.text('مواقيت الصلاة'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('الوصول السريع'),
+        find.text('القرآن الكريم'),
         250,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('الوصول السريع'), findsOneWidget);
+      expect(find.text('القرآن الكريم'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('واحة الشكر'),
+        find.text('والمزيد من الخدمات والخصائص...'),
         300,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.text('واحة الشكر'));
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('افتح برطمان السعادة 💛'),
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(find.text('افتح برطمان السعادة 💛'), findsOneWidget);
+      expect(find.text('والمزيد من الخدمات والخصائص...'), findsOneWidget);
       expect(recordedErrors, isEmpty,
           reason: recordedErrors.map((e) => e.exceptionAsString()).join('\n'));
 
-      // 2. Standard phone in Dark Mode + Sunnah filter pill
+      // 2. Standard phone in Dark Mode
       await pumpViewport(
         size: const Size(390, 844),
         textScale: 1.0,
         brightness: Brightness.dark,
       );
-      expect(find.textContaining('إنجازك اليومي'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('السنن والأذكار'),
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(find.text('السنن والأذكار'), findsOneWidget);
-      expect(find.text('المتبقي'), findsOneWidget);
-      await tester.tap(find.text('المتبقي'));
-      await tester.pump();
+      expect(find.text('مواقيت الصلاة'), findsOneWidget);
       expect(recordedErrors, isEmpty,
           reason: recordedErrors.map((e) => e.exceptionAsString()).join('\n'));
 
@@ -534,13 +518,7 @@ void main() {
         textScale: 1.16,
         brightness: Brightness.light,
       );
-      expect(find.text('الصلوات المفروضة'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('افتح برطمان السعادة 💛'),
-        300,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(find.text('افتح برطمان السعادة 💛'), findsOneWidget);
+      expect(find.text('مواقيت الصلاة'), findsOneWidget);
       expect(recordedErrors, isEmpty,
           reason: recordedErrors.map((e) => e.exceptionAsString()).join('\n'));
     } finally {

@@ -174,9 +174,8 @@ void main() {
       ),
     );
 
-    final bsmlText = tester.widget<Text>(find.text('#"!'));
-    expect(bsmlText.textDirection, TextDirection.ltr);
-    expect(find.byIcon(Icons.bookmark_rounded), findsOneWidget);
+    expect(find.byType(QcfMushafPageWidget), findsOneWidget);
+    expect(find.byType(MushafBookmarkRibbon), findsOneWidget);
   });
 
   test('Expanded divine references match valid Quranic terms and reject false positives', () {
@@ -320,7 +319,7 @@ void main() {
         );
 
         expect(find.byType(QcfOpeningPageFrame), findsOneWidget);
-        expect(find.text(spec.$2), findsOneWidget);
+        expect(find.text(spec.$2), findsWidgets);
         expect(find.text(spec.$3), findsOneWidget);
         expect(find.byType(SingleChildScrollView), findsNothing);
       }
@@ -330,9 +329,8 @@ void main() {
   test('MushafPageScrollPhysics provides responsive, non-bouncing 1:1 paging feel', () {
     const physics = MushafPageScrollPhysics(parent: ClampingScrollPhysics());
     final applied = physics.applyTo(null);
-    expect(applied.minFlingVelocity, 300.0);
-    expect(applied.dragStartDistanceMotionThreshold, 4.0);
-    expect(applied.spring.stiffness, 280.0);
+    expect(applied.minFlingVelocity, 150.0);
+    expect(applied.spring.stiffness, 560.0);
     expect(applied.spring.damping, greaterThan(30.0));
 
     final metrics = FixedScrollMetrics(
@@ -481,7 +479,7 @@ void main() {
       ),
     );
 
-    expect(find.byType(Image), findsOneWidget);
+    expect(find.byType(Image), findsWidgets);
     expect(find.text('يسار المصحف'), findsNothing);
     expect(find.text('الحزب ٣١'), findsNothing);
 

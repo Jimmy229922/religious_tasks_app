@@ -672,6 +672,7 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -682,13 +683,16 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard>
                     color: isDarkScene ? _goldLight : const Color(0xFF78350F),
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    'الصلاة القادمة',
-                    style: GoogleFonts.cairo(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color:
-                          isDarkScene ? _goldLight : const Color(0xFF78350F),
+                  Flexible(
+                    child: Text(
+                      'الصلاة القادمة',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.cairo(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color:
+                            isDarkScene ? _goldLight : const Color(0xFF78350F),
+                      ),
                     ),
                   ),
                 ],
@@ -703,7 +707,7 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard>
                   color: isDarkScene ? Colors.white : const Color(0xFF0F172A),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
@@ -1129,12 +1133,15 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard>
               color: isDark ? _goldLight : accent,
             ),
             const SizedBox(width: 8),
-            Text(
-              'والمزيد من الخدمات والخصائص...',
-              style: GoogleFonts.cairo(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: isDark ? _goldLight : context.primaryDarkColor,
+            Flexible(
+              child: Text(
+                'والمزيد من الخدمات والخصائص...',
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.cairo(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? _goldLight : context.primaryDarkColor,
+                ),
               ),
             ),
           ],
