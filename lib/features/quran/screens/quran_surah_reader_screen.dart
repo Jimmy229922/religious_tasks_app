@@ -915,14 +915,13 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
                       _pendingLastReadPage = null;
                     });
                   }
-                  if (cached == null) {
+                  if (cached == null && !widget.singleSurahOnly) {
                     QcfMushafRepository.loadPage(
                       newPage,
                       onlySurahNumber: _onlySurahFilter,
                     ).then((content) {
                       if (mounted &&
                           _currentPage == newPage &&
-                          !widget.singleSurahOnly &&
                           _currentSurahName != content.surahName) {
                         _currentSurahName = content.surahName;
                         _currentSurahNameNotifier.value = content.surahName;

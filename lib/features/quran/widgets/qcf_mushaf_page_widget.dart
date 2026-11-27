@@ -1,5 +1,7 @@
+import 'dart:developer' as developer;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
@@ -88,23 +90,47 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget>
       return _preparedLines!;
     }
     _disposePreparedLines();
-    final built = List<_PreparedQcfLine>.generate(
-      lines.length,
-      (i) => _PreparedQcfLine.prepare(
-        line: lines[i],
-        fontFamily: widget.pageData.fontFamily,
-        inkColor: inkColor,
-        divineNameColor: divineNameColor,
-        isDark: isDark,
-        textScaler: textScaler,
-      ),
-      growable: false,
-    );
-    _preparedLines = built;
-    _preparedPageData = widget.pageData;
-    _preparedIsDark = isDark;
-    _preparedTextScaler = textScaler;
-    return built;
+    final sw = !kReleaseMode ? (Stopwatch()..start()) : null;
+    if (!kReleaseMode) {
+      developer.Timeline.startSync(
+        'QCF.ensureLinesPrepared(p${widget.pageData.pageNumber})',
+      );
+    }
+    int totalTextLayoutUs = 0;
+    try {
+      final built = List<_PreparedQcfLine>.generate(
+        lines.length,
+        (i) => _PreparedQcfLine.prepare(
+          line: lines[i],
+          fontFamily: widget.pageData.fontFamily,
+          inkColor: inkColor,
+          divineNameColor: divineNameColor,
+          isDark: isDark,
+          textScaler: textScaler,
+          onLayoutUs: !kReleaseMode
+              ? (layoutUs) {
+                  totalTextLayoutUs += layoutUs;
+                }
+              : null,
+        ),
+        growable: false,
+      );
+      _preparedLines = built;
+      _preparedPageData = widget.pageData;
+      _preparedIsDark = isDark;
+      _preparedTextScaler = textScaler;
+      if (sw != null) {
+        sw.stop();
+        debugPrint(
+          '[QCF_PERF] ensureLinesPrepared page=${widget.pageData.pageNumber} lines=${lines.length} total=${(sw.elapsedMicroseconds / 1000.0).toStringAsFixed(2)}ms (textLayout=${(totalTextLayoutUs / 1000.0).toStringAsFixed(2)}ms)',
+        );
+      }
+      return built;
+    } finally {
+      if (!kReleaseMode) {
+        developer.Timeline.finishSync();
+      }
+    }
   }
 
   @override
@@ -376,6 +402,7 @@ class _PreparedQcfLine {
     required Color divineNameColor,
     required bool isDark,
     required TextScaler textScaler,
+    void Function(int layoutUs)? onLayoutUs,
   }) {
     if (line.type == 'surah-header') {
       return _PreparedQcfLine._(
@@ -413,7 +440,15 @@ class _PreparedQcfLine {
         textAlign: TextAlign.center,
         maxLines: 1,
         textScaler: textScaler,
-      )..layout();
+      );
+      if (!kReleaseMode && onLayoutUs != null) {
+        final sw = Stopwatch()..start();
+        tp.layout();
+        sw.stop();
+        onLayoutUs(sw.elapsedMicroseconds);
+      } else {
+        tp.layout();
+      }
 
       return _PreparedQcfLine._(
         rawLine: line,
@@ -505,7 +540,15 @@ class _PreparedQcfLine {
       textAlign: TextAlign.center,
       maxLines: 1,
       textScaler: textScaler,
-    )..layout();
+    );
+    if (!kReleaseMode && onLayoutUs != null) {
+      final sw = Stopwatch()..start();
+      tp.layout();
+      sw.stop();
+      onLayoutUs(sw.elapsedMicroseconds);
+    } else {
+      tp.layout();
+    }
 
     final lineHeight = tp.height;
     final ornamentRects = <Rect>[];

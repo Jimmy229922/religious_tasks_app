@@ -1,10 +1,17 @@
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_data.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_page_mapping.dart';
+
+void _qcfPerfLog(String message) {
+  if (!kReleaseMode) {
+    debugPrint('[QCF_PERF] $message');
+  }
+}
 
 class QcfMushafWord {
   static final RegExp _pureDigitsRegex = RegExp(r'^[\u0660-\u06690-9]+$');
@@ -85,6 +92,9 @@ class QcfMushafWord {
   final String arabicWord;
   final String glyph;
   final bool? _precomputedDivine;
+  final bool? _precomputedPureOrnament;
+  final bool? _precomputedSajdah;
+  final bool? _precomputedTrailingOrnament;
 
   const QcfMushafWord({
     required this.surahNumber,
@@ -93,19 +103,27 @@ class QcfMushafWord {
     required this.arabicWord,
     required this.glyph,
     bool? precomputedDivine,
-  }) : _precomputedDivine = precomputedDivine;
+    bool? precomputedPureOrnament,
+    bool? precomputedSajdah,
+    bool? precomputedTrailingOrnament,
+  })  : _precomputedDivine = precomputedDivine,
+        _precomputedPureOrnament = precomputedPureOrnament,
+        _precomputedSajdah = precomputedSajdah,
+        _precomputedTrailingOrnament = precomputedTrailingOrnament;
 
   String get verseKey => '$surahNumber:$ayahNumber';
   String get locationKey => '$surahNumber:$ayahNumber:$wordIndex';
 
-  bool get isPureAyahOrnament => _pureDigitsRegex.hasMatch(arabicWord.trim());
+  bool get isPureAyahOrnament =>
+      _precomputedPureOrnament ?? _pureDigitsRegex.hasMatch(arabicWord.trim());
 
-  bool get isSajdahWord => arabicWord.contains('\u06E9');
+  bool get isSajdahWord => _precomputedSajdah ?? arabicWord.contains('\u06E9');
 
   bool get hasTrailingAyahOrnament =>
-      !isPureAyahOrnament &&
-      _trailingDigitsRegex.hasMatch(arabicWord.trim()) &&
-      glyph.contains(' ');
+      _precomputedTrailingOrnament ??
+      (!isPureAyahOrnament &&
+          _trailingDigitsRegex.hasMatch(arabicWord.trim()) &&
+          glyph.contains(' '));
 
   String get _normalizedWord {
     final withoutDigits =
@@ -215,6 +233,12 @@ class QcfMushafLine {
           prevWord: i > 0 ? baseWords[i - 1] : null,
           nextWord: i + 1 < baseWords.length ? baseWords[i + 1] : null,
         );
+        final trimmedWord = w.arabicWord.trim();
+        final isPureOrnament = QcfMushafWord._pureDigitsRegex.hasMatch(trimmedWord);
+        final isSajdah = w.arabicWord.contains('\u06E9');
+        final hasTrailingOrnament = !isPureOrnament &&
+            QcfMushafWord._trailingDigitsRegex.hasMatch(trimmedWord) &&
+            w.glyph.contains(' ');
         return QcfMushafWord(
           surahNumber: w.surahNumber,
           ayahNumber: w.ayahNumber,
@@ -222,6 +246,9 @@ class QcfMushafLine {
           arabicWord: w.arabicWord,
           glyph: w.glyph,
           precomputedDivine: isDiv,
+          precomputedPureOrnament: isPureOrnament,
+          precomputedSajdah: isSajdah,
+          precomputedTrailingOrnament: hasTrailingOrnament,
         );
       },
       growable: false,
@@ -390,11 +417,32 @@ class QcfMushafRepository {
     if (existing != null) return existing;
 
     final future = () async {
-      final fontData = await rootBundle.load(assetPath);
-      final loader = FontLoader(family)
-        ..addFont(Future<ByteData>.value(fontData));
-      await loader.load();
-      _loadedFontFamilies.add(family);
+      final sw = !kReleaseMode ? (Stopwatch()..start()) : null;
+      if (!kReleaseMode) {
+        developer.Timeline.startSync('QCF.fontRegister($family)');
+      }
+      try {
+        final fontData = await rootBundle.load(assetPath);
+        final readUs = sw?.elapsedMicroseconds ?? 0;
+        final loader = FontLoader(family)
+          ..addFont(Future<ByteData>.value(fontData));
+        await loader.load();
+        _loadedFontFamilies.add(family);
+        if (sw != null) {
+          sw.stop();
+          final totalMs = (sw.elapsedMicroseconds / 1000.0).toStringAsFixed(2);
+          final readMs = (readUs / 1000.0).toStringAsFixed(2);
+          final registerMs =
+              ((sw.elapsedMicroseconds - readUs) / 1000.0).toStringAsFixed(2);
+          _qcfPerfLog(
+            'fontRegister family=$family total=${totalMs}ms (assetRead=${readMs}ms, fontLoader=${registerMs}ms)',
+          );
+        }
+      } finally {
+        if (!kReleaseMode) {
+          developer.Timeline.finishSync();
+        }
+      }
     }()
         .whenComplete(() {
       _inFlightFonts.remove(family);
@@ -407,8 +455,20 @@ class QcfMushafRepository {
   static Future<void> ensurePageFontsLoaded(int pageNumber) async {
     final page = pageNumber.clamp(1, 604);
     final family = fontFamilyFor(page);
-    if (_loadedFontFamilies.contains(family) &&
-        _loadedFontFamilies.contains(basmalaFontFamily)) {
+    final needPageFont = !_loadedFontFamilies.contains(family);
+    final needBasmalaFont = !_loadedFontFamilies.contains(basmalaFontFamily);
+    if (!needPageFont && !needBasmalaFont) {
+      return;
+    }
+    if (needPageFont && !needBasmalaFont) {
+      await _ensureFontRegistered(family, fontAssetPathFor(page));
+      return;
+    }
+    if (!needPageFont && needBasmalaFont) {
+      await _ensureFontRegistered(
+        basmalaFontFamily,
+        'assets/mushaf_qcf/fonts/QCF_BSML.ttf',
+      );
       return;
     }
     await Future.wait(<Future<void>>[
@@ -448,40 +508,89 @@ class QcfMushafRepository {
     final key = _cacheKey(page, onlySurahNumber);
     final cached = _pageCache.remove(key);
     if (cached != null) {
+      final sw = !kReleaseMode ? (Stopwatch()..start()) : null;
       await ensurePageFontsLoaded(page);
       _pageCache[key] = cached;
+      if (sw != null) {
+        sw.stop();
+        _qcfPerfLog(
+          'loadPage page=$page cache=HIT fontWait=${(sw.elapsedMicroseconds / 1000.0).toStringAsFixed(2)}ms',
+        );
+      }
       return cached;
     }
 
     final existing = _inFlightPages[key];
-    if (existing != null) return existing;
+    if (existing != null) {
+      _qcfPerfLog('loadPage page=$page cache=IN_FLIGHT');
+      return existing;
+    }
 
     final future = () async {
-      final results = await Future.wait<Object?>(<Future<Object?>>[
-        ensurePageFontsLoaded(page),
-        rootBundle
-            .loadString(
-              layoutAssetPathFor(page),
-              cache: false,
-            )
-            .then(
-              (layoutJson) => compute(
-                _parseQcfPageData,
-                _QcfParseArgs(
-                  layoutJson: layoutJson,
-                  fontFamily: fontFamilyFor(page),
-                  onlySurahNumber: onlySurahNumber,
-                ),
-              ),
-            ),
-      ]);
-      final pageData = results[1] as QcfMushafPageData;
-
-      if (_pageCache.length >= _maxCacheSize) {
-        _pageCache.remove(_pageCache.keys.first);
+      final totalSw = !kReleaseMode ? (Stopwatch()..start()) : null;
+      if (!kReleaseMode) {
+        developer.Timeline.startSync('QCF.loadPage($page)');
       }
-      _pageCache[key] = pageData;
-      return pageData;
+      try {
+        int fontUs = 0;
+        int jsonReadUs = 0;
+        int jsonParseUs = 0;
+        final fontFuture = () async {
+          final sw = !kReleaseMode ? (Stopwatch()..start()) : null;
+          await ensurePageFontsLoaded(page);
+          if (sw != null) {
+            sw.stop();
+            fontUs = sw.elapsedMicroseconds;
+          }
+        }();
+        final parseFuture = () async {
+          final readSw = !kReleaseMode ? (Stopwatch()..start()) : null;
+          final layoutJson = await rootBundle.loadString(
+            layoutAssetPathFor(page),
+            cache: false,
+          );
+          if (readSw != null) {
+            readSw.stop();
+            jsonReadUs = readSw.elapsedMicroseconds;
+          }
+          final parseSw = !kReleaseMode ? (Stopwatch()..start()) : null;
+          final parsed = await compute(
+            _parseQcfPageData,
+            _QcfParseArgs(
+              layoutJson: layoutJson,
+              fontFamily: fontFamilyFor(page),
+              onlySurahNumber: onlySurahNumber,
+            ),
+          );
+          if (parseSw != null) {
+            parseSw.stop();
+            jsonParseUs = parseSw.elapsedMicroseconds;
+          }
+          return parsed;
+        }();
+
+        final results = await Future.wait<Object?>(<Future<Object?>>[
+          fontFuture,
+          parseFuture,
+        ]);
+        final pageData = results[1] as QcfMushafPageData;
+
+        if (_pageCache.length >= _maxCacheSize) {
+          _pageCache.remove(_pageCache.keys.first);
+        }
+        _pageCache[key] = pageData;
+        if (totalSw != null) {
+          totalSw.stop();
+          _qcfPerfLog(
+            'loadPage page=$page cache=MISS total=${(totalSw.elapsedMicroseconds / 1000.0).toStringAsFixed(2)}ms (font=${(fontUs / 1000.0).toStringAsFixed(2)}ms, jsonRead=${(jsonReadUs / 1000.0).toStringAsFixed(2)}ms, jsonParse=${(jsonParseUs / 1000.0).toStringAsFixed(2)}ms)',
+          );
+        }
+        return pageData;
+      } finally {
+        if (!kReleaseMode) {
+          developer.Timeline.finishSync();
+        }
+      }
     }()
         .whenComplete(() {
       _inFlightPages.remove(key);
@@ -499,30 +608,64 @@ class QcfMushafRepository {
   }) {
     final generation = ++_pagePrefetchGeneration;
     final readingDirection = direction < 0 ? -1 : 1;
-    final targets = <int>[];
-    for (int step = 1; step <= _prefetchAheadPages; step++) {
+    final targets = <int>[
+      pageNumber + readingDirection,
+      pageNumber - readingDirection,
+    ];
+    for (int step = 2; step <= _prefetchAheadPages; step++) {
       targets.add(pageNumber + (readingDirection * step));
       if (step <= _prefetchBehindPages) {
         targets.add(pageNumber - (readingDirection * step));
       }
     }
 
+    _qcfPerfLog(
+      'prefetchAdjacent scheduled center=$pageNumber dir=$readingDirection gen=$generation targets=$targets',
+    );
+
     SchedulerBinding.instance.scheduleTask<void>(
       () async {
-        for (final target in targets) {
-          if (generation != _pagePrefetchGeneration) return;
+        final sw = !kReleaseMode ? (Stopwatch()..start()) : null;
+        int loadedCount = 0;
+        for (int i = 0; i < targets.length; i++) {
+          final target = targets[i];
           if (target < 1 || target > 604) continue;
           if (allowedPages != null && !allowedPages.contains(target)) continue;
           if (getCachedPage(target, onlySurahNumber: onlySurahNumber) != null) {
             continue;
           }
-          await _waitForSettledFrames();
-          if (generation != _pagePrefetchGeneration) return;
+          final isImmediateAdjacent = i < 2;
+          if (generation != _pagePrefetchGeneration) {
+            if (!isImmediateAdjacent) {
+              _qcfPerfLog(
+                'prefetchAdjacent cancelled gen=$generation after=$loadedCount before=$target',
+              );
+              return;
+            }
+          }
+          if (isImmediateAdjacent) {
+            await SchedulerBinding.instance.endOfFrame;
+          } else {
+            await _waitForSettledFrames();
+            if (generation != _pagePrefetchGeneration) {
+              _qcfPerfLog(
+                'prefetchAdjacent cancelled gen=$generation after=$loadedCount before=$target',
+              );
+              return;
+            }
+          }
           try {
             await loadPage(target, onlySurahNumber: onlySurahNumber);
+            loadedCount++;
           } catch (_) {
             // The visible page will retry normally if prefetching fails.
           }
+        }
+        if (sw != null) {
+          sw.stop();
+          _qcfPerfLog(
+            'prefetchAdjacent completed center=$pageNumber gen=$generation loaded=$loadedCount total=${(sw.elapsedMicroseconds / 1000.0).toStringAsFixed(2)}ms',
+          );
         }
       },
       Priority.idle,
@@ -544,18 +687,31 @@ class QcfMushafRepository {
 
     SchedulerBinding.instance.scheduleTask<void>(
       () async {
+        final sw = !kReleaseMode ? (Stopwatch()..start()) : null;
+        int loadedCount = 0;
         for (final target in targets) {
           if (generation != _fontPrefetchGeneration) return;
           if (target < 1 || target > 604) continue;
           if (allowedPages != null && !allowedPages.contains(target)) continue;
-          if (_loadedFontFamilies.contains(fontFamilyFor(target))) continue;
+          final family = fontFamilyFor(target);
+          if (_loadedFontFamilies.contains(family) ||
+              _inFlightFonts.containsKey(family)) {
+            continue;
+          }
           await _waitForSettledFrames();
           if (generation != _fontPrefetchGeneration) return;
           try {
             await ensurePageFontsLoaded(target);
+            loadedCount++;
           } catch (_) {
             // The visible page will retry normally if prefetching fails.
           }
+        }
+        if (sw != null && loadedCount > 0) {
+          sw.stop();
+          _qcfPerfLog(
+            'prefetchFonts completed center=$pageNumber gen=$generation loaded=$loadedCount total=${(sw.elapsedMicroseconds / 1000.0).toStringAsFixed(2)}ms',
+          );
         }
       },
       Priority.idle,
@@ -567,8 +723,11 @@ class QcfMushafRepository {
     List<int> pages, {
     int? onlySurahNumber,
   }) {
+    _qcfPerfLog('prefetchPages scheduled count=${pages.length}');
     SchedulerBinding.instance.scheduleTask<void>(
       () async {
+        final sw = !kReleaseMode ? (Stopwatch()..start()) : null;
+        int loadedCount = 0;
         for (final target in pages) {
           if (target < 1 || target > 604) continue;
           if (getCachedPage(target, onlySurahNumber: onlySurahNumber) != null) {
@@ -577,9 +736,16 @@ class QcfMushafRepository {
           await _waitForSettledFrames();
           try {
             await loadPage(target, onlySurahNumber: onlySurahNumber);
+            loadedCount++;
           } catch (_) {
             // The visible page will retry normally if prefetching fails.
           }
+        }
+        if (sw != null) {
+          sw.stop();
+          _qcfPerfLog(
+            'prefetchPages completed loaded=$loadedCount total=${(sw.elapsedMicroseconds / 1000.0).toStringAsFixed(2)}ms',
+          );
         }
       },
       Priority.idle,
