@@ -13,6 +13,7 @@ import 'package:religious_tasks_app/features/quran/theme/mushaf_reader_theme.dar
 import 'package:religious_tasks_app/features/quran/widgets/ayah_tafsir_sheet.dart';
 import 'package:religious_tasks_app/features/quran/widgets/mushaf_page_scroll_physics.dart';
 import 'package:religious_tasks_app/features/quran/widgets/mushaf_page_side_indicator.dart';
+import 'package:religious_tasks_app/features/quran/widgets/mushaf_section_start_toast.dart';
 import 'package:religious_tasks_app/features/quran/widgets/qcf_mushaf_page_widget.dart';
 
 class SurahKahfScreen extends StatefulWidget {
@@ -49,6 +50,57 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
 
   static const int _kahfStartPage = 293;
   static const int _kahfTotalPages = 12; // Pages 293 to 304 (All 110 Verses)
+  static final List<int> _kahfAllowedPages = List<int>.generate(
+    _kahfTotalPages,
+    (index) => _kahfStartPage + index,
+    growable: false,
+  );
+  static const List<int> _sectionStartPageIndexes = [0, 4, 7, 9];
+  static const List<String> _sectionStartLabels = [
+    "بداية قصة أصحاب الكهف",
+    "بداية قصة صاحب الجنتين",
+    "بداية قصة موسى والخضر",
+    "بداية قصة ذي القرنين",
+  ];
+
+  final List<GlobalKey> _sectionChipKeys =
+      List<GlobalKey>.generate(5, (_) => GlobalKey());
+  bool _isJumpingToSection = false;
+
+  int _sectionIdForPageIndex(int pageIndex) {
+    for (int i = _sectionStartPageIndexes.length - 1; i >= 0; i--) {
+      if (pageIndex >= _sectionStartPageIndexes[i]) return i + 1;
+    }
+    return 1;
+  }
+
+  String? _sectionStartLabelForPage(int absolutePage) {
+    final idx = _sectionStartPageIndexes.indexOf(absolutePage - _kahfStartPage);
+    return idx == -1 ? null : _sectionStartLabels[idx];
+  }
+
+  void _syncSectionWithPage(int pageIndex) {
+    final sectionId = _sectionIdForPageIndex(pageIndex);
+    if (sectionId == _selectedSectionId) return;
+    setState(() {
+      _selectedSectionId = sectionId;
+    });
+    _scrollSelectedChipIntoView();
+  }
+
+  void _scrollSelectedChipIntoView() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final chipContext = _sectionChipKeys[_selectedSectionId].currentContext;
+      if (chipContext == null) return;
+      Scrollable.ensureVisible(
+        chipContext,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
 
   @override
   void initState() {
@@ -153,7 +205,8 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
                   onTap: () => Navigator.pop(ctx, 'select'),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.menu_book_rounded, color: Colors.teal),
+                  leading:
+                      const Icon(Icons.menu_book_rounded, color: Colors.teal),
                   title: Text(
                     "تفسير الآية",
                     style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
@@ -213,6 +266,9 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
     SystemChrome.setEnabledSystemUIMode(
       next ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky,
     );
+    if (next) {
+      _scrollSelectedChipIntoView();
+    }
   }
 
   void _initBookmarkAndController() {
@@ -244,10 +300,23 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
     _savedVerseBookmarkVerse = verseBmNum;
     _currentPageIndex = initialIdx;
     _currentPageIndexNotifier.value = initialIdx;
+    _selectedSectionId = _sectionIdForPageIndex(initialIdx);
 
     _pageController = PageController(initialPage: initialIdx);
     QcfMushafRepository.prefetchAdjacentPages(
       _kahfStartPage + initialIdx,
+      onlySurahNumber: 18,
+      allowedPages: _kahfAllowedPages,
+    );
+    QcfMushafRepository.prefetchReadingPageFonts(
+      _kahfStartPage + initialIdx,
+      allowedPages: _kahfAllowedPages,
+    );
+    QcfMushafRepository.prefetchPages(
+      <int>[
+        for (int i = initialIdx; i < _kahfTotalPages; i++) _kahfStartPage + i,
+        for (int i = initialIdx - 1; i >= 0; i--) _kahfStartPage + i,
+      ],
       onlySurahNumber: 18,
     );
   }
@@ -299,10 +368,10 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
     int ayahNumber,
   ) async {
     final verseNum = ayahNumber.toString();
-    final isAlreadySelected = (_selectedPage == absolutePage &&
-            _selectedAyahNumber == ayahNumber) ||
-        (_savedVerseBookmarkPage == absolutePage &&
-            _savedVerseBookmarkVerse == verseNum);
+    final isAlreadySelected =
+        (_selectedPage == absolutePage && _selectedAyahNumber == ayahNumber) ||
+            (_savedVerseBookmarkPage == absolutePage &&
+                _savedVerseBookmarkVerse == verseNum);
 
     if (isAlreadySelected) {
       setState(() {
@@ -434,8 +503,8 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
                 ),
                 const SizedBox(height: 10),
                 ListTile(
-                  leading:
-                      const Icon(Icons.bookmark_add_rounded, color: Colors.amber),
+                  leading: const Icon(Icons.bookmark_add_rounded,
+                      color: Colors.amber),
                   title: Text(
                     "حفظ الصفحة الحالية",
                     style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
@@ -566,15 +635,21 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
     });
     int targetPageIdx = 0;
     if (sectionId == 1) targetPageIdx = 0; // Verses 1..27 (Page 293)
-    if (sectionId == 2) targetPageIdx = 3; // Verses 28..45 (Page 296)
-    if (sectionId == 3) targetPageIdx = 6; // Verses 46..74 (Page 299)
+    if (sectionId == 2) targetPageIdx = 4; // Verse 32 starts on Page 297
+    if (sectionId == 3) targetPageIdx = 7; // Verse 60 starts on Page 300
     if (sectionId == 4) targetPageIdx = 9; // Verses 75..110 (Page 302)
 
-    _pageController.animateToPage(
+    _isJumpingToSection = true;
+    _pageController
+        .animateToPage(
       targetPageIdx,
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOutCubic,
-    );
+    )
+        .whenComplete(() {
+      _isJumpingToSection = false;
+    });
+    _scrollSelectedChipIntoView();
   }
 
   void _showVirtueDialog(BuildContext context, bool isDark) {
@@ -639,7 +714,8 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final accent = context.primaryColor;
-    final paperColor = isDark ? const Color(0xFF121820) : const Color(0xFFFBF7EE);
+    final paperColor =
+        isDark ? const Color(0xFF121820) : const Color(0xFFFBF7EE);
     final readerTheme = MushafReaderTheme.of(isDark);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -647,307 +723,287 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
-        backgroundColor: paperColor,
-        body: Stack(
-          children: [
-            GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: _toggleControls,
-              child: SafeArea(
-                top: false,
-                child: PageView.builder(
-                  controller: _pageController,
-                  allowImplicitScrolling: true,
-                  physics: const MushafPageScrollPhysics(
-                    parent: ClampingScrollPhysics(),
-                  ),
-                  itemCount: _kahfTotalPages,
-                  onPageChanged: (pageIndex) {
-                    _currentPageIndex = pageIndex;
-                    _currentPageIndexNotifier.value = pageIndex;
-                    QcfMushafRepository.prefetchAdjacentPages(
-                      _kahfStartPage + pageIndex,
-                      onlySurahNumber: 18,
-                    );
-                  },
-                  itemBuilder: (context, index) {
-                    final absolutePage = _kahfStartPage + index;
-                    final itemArabicPageNum =
-                        QuranTextFormatter.toArabicDigits(
-                      absolutePage.toString(),
-                    );
-                    final cachedPage = QcfMushafRepository.getCachedPage(
-                      absolutePage,
-                      onlySurahNumber: 18,
-                    );
+          backgroundColor: paperColor,
+          body: Stack(
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _toggleControls,
+                child: SafeArea(
+                  top: false,
+                  child: PageView.builder(
+                    controller: _pageController,
+                    allowImplicitScrolling: true,
+                    physics: const MushafPageScrollPhysics(
+                      parent: ClampingScrollPhysics(),
+                    ),
+                    itemCount: _kahfTotalPages,
+                    onPageChanged: (pageIndex) {
+                      final readingDirection =
+                          pageIndex.compareTo(_currentPageIndex);
+                      _currentPageIndex = pageIndex;
+                      _currentPageIndexNotifier.value = pageIndex;
+                      if (!_isJumpingToSection) {
+                        _syncSectionWithPage(pageIndex);
+                      }
+                      QcfMushafRepository.prefetchAdjacentPages(
+                        _kahfStartPage + pageIndex,
+                        direction: readingDirection,
+                        onlySurahNumber: 18,
+                        allowedPages: _kahfAllowedPages,
+                      );
+                      QcfMushafRepository.prefetchReadingPageFonts(
+                        _kahfStartPage + pageIndex,
+                        direction: readingDirection,
+                        allowedPages: _kahfAllowedPages,
+                      );
+                    },
+                    itemBuilder: (context, index) {
+                      final absolutePage = _kahfStartPage + index;
+                      final itemArabicPageNum =
+                          QuranTextFormatter.toArabicDigits(
+                        absolutePage.toString(),
+                      );
+                      final cachedPage = QcfMushafRepository.getCachedPage(
+                        absolutePage,
+                        onlySurahNumber: 18,
+                      );
 
-                    return FutureBuilder<QcfMushafPageData>(
-                      initialData: cachedPage,
-                      future: cachedPage != null
-                          ? null
-                          : QcfMushafRepository.loadPage(
-                              absolutePage,
-                              onlySurahNumber: 18,
-                            ),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 28,
-                                  height: 28,
-                                  child: CircularProgressIndicator(
-                                    color: accent,
-                                    strokeWidth: 3,
+                      return FutureBuilder<QcfMushafPageData>(
+                        initialData: cachedPage,
+                        future: cachedPage != null
+                            ? null
+                            : QcfMushafRepository.loadPage(
+                                absolutePage,
+                                onlySurahNumber: 18,
+                              ),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: CircularProgressIndicator(
+                                      color: accent,
+                                      strokeWidth: 3,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 14),
-                                Text(
-                                  "جاري فتح الصفحة $itemArabicPageNum من سورة الكهف...",
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.tealAccent : accent,
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    "جاري فتح الصفحة $itemArabicPageNum من سورة الكهف...",
+                                    style: GoogleFonts.cairo(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          isDark ? Colors.tealAccent : accent,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        final pageData = snapshot.data!;
-                        String? highlightedKey;
-                        if (_inspectingPage == absolutePage &&
-                            _inspectingVerse != null) {
-                          highlightedKey = '18:$_inspectingVerse';
-                        } else if (_selectedPage == absolutePage &&
-                            _selectedAyahNumber != null) {
-                          highlightedKey = '18:$_selectedAyahNumber';
-                        } else if (_savedVerseBookmarkPage == absolutePage &&
-                            _savedVerseBookmarkVerse != null) {
-                          final ayahInt = QuranTextFormatter.parseVerseNumber(
-                            _savedVerseBookmarkVerse!,
-                          );
-                          if (ayahInt != null) {
-                            highlightedKey = '18:$ayahInt';
+                                ],
+                              ),
+                            );
                           }
-                        }
 
-                        return QcfMushafPageWidget(
-                          pageData: pageData,
-                          highlightedVerseKey: highlightedKey,
-                          isPageBookmarked: _savedPageBookmark == absolutePage,
-                          topInset: MediaQuery.paddingOf(context).top,
-                          isDark: isDark,
-                          accentColor: accent,
-                          onTapVerse: null,
-                          onLongPressVerse: (_, ayahNum) =>
-                              _onVerseLongPressed(absolutePage, ayahNum),
-                        );
-                      },
-                    );
-                  },
+                          final pageData = snapshot.data!;
+                          String? highlightedKey;
+                          if (_inspectingPage == absolutePage &&
+                              _inspectingVerse != null) {
+                            highlightedKey = '18:$_inspectingVerse';
+                          } else if (_selectedPage == absolutePage &&
+                              _selectedAyahNumber != null) {
+                            highlightedKey = '18:$_selectedAyahNumber';
+                          } else if (_savedVerseBookmarkPage == absolutePage &&
+                              _savedVerseBookmarkVerse != null) {
+                            final ayahInt = QuranTextFormatter.parseVerseNumber(
+                              _savedVerseBookmarkVerse!,
+                            );
+                            if (ayahInt != null) {
+                              highlightedKey = '18:$ayahInt';
+                            }
+                          }
+
+                          return QcfMushafPageWidget(
+                            pageData: pageData,
+                            highlightedVerseKey: highlightedKey,
+                            isPageBookmarked:
+                                _savedPageBookmark == absolutePage,
+                            topInset: MediaQuery.paddingOf(context).top,
+                            isDark: isDark,
+                            accentColor: accent,
+                            onTapVerse: null,
+                            onLongPressVerse: (_, ayahNum) =>
+                                _onVerseLongPressed(absolutePage, ayahNum),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
-            ValueListenableBuilder<bool>(
-              valueListenable: _showControlsNotifier,
-              builder: (_, showControls, __) {
-                if (!showControls) return const SizedBox.shrink();
-                return ValueListenableBuilder<int>(
-                  valueListenable: _currentPageIndexNotifier,
-                  builder: (_, pageIndex, __) {
-                    final absolutePageNumber = _kahfStartPage + pageIndex;
-                    final arabicPageNum = QuranTextFormatter.toArabicDigits(
-                      absolutePageNumber.toString(),
-                    );
-                    final arabicJuzNum =
-                        absolutePageNumber >= 302 ? '١٦' : '١٥';
-                    return Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Material(
-                            color: readerTheme.headerBackground,
-                            elevation: 0,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color: readerTheme.divider,
-                                    width: 1,
+              MushafSectionStartToast(
+                pageNotifier: _currentPageIndexNotifier,
+                isDark: isDark,
+                pageIndexOffset: _kahfStartPage,
+                extraTitleForPage: _sectionStartLabelForPage,
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: _showControlsNotifier,
+                builder: (_, showControls, __) {
+                  if (!showControls) return const SizedBox.shrink();
+                  return ValueListenableBuilder<int>(
+                    valueListenable: _currentPageIndexNotifier,
+                    builder: (_, pageIndex, __) {
+                      final absolutePageNumber = _kahfStartPage + pageIndex;
+                      final arabicPageNum = QuranTextFormatter.toArabicDigits(
+                        absolutePageNumber.toString(),
+                      );
+                      final arabicJuzNum =
+                          absolutePageNumber >= 302 ? '١٦' : '١٥';
+                      return Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Material(
+                              color: readerTheme.headerBackground,
+                              elevation: 0,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: readerTheme.divider,
+                                      width: 1,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              child: SafeArea(
-                                bottom: false,
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(
-                                      height: kToolbarHeight,
-                                      child: Row(
-                                        children: [
-                                          IconButton(
-                                            icon: Icon(
-                                              Icons.arrow_back_ios_new_rounded,
-                                              color: readerTheme.actionIcon,
-                                              size: 20,
-                                            ),
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                          ),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                FittedBox(
-                                                  fit: BoxFit.scaleDown,
-                                                  alignment:
-                                                      AlignmentDirectional
-                                                          .centerStart,
-                                                  child: Text(
-                                                    "سورة الكهف الشريفة",
-                                                    maxLines: 1,
-                                                    style: GoogleFonts.cairo(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 15.5,
-                                                      color: readerTheme
-                                                          .primaryText,
-                                                    ),
-                                                  ),
-                                                ),
-                                                FittedBox(
-                                                  fit: BoxFit.scaleDown,
-                                                  alignment:
-                                                      AlignmentDirectional
-                                                          .centerStart,
-                                                  child: Text(
-                                                    "الجزء $arabicJuzNum • الصفحة $arabicPageNum من ٣٠٤",
-                                                    maxLines: 1,
-                                                    style: GoogleFonts.cairo(
-                                                      fontSize: 11,
-                                                      color: readerTheme
-                                                          .secondaryText,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          IconButton(
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                            icon: Icon(
-                                              (_savedPageBookmark != null ||
-                                                      _savedVerseBookmarkPage !=
-                                                          null)
-                                                  ? Icons.bookmark_rounded
-                                                  : Icons.bookmark_add_outlined,
-                                              color: (_savedPageBookmark !=
-                                                          null ||
-                                                      _savedVerseBookmarkPage !=
-                                                          null)
-                                                  ? readerTheme.activeBookmark
-                                                  : readerTheme.actionIcon,
-                                            ),
-                                            tooltip: "حفظ موضع القراءة",
-                                            onPressed: () =>
-                                                _showKahfBookmarkOptionsSheet(
-                                              context,
-                                              isDark,
-                                            ),
-                                          ),
-                                          IconButton(
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                            icon: Icon(
-                                              Icons.menu_book_rounded,
-                                              color: readerTheme.actionIcon,
-                                            ),
-                                            tooltip: "فضل سورة الكهف",
-                                            onPressed: () => _showVirtueDialog(
-                                                context, isDark),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: readerTheme.chipStripBackground,
-                                        border: Border(
-                                          top: BorderSide(
-                                            color: readerTheme.divider
-                                                .withValues(alpha: 0.65),
-                                            width: 0.8,
-                                          ),
-                                        ),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 6),
-                                      child: SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        physics: const BouncingScrollPhysics(),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8),
+                                child: SafeArea(
+                                  bottom: false,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        height: kToolbarHeight,
                                         child: Row(
                                           children: [
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                  left: 6.0),
-                                              child: ChoiceChip(
-                                                visualDensity:
-                                                    VisualDensity.compact,
-                                                materialTapTargetSize:
-                                                    MaterialTapTargetSize
-                                                        .shrinkWrap,
-                                                avatar: Icon(
-                                                  Icons.menu_book_rounded,
-                                                  size: 14,
-                                                  color: _selectedSectionId == 0
-                                                      ? Colors.white
-                                                      : readerTheme.actionIcon,
-                                                ),
-                                                label: Text(
-                                                  "السورة كاملة (١٢ صفحة)",
-                                                  style: GoogleFonts.cairo(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 10.5,
-                                                    color:
-                                                        _selectedSectionId == 0
-                                                            ? Colors.white
-                                                            : readerTheme
-                                                                .primaryText,
+                                            IconButton(
+                                              icon: Icon(
+                                                Icons
+                                                    .arrow_back_ios_new_rounded,
+                                                color: readerTheme.actionIcon,
+                                                size: 20,
+                                              ),
+                                              onPressed: () =>
+                                                  Navigator.pop(context),
+                                            ),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    alignment:
+                                                        AlignmentDirectional
+                                                            .centerStart,
+                                                    child: Text(
+                                                      "سورة الكهف الشريفة",
+                                                      maxLines: 1,
+                                                      style: GoogleFonts.cairo(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 15.5,
+                                                        color: readerTheme
+                                                            .primaryText,
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                                selected:
-                                                    _selectedSectionId == 0,
-                                                selectedColor: readerTheme
-                                                    .chipSelectedBackground,
-                                                backgroundColor: readerTheme
-                                                    .chipUnselectedBackground,
-                                                side: BorderSide(
-                                                  color: readerTheme.divider,
-                                                  width: 0.8,
-                                                ),
-                                                onSelected: (_) =>
-                                                    _jumpToSection(0),
+                                                  FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    alignment:
+                                                        AlignmentDirectional
+                                                            .centerStart,
+                                                    child: Text(
+                                                      "الجزء $arabicJuzNum • الصفحة $arabicPageNum من ٣٠٤",
+                                                      maxLines: 1,
+                                                      style: GoogleFonts.cairo(
+                                                        fontSize: 11,
+                                                        color: readerTheme
+                                                            .secondaryText,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                            ...SurahKahfData.sections
-                                                .map((sec) {
-                                              final isSelected =
-                                                  _selectedSectionId == sec.id;
-                                              return Padding(
+                                            IconButton(
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              icon: Icon(
+                                                (_savedPageBookmark != null ||
+                                                        _savedVerseBookmarkPage !=
+                                                            null)
+                                                    ? Icons.bookmark_rounded
+                                                    : Icons
+                                                        .bookmark_add_outlined,
+                                                color: (_savedPageBookmark !=
+                                                            null ||
+                                                        _savedVerseBookmarkPage !=
+                                                            null)
+                                                    ? readerTheme.activeBookmark
+                                                    : readerTheme.actionIcon,
+                                              ),
+                                              tooltip: "حفظ موضع القراءة",
+                                              onPressed: () =>
+                                                  _showKahfBookmarkOptionsSheet(
+                                                context,
+                                                isDark,
+                                              ),
+                                            ),
+                                            IconButton(
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              icon: Icon(
+                                                Icons.menu_book_rounded,
+                                                color: readerTheme.actionIcon,
+                                              ),
+                                              tooltip: "فضل سورة الكهف",
+                                              onPressed: () =>
+                                                  _showVirtueDialog(
+                                                      context, isDark),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color:
+                                              readerTheme.chipStripBackground,
+                                          border: Border(
+                                            top: BorderSide(
+                                              color: readerTheme.divider
+                                                  .withValues(alpha: 0.65),
+                                              width: 0.8,
+                                            ),
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 6),
+                                        child: SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          physics:
+                                              const BouncingScrollPhysics(),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8),
+                                          child: Row(
+                                            children: [
+                                              Padding(
+                                                key: _sectionChipKeys[0],
                                                 padding: const EdgeInsets.only(
                                                     left: 6.0),
                                                 child: ChoiceChip(
@@ -956,19 +1012,31 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
                                                   materialTapTargetSize:
                                                       MaterialTapTargetSize
                                                           .shrinkWrap,
+                                                  avatar: Icon(
+                                                    Icons.menu_book_rounded,
+                                                    size: 14,
+                                                    color:
+                                                        _selectedSectionId == 0
+                                                            ? Colors.white
+                                                            : readerTheme
+                                                                .actionIcon,
+                                                  ),
                                                   label: Text(
-                                                    sec.title,
+                                                    "السورة كاملة (١٢ صفحة)",
                                                     style: GoogleFonts.cairo(
                                                       fontWeight:
                                                           FontWeight.bold,
                                                       fontSize: 10.5,
-                                                      color: isSelected
-                                                          ? Colors.white
-                                                          : readerTheme
-                                                              .primaryText,
+                                                      color:
+                                                          _selectedSectionId ==
+                                                                  0
+                                                              ? Colors.white
+                                                              : readerTheme
+                                                                  .primaryText,
                                                     ),
                                                   ),
-                                                  selected: isSelected,
+                                                  selected:
+                                                      _selectedSectionId == 0,
                                                   selectedColor: readerTheme
                                                       .chipSelectedBackground,
                                                   backgroundColor: readerTheme
@@ -978,87 +1046,131 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
                                                     width: 0.8,
                                                   ),
                                                   onSelected: (_) =>
-                                                      _jumpToSection(sec.id),
+                                                      _jumpToSection(0),
                                                 ),
-                                              );
-                                            }),
-                                          ],
+                                              ),
+                                              ...SurahKahfData.sections
+                                                  .map((sec) {
+                                                final isSelected =
+                                                    _selectedSectionId ==
+                                                        sec.id;
+                                                return Padding(
+                                                  key: _sectionChipKeys[sec.id],
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          left: 6.0),
+                                                  child: ChoiceChip(
+                                                    visualDensity:
+                                                        VisualDensity.compact,
+                                                    materialTapTargetSize:
+                                                        MaterialTapTargetSize
+                                                            .shrinkWrap,
+                                                    label: Text(
+                                                      sec.title,
+                                                      style: GoogleFonts.cairo(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 10.5,
+                                                        color: isSelected
+                                                            ? Colors.white
+                                                            : readerTheme
+                                                                .primaryText,
+                                                      ),
+                                                    ),
+                                                    selected: isSelected,
+                                                    selectedColor: readerTheme
+                                                        .chipSelectedBackground,
+                                                    backgroundColor: readerTheme
+                                                        .chipUnselectedBackground,
+                                                    side: BorderSide(
+                                                      color:
+                                                          readerTheme.divider,
+                                                      width: 0.8,
+                                                    ),
+                                                    onSelected: (_) =>
+                                                        _jumpToSection(sec.id),
+                                                  ),
+                                                );
+                                              }),
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 8),
+                            MushafPageSideIndicator(
+                              pageNumber: absolutePageNumber,
+                              isDark: isDark,
+                              pageController: _pageController,
+                              pageIndexOffset: _kahfStartPage,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: _showControlsNotifier,
+                builder: (_, showControls, child) =>
+                    showControls ? child! : const SizedBox.shrink(),
+                child: Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: SafeArea(
+                    top: false,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                        border: Border(
+                          top: BorderSide(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : Colors.grey.shade200,
                           ),
-                          const SizedBox(height: 8),
-                          MushafPageSideIndicator(
-                            pageNumber: absolutePageNumber,
-                            isDark: isDark,
-                            pageController: _pageController,
-                            pageIndexOffset: _kahfStartPage,
-                          ),
-                        ],
+                        ),
                       ),
-                    );
-                  },
-                );
-              },
-            ),
-            ValueListenableBuilder<bool>(
-              valueListenable: _showControlsNotifier,
-              builder: (_, showControls, child) =>
-                  showControls ? child! : const SizedBox.shrink(),
-              child: Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: SafeArea(
-                  top: false,
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                      border: Border(
-                        top: BorderSide(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : Colors.grey.shade200,
-                        ),
-                      ),
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed:
-                            _isCompletedToday ? null : _markSurahKahfCompleted,
-                        icon: Icon(
-                          _isCompletedToday
-                              ? Icons.verified_rounded
-                              : Icons.check_circle_outline_rounded,
-                          size: 20,
-                        ),
-                        label: Text(
-                          _isCompletedToday
-                              ? "تم إتمام قراءة سورة الكهف اليوم ✓"
-                              : "أتممت قراءة سورة الكهف",
-                          style: GoogleFonts.cairo(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14.5,
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: _isCompletedToday
+                              ? null
+                              : _markSurahKahfCompleted,
+                          icon: Icon(
+                            _isCompletedToday
+                                ? Icons.verified_rounded
+                                : Icons.check_circle_outline_rounded,
+                            size: 20,
                           ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isCompletedToday
-                              ? const Color(0xFF10B981)
-                              : accent,
-                          disabledBackgroundColor:
-                              const Color(0xFF10B981).withValues(alpha: 0.85),
-                          foregroundColor: Colors.white,
-                          disabledForegroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                          label: Text(
+                            _isCompletedToday
+                                ? "تم إتمام قراءة سورة الكهف اليوم ✓"
+                                : "أتممت قراءة سورة الكهف",
+                            style: GoogleFonts.cairo(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14.5,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isCompletedToday
+                                ? const Color(0xFF10B981)
+                                : accent,
+                            disabledBackgroundColor:
+                                const Color(0xFF10B981).withValues(alpha: 0.85),
+                            foregroundColor: Colors.white,
+                            disabledForegroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
                         ),
                       ),
@@ -1066,11 +1178,10 @@ class _SurahKahfScreenState extends State<SurahKahfScreen> {
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 }

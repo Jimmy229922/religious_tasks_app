@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 
 import 'app/religious_app.dart';
 import 'package:religious_tasks_app/shared/services/notifications/app_notification_service.dart';
@@ -75,6 +76,10 @@ void main() async {
   // Initialize notifications in the background (don't block first frame).
   AppNotificationService().init().catchError((e) {
     debugPrint("Notification init failed: $e");
+  });
+
+  FlutterDisplayMode.setHighRefreshRate().catchError((e) {
+    debugPrint("High refresh rate init failed: $e");
   });
 
   WidgetsBinding.instance.addPostFrameCallback((_) {

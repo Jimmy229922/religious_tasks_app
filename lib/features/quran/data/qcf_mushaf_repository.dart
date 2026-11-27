@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_data.dart';
 import 'package:religious_tasks_app/features/quran/data/quran_page_mapping.dart';
@@ -120,7 +121,8 @@ class QcfMushafWord {
 
   bool get isDivineName => _divineNameRegex.hasMatch(_normalizedWord);
 
-  bool get isDivineReference => _precomputedDivine ?? isWordDivineReference(this);
+  bool get isDivineReference =>
+      _precomputedDivine ?? isWordDivineReference(this);
 
   static bool isWordDivineReference(
     QcfMushafWord word, {
@@ -268,8 +270,8 @@ class QcfMushafPageData {
         ? allLines
         : _filterLinesForSurah(allLines, onlySurahNumber);
 
-    int primarySurah = onlySurahNumber ??
-        QuranPageMapping.getPageRange(pageNum).startSurah;
+    int primarySurah =
+        onlySurahNumber ?? QuranPageMapping.getPageRange(pageNum).startSurah;
     if (onlySurahNumber == null) {
       for (final line in filteredLines) {
         if (line.type == 'text' && line.words.isNotEmpty) {
@@ -345,7 +347,12 @@ class QcfMushafPageData {
 
 class QcfMushafRepository {
   static const String basmalaFontFamily = 'QCF_BSML';
-  static const int _maxCacheSize = 15;
+  static const int _maxCacheSize = 30;
+  static const Duration _prefetchSettleDelay = Duration(milliseconds: 350);
+  static const Duration _prefetchQuietCheckDelay = Duration(milliseconds: 60);
+  static const int _maxSettleAttempts = 4;
+  static const int _prefetchAheadPages = 5;
+  static const int _prefetchBehindPages = 3;
 
   static final Set<String> _loadedFontFamilies = <String>{};
   static final Map<String, Future<void>> _inFlightFonts =
@@ -354,6 +361,8 @@ class QcfMushafRepository {
       <String, Future<QcfMushafPageData>>{};
   static final LinkedHashMap<String, QcfMushafPageData> _pageCache =
       LinkedHashMap<String, QcfMushafPageData>();
+  static int _pagePrefetchGeneration = 0;
+  static int _fontPrefetchGeneration = 0;
 
   static String fontFamilyFor(int pageNumber) {
     final padded = pageNumber.clamp(1, 604).toString().padLeft(3, '0');
@@ -382,10 +391,12 @@ class QcfMushafRepository {
 
     final future = () async {
       final fontData = await rootBundle.load(assetPath);
-      final loader = FontLoader(family)..addFont(Future<ByteData>.value(fontData));
+      final loader = FontLoader(family)
+        ..addFont(Future<ByteData>.value(fontData));
       await loader.load();
       _loadedFontFamilies.add(family);
-    }().whenComplete(() {
+    }()
+        .whenComplete(() {
       _inFlightFonts.remove(family);
     });
 
@@ -446,26 +457,33 @@ class QcfMushafRepository {
     if (existing != null) return existing;
 
     final future = () async {
-      await ensurePageFontsLoaded(page);
-      final layoutJson = await rootBundle.loadString(
-        layoutAssetPathFor(page),
-        cache: false,
-      );
-      final pageData = await compute(
-        _parseQcfPageData,
-        _QcfParseArgs(
-          layoutJson: layoutJson,
-          fontFamily: fontFamilyFor(page),
-          onlySurahNumber: onlySurahNumber,
-        ),
-      );
+      final results = await Future.wait<Object?>(<Future<Object?>>[
+        ensurePageFontsLoaded(page),
+        rootBundle
+            .loadString(
+              layoutAssetPathFor(page),
+              cache: false,
+            )
+            .then(
+              (layoutJson) => compute(
+                _parseQcfPageData,
+                _QcfParseArgs(
+                  layoutJson: layoutJson,
+                  fontFamily: fontFamilyFor(page),
+                  onlySurahNumber: onlySurahNumber,
+                ),
+              ),
+            ),
+      ]);
+      final pageData = results[1] as QcfMushafPageData;
 
       if (_pageCache.length >= _maxCacheSize) {
         _pageCache.remove(_pageCache.keys.first);
       }
       _pageCache[key] = pageData;
       return pageData;
-    }().whenComplete(() {
+    }()
+        .whenComplete(() {
       _inFlightPages.remove(key);
     });
 
@@ -475,18 +493,108 @@ class QcfMushafRepository {
 
   static void prefetchAdjacentPages(
     int pageNumber, {
+    int direction = 1,
     int? onlySurahNumber,
     List<int>? allowedPages,
   }) {
-    for (final target in <int>[
-      pageNumber - 1,
-      pageNumber + 1,
-    ]) {
-      if (target < 1 || target > 604) continue;
-      if (allowedPages != null && !allowedPages.contains(target)) continue;
-      if (getCachedPage(target, onlySurahNumber: onlySurahNumber) == null) {
-        loadPage(target, onlySurahNumber: onlySurahNumber);
+    final generation = ++_pagePrefetchGeneration;
+    final readingDirection = direction < 0 ? -1 : 1;
+    final targets = <int>[];
+    for (int step = 1; step <= _prefetchAheadPages; step++) {
+      targets.add(pageNumber + (readingDirection * step));
+      if (step <= _prefetchBehindPages) {
+        targets.add(pageNumber - (readingDirection * step));
       }
+    }
+
+    SchedulerBinding.instance.scheduleTask<void>(
+      () async {
+        for (final target in targets) {
+          if (generation != _pagePrefetchGeneration) return;
+          if (target < 1 || target > 604) continue;
+          if (allowedPages != null && !allowedPages.contains(target)) continue;
+          if (getCachedPage(target, onlySurahNumber: onlySurahNumber) != null) {
+            continue;
+          }
+          await _waitForSettledFrames();
+          if (generation != _pagePrefetchGeneration) return;
+          try {
+            await loadPage(target, onlySurahNumber: onlySurahNumber);
+          } catch (_) {
+            // The visible page will retry normally if prefetching fails.
+          }
+        }
+      },
+      Priority.idle,
+      debugLabel: 'QCF adjacent page prefetch',
+    );
+  }
+
+  static void prefetchReadingPageFonts(
+    int pageNumber, {
+    int direction = 1,
+    List<int>? allowedPages,
+  }) {
+    final generation = ++_fontPrefetchGeneration;
+    final readingDirection = direction < 0 ? -1 : 1;
+    final targets = <int>[
+      pageNumber + readingDirection,
+      pageNumber + (readingDirection * 2),
+    ];
+
+    SchedulerBinding.instance.scheduleTask<void>(
+      () async {
+        for (final target in targets) {
+          if (generation != _fontPrefetchGeneration) return;
+          if (target < 1 || target > 604) continue;
+          if (allowedPages != null && !allowedPages.contains(target)) continue;
+          if (_loadedFontFamilies.contains(fontFamilyFor(target))) continue;
+          await _waitForSettledFrames();
+          if (generation != _fontPrefetchGeneration) return;
+          try {
+            await ensurePageFontsLoaded(target);
+          } catch (_) {
+            // The visible page will retry normally if prefetching fails.
+          }
+        }
+      },
+      Priority.idle,
+      debugLabel: 'QCF page font prefetch',
+    );
+  }
+
+  static void prefetchPages(
+    List<int> pages, {
+    int? onlySurahNumber,
+  }) {
+    SchedulerBinding.instance.scheduleTask<void>(
+      () async {
+        for (final target in pages) {
+          if (target < 1 || target > 604) continue;
+          if (getCachedPage(target, onlySurahNumber: onlySurahNumber) != null) {
+            continue;
+          }
+          await _waitForSettledFrames();
+          try {
+            await loadPage(target, onlySurahNumber: onlySurahNumber);
+          } catch (_) {
+            // The visible page will retry normally if prefetching fails.
+          }
+        }
+      },
+      Priority.idle,
+      debugLabel: 'QCF pages prefetch',
+    );
+  }
+
+  static Future<void> _waitForSettledFrames() async {
+    for (int attempt = 0; attempt < _maxSettleAttempts; attempt++) {
+      await Future<void>.delayed(
+        SchedulerBinding.instance.hasScheduledFrame
+            ? _prefetchSettleDelay
+            : _prefetchQuietCheckDelay,
+      );
+      if (!SchedulerBinding.instance.hasScheduledFrame) return;
     }
   }
 }

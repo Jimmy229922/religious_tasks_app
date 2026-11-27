@@ -74,6 +74,19 @@ class _MushafPageSideIndicatorState extends State<MushafPageSideIndicator>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(
+      const AssetImage(MushafPageSideIndicator.rightPageAsset),
+      context,
+    );
+    precacheImage(
+      const AssetImage(MushafPageSideIndicator.leftPageAsset),
+      context,
+    );
+  }
+
+  @override
   void didUpdateWidget(covariant MushafPageSideIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.pageController != widget.pageController) {

@@ -22,6 +22,8 @@ class NotificationPreferences {
   final int happinessJarHour;
   final int happinessJarMinute;
   final int preAdhanReminderMinutes;
+  final bool postAdhanReminderEnabled;
+  final int postAdhanReminderMinutes;
 
   const NotificationPreferences({
     required this.adhanEnabled,
@@ -41,6 +43,8 @@ class NotificationPreferences {
     required this.happinessJarHour,
     required this.happinessJarMinute,
     this.preAdhanReminderMinutes = 5,
+    this.postAdhanReminderEnabled = true,
+    this.postAdhanReminderMinutes = 15,
   });
 
   factory NotificationPreferences.defaults() {
@@ -76,6 +80,8 @@ class NotificationPreferences {
       happinessJarHour: 17,
       happinessJarMinute: 0,
       preAdhanReminderMinutes: 5,
+      postAdhanReminderEnabled: true,
+      postAdhanReminderMinutes: 15,
     );
   }
 
@@ -97,6 +103,8 @@ class NotificationPreferences {
     int? happinessJarHour,
     int? happinessJarMinute,
     int? preAdhanReminderMinutes,
+    bool? postAdhanReminderEnabled,
+    int? postAdhanReminderMinutes,
   }) {
     return NotificationPreferences(
       adhanEnabled: adhanEnabled ?? this.adhanEnabled,
@@ -124,6 +132,10 @@ class NotificationPreferences {
       happinessJarMinute: happinessJarMinute ?? this.happinessJarMinute,
       preAdhanReminderMinutes:
           preAdhanReminderMinutes ?? this.preAdhanReminderMinutes,
+      postAdhanReminderEnabled:
+          postAdhanReminderEnabled ?? this.postAdhanReminderEnabled,
+      postAdhanReminderMinutes:
+          postAdhanReminderMinutes ?? this.postAdhanReminderMinutes,
     );
   }
 

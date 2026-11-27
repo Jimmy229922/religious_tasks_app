@@ -11,6 +11,7 @@ import '../features/splash/screens/splash_screen.dart';
 import '../core/theme/theme_provider.dart';
 import '../features/radio/screens/radio_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 
 class ReligiousApp extends StatefulWidget {
   const ReligiousApp({super.key});
@@ -19,14 +20,33 @@ class ReligiousApp extends StatefulWidget {
   State<ReligiousApp> createState() => _ReligiousAppState();
 }
 
-class _ReligiousAppState extends State<ReligiousApp> {
+class _ReligiousAppState extends State<ReligiousApp>
+    with WidgetsBindingObserver {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   StreamSubscription<dynamic>? _overlaySubscription;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _listenToOverlay();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _enableHighRefreshRate();
+    });
+  }
+
+  Future<void> _enableHighRefreshRate() async {
+    try {
+      await FlutterDisplayMode.setHighRefreshRate();
+    } catch (_) {}
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      Provider.of<ThemeProvider>(context, listen: false).refreshPrayerPhase();
+      _enableHighRefreshRate();
+    }
   }
 
   void _listenToOverlay() {
@@ -49,6 +69,7 @@ class _ReligiousAppState extends State<ReligiousApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _overlaySubscription?.cancel();
     super.dispose();
   }
@@ -173,6 +194,8 @@ class _ReligiousAppState extends State<ReligiousApp> {
         textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
       ),
       themeMode: themeProvider.themeMode,
+      themeAnimationDuration: const Duration(milliseconds: 800),
+      themeAnimationCurve: Curves.easeInOut,
       builder: (context, child) {
         final mediaQuery = MediaQuery.of(context);
         return MediaQuery(

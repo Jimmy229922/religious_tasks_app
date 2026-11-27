@@ -466,6 +466,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _togglePostAdhanReminder(bool value) async {
+    setState(() {
+      _prefs = _prefs.copyWith(postAdhanReminderEnabled: value);
+    });
+    await _prefsService.setPostAdhanReminderEnabled(value);
+    _reschedulePrayers();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          value
+              ? "تم تفعيل تنبيه الإقامة بعد الأذان"
+              : "تم إيقاف تنبيه الإقامة بعد الأذان",
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: _emerald,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _updatePostAdhanReminderMinutes(int minutes) async {
+    setState(() {
+      _prefs = _prefs.copyWith(
+        postAdhanReminderEnabled: true,
+        postAdhanReminderMinutes: minutes,
+      );
+    });
+    await _prefsService.setPostAdhanReminderEnabled(true);
+    await _prefsService.setPostAdhanReminderMinutes(minutes);
+    _reschedulePrayers();
+    if (!mounted) return;
+    final unit = minutes >= 11 ? "دقيقة" : "دقائق";
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          "تم ضبط تنبيه الإقامة بعد الأذان بـ ${QuranTextFormatter.toArabicDigits(minutes.toString())} $unit",
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: _emerald,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<void> _updateSelectedMoazzen(String moazzenId) async {
     setState(() {
       _selectedMoazzenId = moazzenId;
@@ -1022,6 +1071,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 }).toList(),
               ),
+              const SizedBox(height: 16),
+              Divider(
+                height: 1,
+                color: isDark ? Colors.white10 : Colors.grey.shade200,
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "التنبيه بعد الأذان (الإقامة)",
+                    style: GoogleFonts.cairo(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Switch(
+                    value: _prefs.postAdhanReminderEnabled,
+                    onChanged: _togglePostAdhanReminder,
+                    activeThumbColor: _emerald,
+                    activeTrackColor: _emerald.withValues(alpha: 0.4),
+                  ),
+                ],
+              ),
+              if (_prefs.postAdhanReminderEnabled) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: NotificationPreferencesService
+                      .postAdhanReminderOptions
+                      .map((minutes) {
+                    final isSelected =
+                        _prefs.postAdhanReminderMinutes == minutes;
+                    final unit = minutes >= 11 ? "دقيقة" : "دقائق";
+                    final label =
+                        "${QuranTextFormatter.toArabicDigits(minutes.toString())} $unit";
+                    return Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          left: minutes == 15 ? 0 : 8,
+                        ),
+                        child: InkWell(
+                          onTap: () =>
+                              _updatePostAdhanReminderMinutes(minutes),
+                          borderRadius: BorderRadius.circular(14),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 6),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? _emerald
+                                  : (isDark
+                                      ? const Color(0xFF1E2B3C)
+                                      : const Color(0xFFF1F5F9)),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color:
+                                    isSelected ? _gold : Colors.transparent,
+                                width: 1.3,
+                              ),
+                            ),
+                            child: Center(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  label,
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : (isDark
+                                            ? Colors.white70
+                                            : const Color(0xFF1E293B)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
               const SizedBox(height: 16),
               Divider(
                 height: 1,
@@ -2830,8 +2964,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentHour = DateTime.now().hour;
-    final activeSeed = themeProvider.getDynamicSeedColor(currentHour);
+    final activeSeed =
+        themeProvider.getDynamicSeedColor(currentHour, isDark: isDark);
     final isDynamic = themeProvider.appThemeMode == AppThemeMode.dynamic;
+    final nextPhase = themeProvider.nextPrayerPhase;
+    final nextPhaseAt = themeProvider.nextPhaseAt;
 
     return ListView(
       physics: const BouncingScrollPhysics(),
@@ -2904,6 +3041,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+              if (isDynamic && nextPhase != null && nextPhaseAt != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.schedule_rounded,
+                        color: Colors.amberAccent, size: 14),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        "يتحول إلى ${nextPhase.label} الساعة ${intl.DateFormat('h:mm a', 'ar').format(nextPhaseAt)}",
+                        style: GoogleFonts.cairo(
+                          fontSize: 11,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
@@ -2996,7 +3153,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               themeProvider: themeProvider,
               mode: AppThemeMode.dynamic,
               title: "تفاعلي مع الصلاة",
-              subtitle: "يتلون تلقائياً مع أوقات اليوم",
+              subtitle: "يتلون تلقائياً مع أوقات الصلاة",
               icon: Icons.schedule_rounded,
               iconColor: const Color(0xFFEA580C),
               isDark: isDark,
@@ -3046,7 +3203,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          "الوضع التفاعلي يحدد اللون تلقائياً حسب وقت الصلاة، واختر أي لون أدناه ليتم تفعيله في باقي الأوضاع.",
+                          "الوضع التفاعلي يغيّر الإضاءة واللون تلقائياً مع كل أذان حسب موقعك، واختر أي لون أدناه ليتم تفعيله في باقي الأوضاع.",
                           style: GoogleFonts.cairo(fontSize: 11),
                         ),
                       ),

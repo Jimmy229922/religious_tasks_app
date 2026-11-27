@@ -51,6 +51,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   bool _manualThemeOverride = false;
   bool _hasCelebrated = false;
   ThemeData? _cachedTheme;
+  Color? _cachedSeed;
   int _focusIndex = 0;
   double _fontScale = 1.0;
   late final String _progressKey;
@@ -80,9 +81,17 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final globalIsDark = Theme.of(context).brightness == Brightness.dark;
+    final themeProvider = Provider.of<ThemeProvider>(context);
     if (!_manualThemeOverride &&
         (_cachedTheme == null || _isNightMode != globalIsDark)) {
       _isNightMode = globalIsDark;
+      _updateCachedTheme();
+    } else if (_cachedTheme != null &&
+        themeProvider.getDynamicSeedColor(
+              DateTime.now().hour,
+              isDark: _isNightMode,
+            ) !=
+            _cachedSeed) {
       _updateCachedTheme();
     }
   }
@@ -93,6 +102,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
       DateTime.now().hour,
       isDark: _isNightMode,
     );
+    _cachedSeed = seedColor;
     final baseTheme = _isNightMode
         ? ThemeData.dark(useMaterial3: true)
         : ThemeData.light(useMaterial3: true);

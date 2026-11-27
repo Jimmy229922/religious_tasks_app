@@ -1,8 +1,28 @@
+import 'dart:async';
+
+import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:religious_tasks_app/core/services/storage_service.dart';
 
 enum AppThemeMode { light, dark, system, dynamic }
+
+enum PrayerThemePhase {
+  fajr(Color(0xFF3B5BA9), Color(0xFF8FA8F0), 'أجواء الفجر الهادئة', true),
+  duha(Color(0xFFB45309), Color(0xFFFBBF24), 'إشراقة الضحى', false),
+  dhuhr(Color(0xFF0F766E), Color(0xFF2DD4BF), 'نور الظهيرة', false),
+  asr(Color(0xFF9A3412), Color(0xFFFB923C), 'وقت الأصيل', false),
+  maghrib(Color(0xFF7E22CE), Color(0xFFC084FC), 'سكينة الغروب', true),
+  isha(Color(0xFF1E3A8A), Color(0xFF93C5FD), 'سكون الليل والقيام', true);
+
+  final Color color;
+  final Color darkColor;
+  final String label;
+  final bool isNight;
+  const PrayerThemePhase(this.color, this.darkColor, this.label, this.isNight);
+
+  Color colorFor(bool isDark) => isDark ? darkColor : color;
+}
 
 enum AppAccentColor {
   emerald(Color(0xFF0F766E), Color(0xFF2DD4BF), 'الزمردي الإسلامي'),
@@ -36,6 +56,10 @@ class ThemeProvider extends ChangeNotifier {
   AppAccentColor _accentColor = AppAccentColor.emerald;
   double _textScaleFactor = 1.0;
   bool _useOledBlack = true;
+  PrayerThemePhase? _prayerPhase;
+  PrayerThemePhase? _nextPrayerPhase;
+  DateTime? _nextPhaseAt;
+  Timer? _phaseTimer;
 
   ThemeProvider() {
     _loadThemeModeSync();
@@ -46,6 +70,10 @@ class ThemeProvider extends ChangeNotifier {
   AppAccentColor get accentColor => _accentColor;
   double get textScaleFactor => _textScaleFactor;
   bool get useOledBlack => _useOledBlack;
+  PrayerThemePhase get prayerPhase =>
+      _prayerPhase ?? _clockPhase(DateTime.now().hour);
+  PrayerThemePhase? get nextPrayerPhase => _nextPrayerPhase;
+  DateTime? get nextPhaseAt => _nextPhaseAt;
 
   ThemeMode get themeMode {
     switch (_appThemeMode) {
@@ -56,9 +84,128 @@ class ThemeProvider extends ChangeNotifier {
       case AppThemeMode.system:
         return ThemeMode.system;
       case AppThemeMode.dynamic:
-        final hour = DateTime.now().hour;
-        return (hour >= 6 && hour < 18) ? ThemeMode.light : ThemeMode.dark;
+        return prayerPhase.isNight ? ThemeMode.dark : ThemeMode.light;
     }
+  }
+
+  PrayerThemePhase _clockPhase(int hour) {
+    if (hour >= 4 && hour < 6) return PrayerThemePhase.fajr;
+    if (hour >= 6 && hour < 12) return PrayerThemePhase.duha;
+    if (hour >= 12 && hour < 15) return PrayerThemePhase.dhuhr;
+    if (hour >= 15 && hour < 17) return PrayerThemePhase.asr;
+    if (hour >= 17 && hour < 19) return PrayerThemePhase.maghrib;
+    return PrayerThemePhase.isha;
+  }
+
+  Future<void> refreshPrayerPhase() async {
+    _phaseTimer?.cancel();
+    _phaseTimer = null;
+    if (_appThemeMode != AppThemeMode.dynamic) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lat = double.tryParse(prefs.getString('last_latitude') ?? '');
+      final lng = double.tryParse(prefs.getString('last_longitude') ?? '');
+
+      if (lat == null || lng == null) {
+        _applyPrayerPhase(null, null, null);
+        _phaseTimer =
+            Timer(const Duration(minutes: 2), () => refreshPrayerPhase());
+        return;
+      }
+
+      final savedMethod = prefs.getString('calculation_method');
+      var method = CalculationMethod.egyptian;
+      if (savedMethod != null) {
+        method = CalculationMethod.values.firstWhere(
+          (e) => e.name == savedMethod,
+          orElse: () => CalculationMethod.egyptian,
+        );
+      }
+
+      final params = method.getParameters();
+      params.madhab = Madhab.shafi;
+      int offset(String key) =>
+          (prefs.getInt('prayer_offset_$key') ?? 0).clamp(-60, 60);
+      params.adjustments.fajr = offset('fajr');
+      params.adjustments.sunrise = offset('sunrise');
+      params.adjustments.dhuhr = offset('dhuhr');
+      params.adjustments.asr = offset('asr');
+      params.adjustments.maghrib = offset('maghrib');
+      params.adjustments.isha = offset('isha');
+
+      final coordinates = Coordinates(lat, lng);
+      final now = DateTime.now();
+      final today = PrayerTimes.today(coordinates, params);
+      final tomorrowDate = now.add(const Duration(days: 1));
+      final tomorrow = PrayerTimes(
+        coordinates,
+        DateComponents(tomorrowDate.year, tomorrowDate.month, tomorrowDate.day),
+        params,
+      );
+
+      final PrayerThemePhase phase;
+      final PrayerThemePhase nextPhase;
+      final DateTime nextAt;
+      if (now.isBefore(today.fajr)) {
+        phase = PrayerThemePhase.isha;
+        nextPhase = PrayerThemePhase.fajr;
+        nextAt = today.fajr;
+      } else if (now.isBefore(today.sunrise)) {
+        phase = PrayerThemePhase.fajr;
+        nextPhase = PrayerThemePhase.duha;
+        nextAt = today.sunrise;
+      } else if (now.isBefore(today.dhuhr)) {
+        phase = PrayerThemePhase.duha;
+        nextPhase = PrayerThemePhase.dhuhr;
+        nextAt = today.dhuhr;
+      } else if (now.isBefore(today.asr)) {
+        phase = PrayerThemePhase.dhuhr;
+        nextPhase = PrayerThemePhase.asr;
+        nextAt = today.asr;
+      } else if (now.isBefore(today.maghrib)) {
+        phase = PrayerThemePhase.asr;
+        nextPhase = PrayerThemePhase.maghrib;
+        nextAt = today.maghrib;
+      } else if (now.isBefore(today.isha)) {
+        phase = PrayerThemePhase.maghrib;
+        nextPhase = PrayerThemePhase.isha;
+        nextAt = today.isha;
+      } else {
+        phase = PrayerThemePhase.isha;
+        nextPhase = PrayerThemePhase.fajr;
+        nextAt = tomorrow.fajr;
+      }
+
+      _applyPrayerPhase(phase, nextPhase, nextAt.toLocal());
+      final delay = nextAt.difference(now) + const Duration(seconds: 1);
+      _phaseTimer = Timer(
+        delay.isNegative ? const Duration(seconds: 1) : delay,
+        () => refreshPrayerPhase(),
+      );
+    } catch (e) {
+      debugPrint("Could not resolve prayer theme phase: $e");
+    }
+  }
+
+  void _applyPrayerPhase(
+    PrayerThemePhase? phase,
+    PrayerThemePhase? nextPhase,
+    DateTime? nextAt,
+  ) {
+    final changed = _prayerPhase != phase ||
+        _nextPrayerPhase != nextPhase ||
+        _nextPhaseAt != nextAt;
+    _prayerPhase = phase;
+    _nextPrayerPhase = nextPhase;
+    _nextPhaseAt = nextAt;
+    if (changed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _phaseTimer?.cancel();
+    super.dispose();
   }
 
   void _loadThemeModeSync() {
@@ -147,11 +294,13 @@ class ThemeProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint("Could not load stored theme mode async: $e");
     }
+    await refreshPrayerPhase();
   }
 
   Future<void> setThemeMode(AppThemeMode mode) async {
     _appThemeMode = mode;
     notifyListeners();
+    unawaited(refreshPrayerPhase());
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_themeKey, mode.name);
@@ -223,25 +372,11 @@ class ThemeProvider extends ChangeNotifier {
     if (_appThemeMode != AppThemeMode.dynamic) {
       return _accentColor.colorFor(isDark);
     }
-
-    // Fajr (Dawn)
-    if (hour >= 4 && hour < 6) return Colors.indigo;
-    // Morning/Sunrise
-    if (hour >= 6 && hour < 9) return Colors.orange;
-    // Day
-    if (hour >= 9 && hour < 16) return Colors.blue;
-    // Sunset/Asr
-    if (hour >= 16 && hour < 19) return Colors.deepOrange;
-    // Night
-    return Colors.blueGrey;
+    return (_prayerPhase ?? _clockPhase(hour)).colorFor(isDark);
   }
 
   String getDynamicPhaseLabel(int hour) {
-    if (hour >= 4 && hour < 6) return 'أجواء الفجر الهادئة';
-    if (hour >= 6 && hour < 9) return 'إشراقة الصباح والضحى';
-    if (hour >= 9 && hour < 16) return 'ضوء النهار والظهر';
-    if (hour >= 16 && hour < 19) return 'أصيلاً ووقت الغروب';
-    return 'سكون الليل والقيام';
+    return (_prayerPhase ?? _clockPhase(hour)).label;
   }
 }
 

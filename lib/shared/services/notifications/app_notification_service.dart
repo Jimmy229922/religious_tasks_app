@@ -312,6 +312,7 @@ class AppNotificationService {
       for (var id in baseIds) {
         await _plugin.cancel(id + suffix); // Reminder ID
         await _plugin.cancel(id + 100 + suffix); // Adhan ID
+        await _plugin.cancel(id + 200 + suffix); // Post-adhan (Iqama) ID
         await _cancelNativeAdhan(id + 100 + suffix);
       }
     }
@@ -352,7 +353,7 @@ class AppNotificationService {
         if (prayerTime == null) continue;
 
         final tzPrayerTime = tz.TZDateTime.from(prayerTime, tz.local);
-        if (tzPrayerTime.isBefore(now)) continue;
+        final isPrayerInFuture = !tzPrayerTime.isBefore(now);
 
         if (key != 'sunrise') {
           final reminderMinutes = preferences.preAdhanReminderMinutes;
@@ -370,11 +371,32 @@ class AppNotificationService {
               invalidSoundFallback: reminderFallbackDetails,
             );
           }
+
+          if (preferences.postAdhanReminderEnabled) {
+            final postMinutes = preferences.postAdhanReminderMinutes;
+            final postTime = tzPrayerTime.add(Duration(minutes: postMinutes));
+            if (postTime.isAfter(now)) {
+              final postUnit = postMinutes >= 11 ? 'دَقِيقَةً' : 'دَقَائِقَ';
+              await _safeZonedSchedule(
+                baseId + 200 + suffix,
+                'مَضَى $postMinutes $postUnit عَلَى أَذَانِ $name',
+                'حَانَ وَقْتُ الْإِقَامَةِ — هَلْ صَلَّيْتَ أَمْ لَمْ تُصَلِّ بَعْدُ؟',
+                postTime,
+                reminderDetails,
+                androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+                invalidSoundFallback: reminderFallbackDetails,
+              );
+            }
+          }
         }
 
         // Sunrise is not a prayer and must never trigger adhan playback, even
         // if an older installation still has a stored `true` value for it.
-        if (key == 'sunrise' || !preferences.isAdhanEnabled(key)) continue;
+        if (!isPrayerInFuture ||
+            key == 'sunrise' ||
+            !preferences.isAdhanEnabled(key)) {
+          continue;
+        }
 
         await _scheduleNativeAdhan(
           baseId + 100 + suffix,

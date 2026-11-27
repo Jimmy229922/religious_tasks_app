@@ -18,6 +18,7 @@ class NotificationPreferencesService {
   static const List<int> dhikrIntervalOptions = [5, 10, 15, 60, 90, 120];
   static const List<int> salawatIntervalOptions = [15, 30, 45, 60, 90, 120];
   static const List<int> preAdhanReminderOptions = [5, 10, 15];
+  static const List<int> postAdhanReminderOptions = [5, 10, 15];
 
   static const String adhanSoundTypeKey = 'adhan_sound_type_v1';
   static const String hourlyDhikrEnabledKey = 'hourly_dhikr_enabled_v1';
@@ -40,6 +41,10 @@ class NotificationPreferencesService {
   static const String happinessJarMinuteKey = 'happiness_jar_minute_v1';
   static const String preAdhanReminderMinutesKey =
       'pre_adhan_reminder_minutes_v1';
+  static const String postAdhanReminderEnabledKey =
+      'post_adhan_reminder_enabled_v1';
+  static const String postAdhanReminderMinutesKey =
+      'post_adhan_reminder_minutes_v1';
 
   Future<NotificationPreferences> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -113,6 +118,13 @@ class NotificationPreferencesService {
               .contains(prefs.getInt(preAdhanReminderMinutesKey))
           ? prefs.getInt(preAdhanReminderMinutesKey)!
           : defaults.preAdhanReminderMinutes,
+      postAdhanReminderEnabled:
+          prefs.getBool(postAdhanReminderEnabledKey) ??
+              defaults.postAdhanReminderEnabled,
+      postAdhanReminderMinutes: postAdhanReminderOptions
+              .contains(prefs.getInt(postAdhanReminderMinutesKey))
+          ? prefs.getInt(postAdhanReminderMinutesKey)!
+          : defaults.postAdhanReminderMinutes,
     );
   }
 
@@ -121,6 +133,18 @@ class NotificationPreferencesService {
     final safeMinutes =
         preAdhanReminderOptions.contains(minutes) ? minutes : 5;
     await prefs.setInt(preAdhanReminderMinutesKey, safeMinutes);
+  }
+
+  Future<void> setPostAdhanReminderEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(postAdhanReminderEnabledKey, value);
+  }
+
+  Future<void> setPostAdhanReminderMinutes(int minutes) async {
+    final prefs = await SharedPreferences.getInstance();
+    final safeMinutes =
+        postAdhanReminderOptions.contains(minutes) ? minutes : 15;
+    await prefs.setInt(postAdhanReminderMinutesKey, safeMinutes);
   }
 
   Future<void> setAdhanEnabled(String prayerKey, bool value) async {

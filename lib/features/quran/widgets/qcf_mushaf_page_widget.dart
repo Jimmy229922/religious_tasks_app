@@ -62,6 +62,17 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
   }
 
   @override
+  void didUpdateWidget(covariant QcfMushafPageWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pageData != widget.pageData ||
+        (oldWidget.onTapVerse == null) != (widget.onTapVerse == null) ||
+        (oldWidget.onLongPressVerse == null) !=
+            (widget.onLongPressVerse == null)) {
+      _disposeRecognizers();
+    }
+  }
+
+  @override
   void dispose() {
     _disposeRecognizers();
     super.dispose();
@@ -69,8 +80,6 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    _disposeRecognizers();
-
     final isDark = widget.isDark;
     final paperColor =
         isDark ? const Color(0xFF121820) : const Color(0xFFFBF7EE);
@@ -134,10 +143,12 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
       );
     }
 
-    final surahMeta = QuranData.surahs.firstWhere(
-      (s) => s.number == widget.pageData.surahNumber,
-      orElse: () => QuranData.surahs.first,
-    );
+    final surahMeta = isOpeningPage
+        ? QuranData.surahs.firstWhere(
+            (s) => s.number == widget.pageData.surahNumber,
+            orElse: () => QuranData.surahs.first,
+          )
+        : null;
 
     return RepaintBoundary(
       child: Stack(
@@ -154,13 +165,6 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
               width: 0.5,
             ),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: pageEdgeShadowColor,
-              blurRadius: 6,
-              offset: const Offset(-2, 0),
-            ),
-          ],
         ),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         child: Column(
@@ -192,7 +196,7 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
               child: isOpeningPage
                   ? QcfOpeningPageFrame(
                       pageNumber: pageNumber,
-                      surahName: surahMeta.name,
+                      surahName: surahMeta!.name,
                       ayahCount: surahMeta.ayahCount,
                       isDark: isDark,
                       versesChild: buildCompactVerses(),
@@ -247,6 +251,26 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
                 height: widget.topInset + 130,
               ),
             ),
+          Positioned(
+            top: widget.topInset,
+            bottom: 0,
+            left: 1.2,
+            width: 6,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      pageEdgeShadowColor,
+                      pageEdgeShadowColor.withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -310,20 +334,21 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
   }
 
   GestureRecognizer? _createRecognizer(int surahNumber, int ayahNumber) {
-    final onTap = widget.onTapVerse;
-    final onLongPress = widget.onLongPressVerse;
+    final hasTap = widget.onTapVerse != null;
+    final hasLongPress = widget.onLongPressVerse != null;
+    void handleTap() => widget.onTapVerse?.call(surahNumber, ayahNumber);
+    void handleLongPress() =>
+        widget.onLongPressVerse?.call(surahNumber, ayahNumber);
     GestureRecognizer? recognizer;
-    if (onTap != null && onLongPress != null) {
+    if (hasTap && hasLongPress) {
       recognizer = _QcfTapAndLongPressRecognizer(
-        onTap: () => onTap(surahNumber, ayahNumber),
-        onLongPress: () => onLongPress(surahNumber, ayahNumber),
+        onTap: handleTap,
+        onLongPress: handleLongPress,
       );
-    } else if (onTap != null) {
-      recognizer = TapGestureRecognizer()
-        ..onTap = () => onTap(surahNumber, ayahNumber);
-    } else if (onLongPress != null) {
-      recognizer = LongPressGestureRecognizer()
-        ..onLongPress = () => onLongPress(surahNumber, ayahNumber);
+    } else if (hasTap) {
+      recognizer = TapGestureRecognizer()..onTap = handleTap;
+    } else if (hasLongPress) {
+      recognizer = LongPressGestureRecognizer()..onLongPress = handleLongPress;
     }
     if (recognizer != null) {
       _recognizers.add(recognizer);
@@ -348,6 +373,8 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
     int charOffset = 0;
     int? sajdahStart;
     int? sajdahEnd;
+    int? highlightStart;
+    int? highlightEnd;
 
     for (int i = 0; i < line.words.length; i++) {
       final word = line.words[i];
@@ -355,7 +382,9 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
       final recognizer = _recognizerForAyah(word.surahNumber, word.ayahNumber);
       final isDivine = word.isDivineReference;
       final wordTextColor = isDivine ? divineNameColor : inkColor;
-      final bg = isSelected ? highlightBg : null;
+      if (isSelected) {
+        highlightStart ??= charOffset;
+      }
 
       if (word.isPureAyahOrnament) {
         spans.add(
@@ -365,8 +394,6 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
               glyph: word.glyph,
               baseStyle: baseStyle,
               isDark: widget.isDark,
-              isSelected: isSelected,
-              highlightBg: highlightBg,
               onTap: widget.onTapVerse == null
                   ? null
                   : () => widget.onTapVerse!(word.surahNumber, word.ayahNumber),
@@ -390,7 +417,7 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
           TextSpan(
             text: wordPart,
             recognizer: recognizer,
-            style: baseStyle.copyWith(color: wordTextColor, backgroundColor: bg),
+            style: baseStyle.copyWith(color: wordTextColor),
           ),
         );
         charOffset += wordPart.length;
@@ -398,7 +425,7 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
           TextSpan(
             text: ' ',
             recognizer: recognizer,
-            style: baseStyle.copyWith(backgroundColor: bg),
+            style: baseStyle,
           ),
         );
         charOffset += 1;
@@ -409,8 +436,6 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
               glyph: ornamentPart,
               baseStyle: baseStyle,
               isDark: widget.isDark,
-              isSelected: isSelected,
-              highlightBg: highlightBg,
               onTap: widget.onTapVerse == null
                   ? null
                   : () => widget.onTapVerse!(word.surahNumber, word.ayahNumber),
@@ -431,38 +456,198 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
           TextSpan(
             text: word.glyph,
             recognizer: recognizer,
-            style: baseStyle.copyWith(color: wordTextColor, backgroundColor: bg),
+            style: baseStyle.copyWith(color: wordTextColor),
           ),
         );
         charOffset += word.glyph.length;
+      }
+      if (isSelected) {
+        highlightEnd = charOffset;
       }
 
       if (i < line.words.length - 1) {
         spans.add(
           TextSpan(
             text: ' ',
-            style: baseStyle.copyWith(backgroundColor: bg),
+            style: baseStyle,
           ),
         );
         charOffset += 1;
       }
     }
 
-    if (sajdahStart != null && sajdahEnd != null) {
-      return _SajdahLineOverlay(
-        sajdahStart: sajdahStart,
-        sajdahEnd: sajdahEnd,
-        isDark: widget.isDark,
-        spans: spans,
-      );
+    final Widget lineText = sajdahStart != null && sajdahEnd != null
+        ? _SajdahLineOverlay(
+            sajdahStart: sajdahStart,
+            sajdahEnd: sajdahEnd,
+            isDark: widget.isDark,
+            spans: spans,
+          )
+        : Text.rich(
+            TextSpan(children: spans),
+            textDirection: TextDirection.rtl,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+          );
+
+    if (highlightStart == null || highlightEnd == null) {
+      return lineText;
     }
 
-    return Text.rich(
-      TextSpan(children: spans),
-      textDirection: TextDirection.rtl,
-      textAlign: TextAlign.center,
-      maxLines: 1,
+    return _QcfAyahHighlightLine(
+      highlightStart: highlightStart,
+      highlightEnd: highlightEnd,
+      highlightColor: highlightBg,
+      borderColor: widget.isDark
+          ? const Color(0x80F59E0B)
+          : const Color(0x80C9A23A),
+      child: lineText,
     );
+  }
+}
+
+class _QcfAyahHighlightLine extends StatefulWidget {
+  final int? highlightStart;
+  final int? highlightEnd;
+  final Color highlightColor;
+  final Color borderColor;
+  final Widget child;
+
+  const _QcfAyahHighlightLine({
+    required this.highlightStart,
+    required this.highlightEnd,
+    required this.highlightColor,
+    required this.borderColor,
+    required this.child,
+  });
+
+  @override
+  State<_QcfAyahHighlightLine> createState() => _QcfAyahHighlightLineState();
+}
+
+class _QcfAyahHighlightLineState extends State<_QcfAyahHighlightLine>
+    with SingleTickerProviderStateMixin {
+  final GlobalKey _childKey = GlobalKey();
+  late final AnimationController _fadeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1.0,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _QcfAyahHighlightLine oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.highlightStart != null &&
+        (oldWidget.highlightStart != widget.highlightStart ||
+            oldWidget.highlightEnd != widget.highlightEnd)) {
+      _fadeController.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final start = widget.highlightStart;
+    final end = widget.highlightEnd;
+    return CustomPaint(
+      painter: start == null || end == null
+          ? null
+          : _QcfAyahHighlightPainter(
+              childKey: _childKey,
+              start: start,
+              end: end,
+              color: widget.highlightColor,
+              borderColor: widget.borderColor,
+              fade: _fadeController,
+            ),
+      child: KeyedSubtree(key: _childKey, child: widget.child),
+    );
+  }
+}
+
+class _QcfAyahHighlightPainter extends CustomPainter {
+  final GlobalKey childKey;
+  final int start;
+  final int end;
+  final Color color;
+  final Color borderColor;
+  final Animation<double> fade;
+
+  _QcfAyahHighlightPainter({
+    required this.childKey,
+    required this.start,
+    required this.end,
+    required this.color,
+    required this.borderColor,
+    required this.fade,
+  }) : super(repaint: fade);
+
+  RenderParagraph? _findParagraph(RenderObject? node) {
+    if (node == null) return null;
+    if (node is RenderParagraph) return node;
+    RenderParagraph? found;
+    node.visitChildren((child) {
+      found ??= _findParagraph(child);
+    });
+    return found;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paragraph =
+        _findParagraph(childKey.currentContext?.findRenderObject());
+    if (paragraph == null || !paragraph.hasSize) return;
+    final boxes = paragraph.getBoxesForSelection(
+      TextSelection(baseOffset: start, extentOffset: end),
+    );
+    if (boxes.isEmpty) return;
+
+    var bounds = boxes.first.toRect();
+    for (final box in boxes.skip(1)) {
+      bounds = bounds.expandToInclude(box.toRect());
+    }
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTRB(
+        bounds.left - 4,
+        bounds.top + 1,
+        bounds.right + 4,
+        bounds.bottom - 1,
+      ),
+      const Radius.circular(9),
+    );
+    final opacity = fade.value.clamp(0.0, 1.0);
+    canvas.drawRRect(
+      rrect,
+      Paint()..color = color.withValues(alpha: color.a * opacity),
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.9
+        ..color = borderColor.withValues(alpha: borderColor.a * opacity),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _QcfAyahHighlightPainter oldDelegate) {
+    return oldDelegate.start != start ||
+        oldDelegate.end != end ||
+        oldDelegate.color != color ||
+        oldDelegate.borderColor != borderColor ||
+        oldDelegate.childKey != childKey ||
+        oldDelegate.fade != fade;
   }
 }
 
@@ -617,8 +802,6 @@ class _QcfOrnamentBadge extends StatelessWidget {
   final String glyph;
   final TextStyle baseStyle;
   final bool isDark;
-  final bool isSelected;
-  final Color highlightBg;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
@@ -626,8 +809,6 @@ class _QcfOrnamentBadge extends StatelessWidget {
     required this.glyph,
     required this.baseStyle,
     required this.isDark,
-    required this.isSelected,
-    required this.highlightBg,
     required this.onTap,
     this.onLongPress,
   });
@@ -647,65 +828,19 @@ class _QcfOrnamentBadge extends StatelessWidget {
         onTap: onTap,
         onLongPress: onLongPress,
         behavior: HitTestBehavior.opaque,
-        child: Container(
-          decoration: isSelected
-              ? BoxDecoration(
-                  color: highlightBg,
-                  borderRadius: BorderRadius.circular(8),
-                )
-              : null,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              const Positioned.fill(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 3, vertical: 6),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: radialColors,
-                        stops: [0.0, 0.46, 0.76, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Text(
-                glyph,
-                textDirection: TextDirection.rtl,
-                style: baseStyle.copyWith(
-                  color: ornamentColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        decoration: isSelected
-            ? BoxDecoration(
-                color: highlightBg,
-                borderRadius: BorderRadius.circular(8),
-              )
-            : null,
         child: Stack(
           alignment: Alignment.center,
           children: [
             const Positioned.fill(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 9),
+                padding: EdgeInsets.symmetric(horizontal: 3, vertical: 6),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Color(0xFFFFFFFF),
+                    gradient: RadialGradient(
+                      colors: radialColors,
+                      stops: [0.0, 0.46, 0.76, 1.0],
+                    ),
                   ),
                 ),
               ),
@@ -714,12 +849,42 @@ class _QcfOrnamentBadge extends StatelessWidget {
               glyph,
               textDirection: TextDirection.rtl,
               style: baseStyle.copyWith(
-                color: const Color(0xFF6B4A20),
+                color: ornamentColor,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      behavior: HitTestBehavior.opaque,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 9),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFFFFFFF),
+                ),
+              ),
+            ),
+          ),
+          Text(
+            glyph,
+            textDirection: TextDirection.rtl,
+            style: baseStyle.copyWith(
+              color: const Color(0xFF6B4A20),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -788,6 +953,14 @@ class _QcfTapAndLongPressRecognizer extends OneSequenceGestureRecognizer {
 
   @override
   String get debugDescription => 'qcf tap and long press';
+
+  @override
+  void rejectGesture(int pointer) {
+    if (pointer == _activePointer) {
+      _reset();
+    }
+    super.rejectGesture(pointer);
+  }
 
   @override
   void didStopTrackingLastPointer(int pointer) {}

@@ -39,6 +39,7 @@ class _TasksScreenState extends State<TasksScreen> {
 
   bool _showRemainingSunnahOnly = false;
   int _currentTabIndex = 0;
+  int _lanternReplayTick = 0;
 
   @override
   void initState() {
@@ -342,6 +343,7 @@ class _TasksScreenState extends State<TasksScreen> {
       athkarVm.loadDailyData(),
     ]);
     if (!mounted) return;
+    setState(() => _lanternReplayTick++);
     _syncAthkarTaskCompletion(
       vm,
       kAthkarMorning,
@@ -523,6 +525,7 @@ class _TasksScreenState extends State<TasksScreen> {
                           vm: vm,
                           isDark: isDark,
                         ),
+                        lanternReplayTick: _lanternReplayTick,
                       ),
                     ),
                   ),

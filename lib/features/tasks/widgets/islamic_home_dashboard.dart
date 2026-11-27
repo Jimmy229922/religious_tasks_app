@@ -27,6 +27,7 @@ class IslamicHomeDashboard extends StatefulWidget {
   final void Function(TaskItem task) onOpenPrayerDetails;
   final void Function(TaskItem task) onTogglePrayerCompletion;
   final Widget? bottomWidget;
+  final int lanternReplayTick;
 
   const IslamicHomeDashboard({
     super.key,
@@ -37,25 +38,50 @@ class IslamicHomeDashboard extends StatefulWidget {
     required this.onOpenPrayerDetails,
     required this.onTogglePrayerCompletion,
     this.bottomWidget,
+    this.lanternReplayTick = 0,
   });
 
   @override
   State<IslamicHomeDashboard> createState() => _IslamicHomeDashboardState();
 }
 
-class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
+class _IslamicHomeDashboardState extends State<IslamicHomeDashboard>
+    with SingleTickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _goldLight = Color(0xFFFDE68A);
   static final intl.DateFormat _clockFormat = intl.DateFormat('hh:mm a', 'ar');
   static final intl.DateFormat _shortTimeFormat =
       intl.DateFormat('hh:mm', 'ar');
   late Timer _timer;
+  late final AnimationController _lanternController;
+  late final Animation<double> _lanternDropAnimation;
+  late final Animation<double> _lanternGlowAnimation;
   final ValueNotifier<DateTime> _nowNotifier =
       ValueNotifier<DateTime>(DateTime.now());
 
   @override
   void initState() {
     super.initState();
+    _lanternController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+      animationBehavior: AnimationBehavior.preserve,
+    );
+    _lanternDropAnimation = CurvedAnimation(
+      parent: _lanternController,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
+    );
+    _lanternGlowAnimation = CurvedAnimation(
+      parent: _lanternController,
+      curve: const Interval(0.62, 1.0, curve: Curves.easeInOut),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 220), () {
+        if (mounted) {
+          _lanternController.forward();
+        }
+      });
+    });
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         _nowNotifier.value = DateTime.now();
@@ -64,7 +90,22 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
   }
 
   @override
+  void didUpdateWidget(covariant IslamicHomeDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.lanternReplayTick != oldWidget.lanternReplayTick) {
+      _lanternController.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _lanternController.forward(from: 0.0);
+  }
+
+  @override
   void dispose() {
+    _lanternController.dispose();
     _timer.cancel();
     _nowNotifier.dispose();
     super.dispose();
@@ -157,12 +198,12 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
             ),
           ),
           Positioned(
-            top: 20,
+            top: 0,
             right: 50,
             child: _buildHangingLantern(isDark, height: 66),
           ),
           Positioned(
-            top: 20,
+            top: 0,
             left: 50,
             child: _buildHangingLantern(isDark, height: 66),
           ),
@@ -262,13 +303,35 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
   }
 
   Widget _buildHangingLantern(bool isDark, {double height = 66}) {
-    return RepaintBoundary(
-      child: CustomPaint(
-        size: Size(32, height),
-        painter: _LanternPainter(
-          gold: _gold,
-          glow: isDark ? _goldLight : const Color(0xFFF59E0B),
-          isDark: isDark,
+    const topInset = 20.0;
+    final travel = height + topInset;
+    return SizedBox(
+      width: 32,
+      height: height + topInset,
+      child: ClipRect(
+        child: AnimatedBuilder(
+          animation: _lanternController,
+          builder: (context, _) {
+            final dropOffsetY =
+                topInset - travel * (1.0 - _lanternDropAnimation.value);
+            return Transform.translate(
+              offset: Offset(0, dropOffsetY),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    size: Size(32, height),
+                    painter: _LanternPainter(
+                      gold: _gold,
+                      glow: isDark ? _goldLight : const Color(0xFFF59E0B),
+                      isDark: isDark,
+                      glowIntensity: _lanternGlowAnimation.value,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -439,6 +502,57 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
     );
   }
 
+  ({String assetPath, bool isDarkScene}) _resolvePrayerHeroStyle(
+    TasksViewModel vm,
+    bool isDark,
+  ) {
+    final prayerTimes = vm.prayerTimes;
+    if (prayerTimes == null) {
+      return (
+        assetPath: isDark
+            ? 'assets/images/prayer_hero_dark.png'
+            : 'assets/images/prayer_hero_light.png',
+        isDarkScene: isDark,
+      );
+    }
+
+    switch (prayerTimes.currentPrayer()) {
+      case Prayer.fajr:
+        return (
+          assetPath: isDark
+              ? 'assets/images/prayer_hero_fajr.png'
+              : 'assets/images/prayer_hero_fajr_light.png',
+          isDarkScene: isDark,
+        );
+      case Prayer.sunrise:
+      case Prayer.dhuhr:
+        return (
+          assetPath: 'assets/images/prayer_hero_light.png',
+          isDarkScene: false,
+        );
+      case Prayer.asr:
+        return (
+          assetPath: 'assets/images/prayer_hero_asr.png',
+          isDarkScene: false,
+        );
+      case Prayer.maghrib:
+        return (
+          assetPath: isDark
+              ? 'assets/images/prayer_hero_maghrib.png'
+              : 'assets/images/prayer_hero_maghrib_light.png',
+          isDarkScene: isDark,
+        );
+      case Prayer.isha:
+      case Prayer.none:
+        return (
+          assetPath: isDark
+              ? 'assets/images/prayer_hero_dark.png'
+              : 'assets/images/prayer_hero_isha_light.png',
+          isDarkScene: isDark,
+        );
+    }
+  }
+
   Widget _buildNextPrayerHeroCard(
     BuildContext context,
     TasksViewModel vm,
@@ -446,6 +560,8 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
     Color accent,
   ) {
     final nextName = vm.nextPrayerName.isNotEmpty ? vm.nextPrayerName : 'الفجر';
+    final heroStyle = _resolvePrayerHeroStyle(vm, isDark);
+    final isDarkScene = heroStyle.isDarkScene;
 
     return InkWell(
       onTap: () {
@@ -467,23 +583,19 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: _gold.withValues(alpha: isDark ? 0.7 : 0.85),
+            color: _gold.withValues(alpha: isDarkScene ? 0.7 : 0.85),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: _gold.withValues(alpha: isDark ? 0.16 : 0.24),
+              color: _gold.withValues(alpha: isDarkScene ? 0.16 : 0.24),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
           ],
           image: DecorationImage(
             image: ResizeImage(
-              AssetImage(
-                isDark
-                    ? 'assets/images/prayer_hero_dark.png'
-                    : 'assets/images/prayer_hero_light.png',
-              ),
+              AssetImage(heroStyle.assetPath),
               width: 900,
             ),
             fit: BoxFit.cover,
@@ -494,7 +606,7 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22.5),
             gradient: LinearGradient(
-              colors: isDark
+              colors: isDarkScene
                   ? [
                       Colors.black.withValues(alpha: 0.45),
                       Colors.black.withValues(alpha: 0.1),
@@ -517,7 +629,7 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                   Icon(
                     Icons.mosque_rounded,
                     size: 16,
-                    color: isDark ? _goldLight : const Color(0xFF78350F),
+                    color: isDarkScene ? _goldLight : const Color(0xFF78350F),
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -525,7 +637,8 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                     style: GoogleFonts.cairo(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? _goldLight : const Color(0xFF78350F),
+                      color:
+                          isDarkScene ? _goldLight : const Color(0xFF78350F),
                     ),
                   ),
                 ],
@@ -537,7 +650,7 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
                   height: 1.15,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  color: isDarkScene ? Colors.white : const Color(0xFF0F172A),
                 ),
               ),
               const SizedBox(height: 8),
@@ -545,7 +658,7 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: isDark
+                  color: isDarkScene
                       ? Colors.black.withValues(alpha: 0.45)
                       : Colors.white.withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(999),
@@ -559,7 +672,8 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                     Icon(
                       Icons.hourglass_bottom_rounded,
                       size: 13.5,
-                      color: isDark ? _goldLight : const Color(0xFFB45309),
+                      color:
+                          isDarkScene ? _goldLight : const Color(0xFFB45309),
                     ),
                     const SizedBox(width: 5),
                     ValueListenableBuilder<DateTime>(
@@ -569,7 +683,9 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard> {
                         style: GoogleFonts.cairo(
                           fontSize: 11.5,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? _goldLight : const Color(0xFF78350F),
+                          color: isDarkScene
+                              ? _goldLight
+                              : const Color(0xFF78350F),
                         ),
                       ),
                     ),
@@ -1088,11 +1204,13 @@ class _LanternPainter extends CustomPainter {
   final Color gold;
   final Color glow;
   final bool isDark;
+  final double glowIntensity;
 
   const _LanternPainter({
     required this.gold,
     required this.glow,
     required this.isDark,
+    this.glowIntensity = 1.0,
   });
 
   @override
@@ -1102,9 +1220,22 @@ class _LanternPainter extends CustomPainter {
     final cx = w / 2;
     const goldDeep = Color(0xFF92400E);
     const goldBright = Color(0xFFFEF3C7);
+    final intensity = glowIntensity.clamp(0.0, 1.0);
+    final metalColor = Color.lerp(
+        isDark ? const Color(0xFF475569) : const Color(0xFF64748B),
+        gold,
+        intensity)!;
+    final metalHighlight = Color.lerp(
+        isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+        goldBright,
+        intensity)!;
+    final unlitGlassTop =
+        isDark ? const Color(0xFF1E293B) : const Color(0xFF475569);
+    final unlitGlassBottom =
+        isDark ? const Color(0xFF0F172A) : const Color(0xFF334155);
 
     final chainPaint = Paint()
-      ..color = gold.withValues(alpha: 0.9)
+      ..color = metalColor.withValues(alpha: 0.9)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.25;
     for (double y = 0; y < h * 0.2; y += 4.2) {
@@ -1120,10 +1251,12 @@ class _LanternPainter extends CustomPainter {
       chainPaint..strokeWidth = 1.4,
     );
 
-    final outerGlow = Paint()
-      ..color = glow.withValues(alpha: isDark ? 0.3 : 0.22)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9);
-    canvas.drawCircle(Offset(cx, h * 0.57), w * 0.44, outerGlow);
+    if (intensity > 0.01) {
+      final outerGlow = Paint()
+        ..color = glow.withValues(alpha: (isDark ? 0.3 : 0.22) * intensity)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9);
+      canvas.drawCircle(Offset(cx, h * 0.57), w * 0.44, outerGlow);
+    }
 
     final domePath = Path()
       ..moveTo(cx, h * 0.25)
@@ -1132,7 +1265,7 @@ class _LanternPainter extends CustomPainter {
       ..quadraticBezierTo(cx - w * 0.24, h * 0.3, cx, h * 0.25)
       ..close();
     final domeShader = LinearGradient(
-      colors: [goldBright, gold, goldDeep],
+      colors: [metalHighlight, metalColor, goldDeep],
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
     ).createShader(Rect.fromLTWH(cx - w * 0.28, h * 0.25, w * 0.56, h * 0.14));
@@ -1166,8 +1299,9 @@ class _LanternPainter extends CustomPainter {
     final sideGlassPaint = Paint()
       ..shader = LinearGradient(
         colors: [
-          glow.withValues(alpha: 0.75),
-          gold.withValues(alpha: 0.65),
+          Color.lerp(unlitGlassTop, glow.withValues(alpha: 0.75), intensity)!,
+          Color.lerp(
+              unlitGlassBottom, gold.withValues(alpha: 0.65), intensity)!,
         ],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
@@ -1180,22 +1314,24 @@ class _LanternPainter extends CustomPainter {
         center: const Alignment(0, 0.15),
         radius: 0.85,
         colors: [
-          Colors.white,
-          goldBright,
-          glow,
+          Color.lerp(unlitGlassTop, Colors.white, intensity)!,
+          Color.lerp(unlitGlassTop, goldBright, intensity)!,
+          Color.lerp(unlitGlassBottom, glow, intensity)!,
         ],
       ).createShader(Rect.fromLTWH(cx - w * 0.15, h * 0.42, w * 0.3, h * 0.32));
     canvas.drawPath(centerFacet, centerGlassPaint);
 
-    final flamePath = Path()
-      ..moveTo(cx, h * 0.5)
-      ..quadraticBezierTo(cx + 2.6, h * 0.58, cx, h * 0.64)
-      ..quadraticBezierTo(cx - 2.6, h * 0.58, cx, h * 0.5)
-      ..close();
-    canvas.drawPath(
-      flamePath,
-      Paint()..color = const Color(0xFFFFFBEB),
-    );
+    if (intensity > 0.05) {
+      final flamePath = Path()
+        ..moveTo(cx, h * 0.5)
+        ..quadraticBezierTo(cx + 2.6, h * 0.58, cx, h * 0.64)
+        ..quadraticBezierTo(cx - 2.6, h * 0.58, cx, h * 0.5)
+        ..close();
+      canvas.drawPath(
+        flamePath,
+        Paint()..color = const Color(0xFFFFFBEB).withValues(alpha: intensity),
+      );
+    }
 
     final framePaint = Paint()
       ..color = goldDeep
@@ -1242,5 +1378,6 @@ class _LanternPainter extends CustomPainter {
   bool shouldRepaint(covariant _LanternPainter oldDelegate) =>
       oldDelegate.gold != gold ||
       oldDelegate.glow != glow ||
-      oldDelegate.isDark != isDark;
+      oldDelegate.isDark != isDark ||
+      oldDelegate.glowIntensity != glowIntensity;
 }
