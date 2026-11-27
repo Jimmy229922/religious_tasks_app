@@ -251,8 +251,9 @@ class RadioViewModel extends ChangeNotifier {
   RadioStation? get currentStation => _currentStation;
   bool get isLoading =>
       _isLoading ||
-      playerState.processingState == ProcessingState.loading ||
-      playerState.processingState == ProcessingState.buffering;
+      (!_radioService.player.playing &&
+          (playerState.processingState == ProcessingState.loading ||
+              playerState.processingState == ProcessingState.buffering));
   bool get isPlaying => _radioService.player.playing;
   PlayerState get playerState => _radioService.player.playerState;
 

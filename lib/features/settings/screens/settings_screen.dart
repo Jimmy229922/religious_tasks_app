@@ -582,19 +582,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _updateSetting(String key, bool value) async {
+  Future<void> _updateSetting(String key, bool value) async {
+    final updatedAdhan = Map<String, bool>.from(adhanSettings)..[key] = value;
     setState(() {
-      adhanSettings[key] = value;
+      adhanSettings = updatedAdhan;
+      _prefs = _prefs.copyWith(adhanEnabled: updatedAdhan);
     });
 
     await _prefsService.setAdhanEnabled(key, value);
-    _reschedulePrayers();
+    if (!mounted) return;
+    final tasksViewModel = Provider.of<TasksViewModel>(context, listen: false);
+    if (tasksViewModel.prayerTimes != null &&
+        tasksViewModel.tomorrowPrayerTimes != null) {
+      await AppNotificationService().schedulePrayerNotifications(
+        today: tasksViewModel.prayerTimes!,
+        tomorrow: tasksViewModel.tomorrowPrayerTimes!,
+      );
+    }
   }
 
-  void _updateOffset(String key, int value) async {
+  Future<void> _updateOffset(String key, int value) async {
     final safeValue = value.clamp(-60, 60);
+    final updatedOffsets = Map<String, int>.from(prayerOffsets)
+      ..[key] = safeValue;
     setState(() {
-      prayerOffsets[key] = safeValue;
+      prayerOffsets = updatedOffsets;
+      _prefs = _prefs.copyWith(prayerOffsets: updatedOffsets);
     });
 
     await _prefsService.setPrayerOffset(key, safeValue);
@@ -602,9 +615,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) {
       final tasksViewModel =
           Provider.of<TasksViewModel>(context, listen: false);
-      await tasksViewModel.refreshLocation();
+      await tasksViewModel.applyPrayerOffsetsAndReschedule();
     }
-    _reschedulePrayers();
   }
 
   void _showRestoreDialog() {
@@ -895,7 +907,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ? null
                     : () async {
                         setState(() => _isRefreshingLocation = true);
-                        await tasksViewModel.refreshLocation();
+                        await tasksViewModel.refreshLocation(userInitiated: true);
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(

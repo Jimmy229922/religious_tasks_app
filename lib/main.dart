@@ -45,48 +45,62 @@ void overlayMain() {
 void main() async {
   debugPrint("🟢 Application Main Function Started");
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Supabase
-  try {
-    await Supabase.initialize(
-      url: 'https://kqjqqaqucsbwvlaourqy.supabase.co',
-      publishableKey: 'sb_publishable_xALekfH8optKoUUZkokBFQ_s0rzdW11',
-      realtimeClientOptions: const RealtimeClientOptions(
-        eventsPerSecond: 2,
-      ),
-    );
-  } catch (e) {
-    debugPrint("Supabase init failed: $e");
-  }
-
-  await AndroidAlarmManager.initialize();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  await initializeDateFormatting('ar', null);
-  HijriCalendar.setLocal('ar');
-  // NotificationManager().init() removed to prevent startup crash.
-  // Moved to SplashScreen/Main App usage.
-  try {
-    await StorageService.init();
-  } catch (e) {
-    debugPrint("StorageService init failed: $e");
-  }
+  await Future.wait<void>([
+    () async {
+      try {
+        await Supabase.initialize(
+          url: 'https://kqjqqaqucsbwvlaourqy.supabase.co',
+          publishableKey: 'sb_publishable_xALekfH8optKoUUZkokBFQ_s0rzdW11',
+          realtimeClientOptions: const RealtimeClientOptions(
+            eventsPerSecond: 2,
+          ),
+        );
+      } catch (e) {
+        debugPrint("Supabase init failed: $e");
+      }
+    }(),
+    () async {
+      try {
+        await AndroidAlarmManager.initialize();
+      } catch (e) {
+        debugPrint("AlarmManager init failed: $e");
+      }
+    }(),
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge),
+    initializeDateFormatting('ar', null),
+    () async {
+      try {
+        await StorageService.init();
+      } catch (e) {
+        debugPrint("StorageService init failed: $e");
+      }
+    }(),
+    () async {
+      try {
+        await RadioService.ensureBackgroundConfigured();
+      } catch (e) {
+        debugPrint("Radio background config failed: $e");
+      }
+    }(),
+  ]);
 
-  // Initialize notifications in the background (don't block first frame).
-  AppNotificationService().init().catchError((e) {
-    debugPrint("Notification init failed: $e");
-  });
+  HijriCalendar.setLocal('ar');
 
   FlutterDisplayMode.setHighRefreshRate().catchError((e) {
     debugPrint("High refresh rate init failed: $e");
   });
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    RadioService().init().catchError((e) {
-      debugPrint("Radio service init failed: $e");
+  final onboardingCompleted = StorageService.isInitialized &&
+      (StorageService.instance.prefs.getBool('onboarding_completed') ?? false);
+  if (onboardingCompleted) {
+    Future<void>.delayed(const Duration(seconds: 4), () {
+      AppNotificationService().init().catchError((e) {
+        debugPrint("Notification init failed: $e");
+      });
     });
-  });
+  }
 
   runApp(
     MultiProvider(

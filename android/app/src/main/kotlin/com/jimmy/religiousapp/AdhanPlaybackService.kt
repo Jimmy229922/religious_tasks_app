@@ -674,9 +674,8 @@ class AdhanPlaybackService : Service() {
         }
 
         private fun isSalawatEvent(prayerName: String, prayerKey: String): Boolean {
-            return prayerName.contains("النبي") ||
-                prayerName.contains("صل") ||
-                prayerKey.lowercase() == "salawat"
+            return prayerKey.lowercase() == "salawat" ||
+                prayerName.contains("النبي")
         }
 
         private fun buildLaunchAppPendingIntent(context: Context, requestCode: Int): PendingIntent {

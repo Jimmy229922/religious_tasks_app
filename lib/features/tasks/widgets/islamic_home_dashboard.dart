@@ -398,7 +398,7 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard>
               child: InkWell(
                 onTap: () {
                   HapticFeedback.selectionClick();
-                  vm.refreshLocation();
+                  vm.refreshLocation(userInitiated: true);
                 },
                 borderRadius: BorderRadius.circular(10),
                 child: Row(
@@ -506,12 +506,46 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard>
     TasksViewModel vm,
     bool isDark,
   ) {
+    final now = DateTime.now();
     final prayerTimes = vm.prayerTimes;
     if (prayerTimes == null) {
+      final hour = now.hour;
+      if (hour >= 4 && hour < 6) {
+        return (
+          assetPath: isDark
+              ? 'assets/images/prayer_hero_fajr.png'
+              : 'assets/images/prayer_hero_fajr_light.png',
+          isDarkScene: isDark,
+        );
+      }
+      if (hour >= 6 && hour < 15) {
+        return (
+          assetPath: isDark
+              ? 'assets/images/prayer_hero_dhuhr_dark.png'
+              : 'assets/images/prayer_hero_light.png',
+          isDarkScene: isDark,
+        );
+      }
+      if (hour >= 15 && hour < 17) {
+        return (
+          assetPath: isDark
+              ? 'assets/images/prayer_hero_asr_dark.png'
+              : 'assets/images/prayer_hero_asr.png',
+          isDarkScene: isDark,
+        );
+      }
+      if (hour >= 17 && hour < 19) {
+        return (
+          assetPath: isDark
+              ? 'assets/images/prayer_hero_maghrib.png'
+              : 'assets/images/prayer_hero_maghrib_light.png',
+          isDarkScene: isDark,
+        );
+      }
       return (
         assetPath: isDark
             ? 'assets/images/prayer_hero_dark.png'
-            : 'assets/images/prayer_hero_light.png',
+            : 'assets/images/prayer_hero_isha_light.png',
         isDarkScene: isDark,
       );
     }
@@ -527,13 +561,17 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard>
       case Prayer.sunrise:
       case Prayer.dhuhr:
         return (
-          assetPath: 'assets/images/prayer_hero_light.png',
-          isDarkScene: false,
+          assetPath: isDark
+              ? 'assets/images/prayer_hero_dhuhr_dark.png'
+              : 'assets/images/prayer_hero_light.png',
+          isDarkScene: isDark,
         );
       case Prayer.asr:
         return (
-          assetPath: 'assets/images/prayer_hero_asr.png',
-          isDarkScene: false,
+          assetPath: isDark
+              ? 'assets/images/prayer_hero_asr_dark.png'
+              : 'assets/images/prayer_hero_asr.png',
+          isDarkScene: isDark,
         );
       case Prayer.maghrib:
         return (
@@ -544,6 +582,18 @@ class _IslamicHomeDashboardState extends State<IslamicHomeDashboard>
         );
       case Prayer.isha:
       case Prayer.none:
+        final nextTime = vm.nextPrayerTime;
+        final isPreDawnWindow = nextTime != null &&
+            nextTime.isAfter(now) &&
+            nextTime.difference(now).inMinutes <= 45;
+        if (isPreDawnWindow) {
+          return (
+            assetPath: isDark
+                ? 'assets/images/prayer_hero_fajr.png'
+                : 'assets/images/prayer_hero_fajr_light.png',
+            isDarkScene: isDark,
+          );
+        }
         return (
           assetPath: isDark
               ? 'assets/images/prayer_hero_dark.png'

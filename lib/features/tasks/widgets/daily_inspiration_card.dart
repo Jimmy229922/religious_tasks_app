@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:religious_tasks_app/core/theme/theme_provider.dart';
 import 'package:religious_tasks_app/core/widgets/islamic_card_generator_dialog.dart';
+import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import '../providers/tasks_view_model.dart';
 
 class DailyInspirationCard extends StatelessWidget {
@@ -14,6 +15,58 @@ class DailyInspirationCard extends StatelessWidget {
     required this.vm,
     required this.isDark,
   });
+
+  List<int> _extractVerseNumbers(String source) {
+    final normalized = QuranTextFormatter.toEnglishDigits(source);
+    final rangeMatch = RegExp(r'(\d+)\s*[-–]\s*(\d+)').firstMatch(normalized);
+    if (rangeMatch != null) {
+      final start = int.tryParse(rangeMatch.group(1)!);
+      final end = int.tryParse(rangeMatch.group(2)!);
+      if (start != null && end != null && end >= start && (end - start) <= 20) {
+        return [for (int v = start; v <= end; v++) v];
+      }
+    }
+    final singleMatch = RegExp(r'(\d+)').firstMatch(normalized);
+    if (singleMatch != null) {
+      final val = int.tryParse(singleMatch.group(1)!);
+      if (val != null) return [val];
+    }
+    return const [];
+  }
+
+  String _prepareQuranMarkedText(String rawText, String source) {
+    String text = rawText.trim();
+    text = text.replaceAllMapped(
+      RegExp(r'۝\s*([0-9\u0660-\u0669]+)'),
+      (m) => ' ﴿${QuranTextFormatter.toArabicDigits(m.group(1)!)}﴾',
+    );
+    final nums = _extractVerseNumbers(source);
+    if (text.contains('۝')) {
+      int idx = 0;
+      text = text.replaceAllMapped(RegExp(r'\s*۝\s*'), (_) {
+        if (idx < nums.length) {
+          final numAr = QuranTextFormatter.toArabicDigits(nums[idx].toString());
+          idx++;
+          return ' ﴿$numAr﴾ ';
+        }
+        return ' ۝ ';
+      }).trim();
+    }
+    if (nums.isNotEmpty &&
+        !RegExp(r'﴿\s*[0-9\u0660-\u0669]+\s*﴾\s*$').hasMatch(text)) {
+      final lastAr = QuranTextFormatter.toArabicDigits(nums.last.toString());
+      text = '$text ﴿$lastAr﴾';
+    }
+    return text.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+  }
+
+  String _formatCopyPayload(bool isQuran, String rawText, String source) {
+    if (isQuran) {
+      final marked = _prepareQuranMarkedText(rawText, source);
+      return '📖 آية اليوم\n$marked${source.isNotEmpty ? '\n— $source' : ''}';
+    }
+    return '✨ همسة اليوم\n« ${rawText.trim()} »';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,16 +162,18 @@ class DailyInspirationCard extends StatelessWidget {
                     tooltip: "نسخ",
                     visualDensity: VisualDensity.compact,
                     onPressed: () async {
-                      final textToCopy = isQuran
-                          ? '﴿ ${vm.currentInspiration} ﴾${source.isNotEmpty ? ' — $source' : ''}'
-                          : '«${vm.currentInspiration}»';
+                      final textToCopy = _formatCopyPayload(
+                        isQuran,
+                        vm.currentInspiration,
+                        source,
+                      );
                       await Clipboard.setData(ClipboardData(text: textToCopy));
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).hideCurrentSnackBar();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            "تم النسخ بنجاح",
+                            "تم النسخ بنفس تنسيق العرض بنجاح",
                             style: GoogleFonts.cairo(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -140,11 +195,15 @@ class DailyInspirationCard extends StatelessWidget {
                     tooltip: "تصميم بطاقة",
                     visualDensity: VisualDensity.compact,
                     onPressed: () {
+                      final cardContent = isQuran
+                          ? _prepareQuranMarkedText(
+                              vm.currentInspiration, source)
+                          : vm.currentInspiration;
                       showDialog(
                         context: context,
                         builder: (_) => IslamicCardGeneratorDialog(
                           title: isQuran ? "آية اليوم 📖" : "همسة اليوم 💛",
-                          content: vm.currentInspiration,
+                          content: cardContent,
                           subtitle: source.isNotEmpty ? source : null,
                         ),
                       );
@@ -181,18 +240,32 @@ class DailyInspirationCard extends StatelessWidget {
             child: Column(
               key: ValueKey('${vm.currentInspiration}_$source'),
               children: [
-                Text(
-                  isQuran
-                      ? "﴿ ${vm.currentInspiration} ﴾"
-                      : "« ${vm.currentInspiration} »",
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.amiri(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: contentColor,
-                    height: 1.7,
+                if (isQuran)
+                  QuranTextFormatter.buildFormattedQuranText(
+                    _prepareQuranMarkedText(vm.currentInspiration, source),
+                    textAlign: TextAlign.center,
+                    isDark: isDark,
+                    badgeColor: isDark
+                        ? const Color(0xFFFBBF24)
+                        : const Color(0xFFD97706),
+                    baseStyle: GoogleFonts.amiri(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: contentColor,
+                      height: 1.75,
+                    ),
+                  )
+                else
+                  Text(
+                    "« ${vm.currentInspiration} »",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.amiri(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: contentColor,
+                      height: 1.7,
+                    ),
                   ),
-                ),
                 if (source.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Container(

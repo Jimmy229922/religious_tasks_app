@@ -31,12 +31,23 @@ class RadioService {
   factory RadioService() => _instance;
   RadioService._internal();
 
-  final AudioPlayer _player = AudioPlayer();
+  AudioPlayer? _playerInstance;
+  AudioPlayer get _player => _playerInstance ??= AudioPlayer();
 
   static const List<RadioStation> stations = [
     RadioStation(
+      id: 'cairo_quran_official',
+      title: 'إذاعة القرآن الكريم من القاهرة (98.2 / 89.8 FM)',
+      subtitle: 'البث الرسمي المباشر من القاهرة • تردد ٩٨.٢ و ٨٩.٨ FM',
+      badge: 'القاهرة مباشر',
+      url: 'https://stream.radiojar.com/8s5u5tpdtwzuv',
+      fallbackUrl: 'https://n0a.radiojar.com/8s5u5tpdtwzuv',
+      category: 'radios',
+      artUri: 'https://i.ibb.co/X7R0qjC/quran-radio.png',
+    ),
+    RadioStation(
       id: 'cairo_quran',
-      title: 'إذاعة القرآن الكريم (عامة ومباشرة)',
+      title: 'إذاعة القرآن الكريم (تلاوات عامة ومباشرة)',
       subtitle: 'تلاوات مختارة وبرامج قرآنية على مدار الساعة',
       badge: 'إذاعة عامة',
       url: 'https://backup.qurango.net/radio/mix',
@@ -229,11 +240,29 @@ class RadioService {
   AudioPlayer get player => _player;
   Stream<IcyMetadata?> get icyMetadataStream => _player.icyMetadataStream;
 
+  static bool _backgroundConfigured = false;
+  static Future<void>? _backgroundConfigFuture;
   bool _isInitialized = false;
   Future<void>? _initFuture;
   StreamSubscription<PlaybackEvent>? _playbackSub;
 
+  static Future<void> ensureBackgroundConfigured() {
+    if (_backgroundConfigured) return Future<void>.value();
+    if (_backgroundConfigFuture != null) return _backgroundConfigFuture!;
+    _backgroundConfigFuture = JustAudioBackground.init(
+      androidNotificationChannelId: 'com.jimmy.religiousapp.channel.audio',
+      androidNotificationChannelName: 'راديو القرآن الكريم',
+      androidNotificationOngoing: true,
+    ).then((_) {
+      _backgroundConfigured = true;
+    }).whenComplete(() {
+      _backgroundConfigFuture = null;
+    });
+    return _backgroundConfigFuture!;
+  }
+
   Future<void> setVolume(double volume) async {
+    if (_playerInstance == null && (volume - 1.0).abs() < 0.001) return;
     await _player.setVolume(volume.clamp(0.0, 1.0));
   }
 
@@ -241,11 +270,7 @@ class RadioService {
     if (_isInitialized) return Future<void>.value();
     if (_initFuture != null) return _initFuture!;
     _initFuture = () async {
-      await JustAudioBackground.init(
-        androidNotificationChannelId: 'com.jimmy.religiousapp.channel.audio',
-        androidNotificationChannelName: 'راديو القرآن الكريم',
-        androidNotificationOngoing: true,
-      );
+      await ensureBackgroundConfigured();
 
       _playbackSub ??= _player.playbackEventStream.listen(
         (event) {},
@@ -263,7 +288,8 @@ class RadioService {
   Future<void> dispose() async {
     await _playbackSub?.cancel();
     _playbackSub = null;
-    await _player.dispose();
+    await _playerInstance?.dispose();
+    _playerInstance = null;
     _isInitialized = false;
   }
 
@@ -279,6 +305,11 @@ class RadioService {
       station.url,
       if (station.fallbackUrl != null && station.fallbackUrl != station.url)
         station.fallbackUrl!,
+      if (station.url.contains('8s5u5tpdtwzuv')) ...[
+        'https://n0a.radiojar.com/8s5u5tpdtwzuv',
+        'https://n0e.radiojar.com/8s5u5tpdtwzuv',
+        'https://n02.radiojar.com/8s5u5tpdtwzuv',
+      ],
       if (station.url.contains('backup.qurango.net'))
         station.url.replaceAll('backup.qurango.net', 'qurango.net')
       else if (station.url.contains('qurango.net'))
@@ -313,8 +344,32 @@ class RadioService {
         // preload: false guarantees ExoPlayer starts Shoutcast/Icecast streaming immediately without blocking
         await _player
             .setAudioSource(source, preload: false)
-            .timeout(const Duration(seconds: 15));
-        await _player.play().timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 12));
+        final readyCompleter = Completer<void>();
+        late final StreamSubscription<PlayerState> stateSub;
+        late final StreamSubscription<PlaybackEvent> eventSub;
+        stateSub = _player.playerStateStream.listen((state) {
+          if (state.playing &&
+              state.processingState == ProcessingState.ready &&
+              !readyCompleter.isCompleted) {
+            readyCompleter.complete();
+          }
+        });
+        eventSub = _player.playbackEventStream.listen(
+          (_) {},
+          onError: (Object err, StackTrace st) {
+            if (!readyCompleter.isCompleted) {
+              readyCompleter.completeError(err, st);
+            }
+          },
+        );
+        try {
+          unawaited(_player.play());
+          await readyCompleter.future.timeout(const Duration(seconds: 12));
+        } finally {
+          await stateSub.cancel();
+          await eventSub.cancel();
+        }
         return; // Success!
       } catch (e) {
         debugPrint("Failed to play stream URL $url: $e");

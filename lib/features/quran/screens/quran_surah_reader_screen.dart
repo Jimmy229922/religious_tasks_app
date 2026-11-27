@@ -14,10 +14,8 @@ import 'package:religious_tasks_app/features/quran/data/quran_repository.dart';
 import 'package:religious_tasks_app/features/quran/data/qcf_mushaf_repository.dart';
 import 'package:religious_tasks_app/features/quran/theme/mushaf_reader_theme.dart';
 import 'package:religious_tasks_app/features/quran/widgets/ayah_tafsir_sheet.dart';
-import 'package:religious_tasks_app/features/quran/widgets/mushaf_page_scroll_physics.dart';
 import 'package:religious_tasks_app/features/quran/widgets/mushaf_page_side_indicator.dart';
-import 'package:religious_tasks_app/features/quran/widgets/mushaf_section_start_toast.dart';
-import 'package:religious_tasks_app/features/quran/widgets/qcf_mushaf_page_widget.dart';
+import 'package:religious_tasks_app/features/quran/widgets/mushaf_paged_reader.dart';
 import 'package:religious_tasks_app/features/tasks/providers/tasks_view_model.dart';
 
 class QuranSurahReaderScreen extends StatefulWidget {
@@ -880,174 +878,84 @@ class _QuranSurahReaderScreenState extends State<QuranSurahReaderScreen> {
           backgroundColor: paperColor,
           body: Stack(
             children: [
-              GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: _toggleControls,
-                child: SafeArea(
-                  top: false,
-                  child: PageView.builder(
-                    controller: _pageController,
-                    allowImplicitScrolling: true,
-                    physics: const MushafPageScrollPhysics(
-                      parent: ClampingScrollPhysics(),
-                    ),
-                    itemCount:
-                        widget.singleSurahOnly ? _surahPages.length : 604,
-                    onPageChanged: (pageIndex) {
-                      final newPage = widget.singleSurahOnly
-                          ? _surahPages[pageIndex]
-                          : pageIndex + 1;
-                      final readingDirection = newPage.compareTo(_currentPage);
-                      final cached = QcfMushafRepository.getCachedPage(
-                        newPage,
-                        onlySurahNumber: _onlySurahFilter,
-                      );
-                      final range = QuranPageMapping.getPageRange(newPage);
-                      final meta = QuranData.surahs.firstWhere(
-                        (s) => s.number == range.startSurah,
-                        orElse: () => QuranData.surahs.first,
-                      );
-                      final nextSurahName = widget.singleSurahOnly
-                          ? widget.surah.name
-                          : (cached?.surahName ?? meta.name);
-                      _currentPage = newPage;
-                      _currentSurahName = nextSurahName;
-                      _currentPageNotifier.value = newPage;
-                      _currentSurahNameNotifier.value = nextSurahName;
-                      if (!widget.singleSurahOnly) {
-                        _pendingLastReadPage = newPage;
-                        _pendingLastReadSurahNum = meta.number;
-                        _pendingLastReadSurahName = nextSurahName;
-                        _saveLastReadDebounce?.cancel();
-                        _saveLastReadDebounce =
-                            Timer(const Duration(milliseconds: 500), () {
-                          final prefs = StorageService.instance.prefs;
-                          prefs.setInt('last_read_page_number', newPage);
-                          prefs.setInt('last_read_surah_number', meta.number);
-                          prefs.setString(
-                              'last_read_surah_name', nextSurahName);
-                          _pendingLastReadPage = null;
-                        });
-                      }
-                      QcfMushafRepository.prefetchAdjacentPages(
-                        newPage,
-                        direction: readingDirection,
-                        onlySurahNumber: _onlySurahFilter,
-                        allowedPages:
-                            widget.singleSurahOnly ? _surahPages : null,
-                      );
-                      QcfMushafRepository.prefetchReadingPageFonts(
-                        newPage,
-                        direction: readingDirection,
-                        allowedPages:
-                            widget.singleSurahOnly ? _surahPages : null,
-                      );
-                      if (cached == null) {
-                        QcfMushafRepository.loadPage(
-                          newPage,
-                          onlySurahNumber: _onlySurahFilter,
-                        ).then((content) {
-                          if (mounted &&
-                              _currentPage == newPage &&
-                              !widget.singleSurahOnly &&
-                              _currentSurahName != content.surahName) {
-                            _currentSurahName = content.surahName;
-                            _currentSurahNameNotifier.value = content.surahName;
-                            _pendingLastReadSurahName = content.surahName;
-                          }
-                        });
-                      }
-                    },
-                    itemBuilder: (context, index) {
-                      final pageNumber = widget.singleSurahOnly
-                          ? _surahPages[index]
-                          : index + 1;
-                      final cachedPage = QcfMushafRepository.getCachedPage(
-                        pageNumber,
-                        onlySurahNumber: _onlySurahFilter,
-                      );
-
-                      return FutureBuilder<QcfMushafPageData>(
-                        initialData: cachedPage,
-                        future: cachedPage != null
-                            ? null
-                            : QcfMushafRepository.loadPage(
-                                pageNumber,
-                                onlySurahNumber: _onlySurahFilter,
-                              ),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) {
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 28,
-                                    height: 28,
-                                    child: CircularProgressIndicator(
-                                      color: accent,
-                                      strokeWidth: 3,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Text(
-                                    "جاري فتح الصفحة ${QuranTextFormatter.toArabicDigits(pageNumber.toString())} من المصحف...",
-                                    style: GoogleFonts.cairo(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          isDark ? Colors.tealAccent : accent,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-
-                          final pageData = snapshot.data!;
-                          String? highlightedKey;
-                          if (_inspectingPage == pageNumber &&
-                              _inspectingSurahNumber != null &&
-                              _inspectingVerse != null) {
-                            highlightedKey =
-                                '$_inspectingSurahNumber:$_inspectingVerse';
-                          } else if (_selectedPage == pageNumber &&
-                              _selectedSurahNumber != null &&
-                              _selectedAyahNumber != null) {
-                            highlightedKey =
-                                '$_selectedSurahNumber:$_selectedAyahNumber';
-                          } else if (_savedVerseBookmarkPage == pageNumber &&
-                              _savedVerseBookmarkVerse != null) {
-                            final surahNum = _savedVerseBookmarkSurahNumber ??
-                                pageData.surahNumber;
-                            final ayahInt = QuranTextFormatter.parseVerseNumber(
-                              _savedVerseBookmarkVerse!,
-                            );
-                            if (ayahInt != null) {
-                              highlightedKey = '$surahNum:$ayahInt';
-                            }
-                          }
-
-                          return QcfMushafPageWidget(
-                            pageData: pageData,
-                            highlightedVerseKey: highlightedKey,
-                            isPageBookmarked: _savedPageBookmark == pageNumber,
-                            topInset: MediaQuery.paddingOf(context).top,
-                            isDark: isDark,
-                            accentColor: accent,
-                            onTapVerse: null,
-                            onLongPressVerse: (sNum, aNum) =>
-                                _onVerseLongPressed(pageNumber, sNum, aNum),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ),
-              MushafSectionStartToast(
-                pageNotifier: _currentPageNotifier,
+              MushafPagedReader(
+                controller: _pageController,
+                pages: widget.singleSurahOnly ? _surahPages : null,
+                onlySurahNumber: _onlySurahFilter,
                 isDark: isDark,
+                accentColor: accent,
+                loadingSourceName: 'المصحف',
+                bookmarkedPage: _savedPageBookmark,
+                onToggleControls: _toggleControls,
+                toastPageNotifier: _currentPageNotifier,
+                onPageChanged: (_, newPage, cached) {
+                  final range = QuranPageMapping.getPageRange(newPage);
+                  final meta = QuranData.surahs.firstWhere(
+                    (s) => s.number == range.startSurah,
+                    orElse: () => QuranData.surahs.first,
+                  );
+                  final nextSurahName = widget.singleSurahOnly
+                      ? widget.surah.name
+                      : (cached?.surahName ?? meta.name);
+                  _currentPage = newPage;
+                  _currentSurahName = nextSurahName;
+                  _currentPageNotifier.value = newPage;
+                  _currentSurahNameNotifier.value = nextSurahName;
+                  if (!widget.singleSurahOnly) {
+                    _pendingLastReadPage = newPage;
+                    _pendingLastReadSurahNum = meta.number;
+                    _pendingLastReadSurahName = nextSurahName;
+                    _saveLastReadDebounce?.cancel();
+                    _saveLastReadDebounce =
+                        Timer(const Duration(milliseconds: 500), () {
+                      final prefs = StorageService.instance.prefs;
+                      prefs.setInt('last_read_page_number', newPage);
+                      prefs.setInt('last_read_surah_number', meta.number);
+                      prefs.setString('last_read_surah_name', nextSurahName);
+                      _pendingLastReadPage = null;
+                    });
+                  }
+                  if (cached == null) {
+                    QcfMushafRepository.loadPage(
+                      newPage,
+                      onlySurahNumber: _onlySurahFilter,
+                    ).then((content) {
+                      if (mounted &&
+                          _currentPage == newPage &&
+                          !widget.singleSurahOnly &&
+                          _currentSurahName != content.surahName) {
+                        _currentSurahName = content.surahName;
+                        _currentSurahNameNotifier.value = content.surahName;
+                        _pendingLastReadSurahName = content.surahName;
+                      }
+                    });
+                  }
+                },
+                highlightedVerseKeyBuilder: (pageNumber, pageData) {
+                  if (_inspectingPage == pageNumber &&
+                      _inspectingSurahNumber != null &&
+                      _inspectingVerse != null) {
+                    return '$_inspectingSurahNumber:$_inspectingVerse';
+                  }
+                  if (_selectedPage == pageNumber &&
+                      _selectedSurahNumber != null &&
+                      _selectedAyahNumber != null) {
+                    return '$_selectedSurahNumber:$_selectedAyahNumber';
+                  }
+                  if (_savedVerseBookmarkPage == pageNumber &&
+                      _savedVerseBookmarkVerse != null) {
+                    final surahNum =
+                        _savedVerseBookmarkSurahNumber ?? pageData.surahNumber;
+                    final ayahInt = QuranTextFormatter.parseVerseNumber(
+                      _savedVerseBookmarkVerse!,
+                    );
+                    if (ayahInt != null) {
+                      return '$surahNum:$ayahInt';
+                    }
+                  }
+                  return null;
+                },
+                onLongPressVerse: _onVerseLongPressed,
               ),
               ValueListenableBuilder<bool>(
                 valueListenable: _showControlsNotifier,

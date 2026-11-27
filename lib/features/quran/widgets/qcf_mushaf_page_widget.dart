@@ -1,7 +1,6 @@
-import 'dart:async';
-import 'package:flutter/gestures.dart';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:religious_tasks_app/core/widgets/quran_text_formatter.dart';
 import 'package:religious_tasks_app/features/quran/data/qcf_mushaf_repository.dart';
@@ -35,46 +34,83 @@ class QcfMushafPageWidget extends StatefulWidget {
   State<QcfMushafPageWidget> createState() => _QcfMushafPageWidgetState();
 }
 
-class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
-  final List<GestureRecognizer> _recognizers = <GestureRecognizer>[];
-  final Map<String, GestureRecognizer?> _ayahRecognizers =
-      <String, GestureRecognizer?>{};
+class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _highlightFadeController;
+  List<_PreparedQcfLine>? _preparedLines;
+  QcfMushafPageData? _preparedPageData;
+  bool? _preparedIsDark;
+  TextScaler? _preparedTextScaler;
 
-  void _disposeRecognizers() {
-    for (final recognizer in _recognizers) {
-      recognizer.dispose();
-    }
-    _recognizers.clear();
-    _ayahRecognizers.clear();
-  }
-
-  GestureRecognizer? _recognizerForAyah(int surahNumber, int ayahNumber) {
-    if (widget.onTapVerse == null && widget.onLongPressVerse == null) {
-      return null;
-    }
-    final key = '$surahNumber:$ayahNumber';
-    if (_ayahRecognizers.containsKey(key)) {
-      return _ayahRecognizers[key];
-    }
-    final recognizer = _createRecognizer(surahNumber, ayahNumber);
-    _ayahRecognizers[key] = recognizer;
-    return recognizer;
+  @override
+  void initState() {
+    super.initState();
+    _highlightFadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1.0,
+    );
   }
 
   @override
   void didUpdateWidget(covariant QcfMushafPageWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.pageData != widget.pageData ||
-        (oldWidget.onTapVerse == null) != (widget.onTapVerse == null) ||
-        (oldWidget.onLongPressVerse == null) !=
-            (widget.onLongPressVerse == null)) {
-      _disposeRecognizers();
+    if (widget.highlightedVerseKey != null &&
+        widget.highlightedVerseKey != oldWidget.highlightedVerseKey) {
+      _highlightFadeController.forward(from: 0.0);
     }
+  }
+
+  void _disposePreparedLines() {
+    final existing = _preparedLines;
+    if (existing != null) {
+      for (final line in existing) {
+        line.dispose();
+      }
+    }
+    _preparedLines = null;
+    _preparedPageData = null;
+    _preparedIsDark = null;
+    _preparedTextScaler = null;
+  }
+
+  List<_PreparedQcfLine> _ensureLinesPrepared({
+    required List<QcfMushafLine> lines,
+    required Color inkColor,
+    required Color divineNameColor,
+    required bool isDark,
+    required TextScaler textScaler,
+  }) {
+    if (_preparedLines != null &&
+        identical(_preparedPageData, widget.pageData) &&
+        _preparedIsDark == isDark &&
+        _preparedTextScaler == textScaler) {
+      return _preparedLines!;
+    }
+    _disposePreparedLines();
+    final built = List<_PreparedQcfLine>.generate(
+      lines.length,
+      (i) => _PreparedQcfLine.prepare(
+        line: lines[i],
+        fontFamily: widget.pageData.fontFamily,
+        inkColor: inkColor,
+        divineNameColor: divineNameColor,
+        isDark: isDark,
+        textScaler: textScaler,
+      ),
+      growable: false,
+    );
+    _preparedLines = built;
+    _preparedPageData = widget.pageData;
+    _preparedIsDark = isDark;
+    _preparedTextScaler = textScaler;
+    return built;
   }
 
   @override
   void dispose() {
-    _disposeRecognizers();
+    _disposePreparedLines();
+    _highlightFadeController.dispose();
     super.dispose();
   }
 
@@ -94,22 +130,23 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
             .withValues(alpha: 0.32);
     final highlightBg =
         isDark ? const Color(0x4DF59E0B) : const Color(0x55FDE68A);
+    final highlightBorderColor =
+        isDark ? const Color(0x80F59E0B) : const Color(0x80C9A23A);
     final pageEdgeDividerColor =
         isDark ? const Color(0xFF2B3440) : const Color(0xFFA79B87);
     final pageEdgeShadowColor = isDark
         ? Colors.black.withValues(alpha: 0.25)
         : const Color(0x1E4A3B24);
 
-    final arabicPage = QuranTextFormatter.toArabicDigits(
-      widget.pageData.pageNumber.toString(),
-    );
+    final pageNumber = widget.pageData.pageNumber;
+    final arabicPage = QuranTextFormatter.toArabicDigits(pageNumber.toString());
     final arabicJuz = QuranTextFormatter.toArabicDigits(
       widget.pageData.juz.toString(),
     );
     final arabicHizb = QuranTextFormatter.toArabicDigits(
-      QuranPageMapping.getHizbForPage(widget.pageData.pageNumber).toString(),
+      QuranPageMapping.getHizbForPage(pageNumber).toString(),
     );
-    final pageNumber = widget.pageData.pageNumber;
+
     final isOpeningPage = pageNumber == 1 || pageNumber == 2;
     final lines = isOpeningPage
         ? widget.pageData.lines
@@ -117,6 +154,15 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
             .toList(growable: false)
         : widget.pageData.lines;
     final isCompactPage = lines.length < 13;
+
+    final textScaler = MediaQuery.textScalerOf(context);
+    final preparedLines = _ensureLinesPrepared(
+      lines: lines,
+      inkColor: inkColor,
+      divineNameColor: divineNameColor,
+      isDark: isDark,
+      textScaler: textScaler,
+    );
 
     Widget buildCompactVerses() {
       return Center(
@@ -126,16 +172,29 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final line in lines)
+              for (final prepared in preparedLines)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: _buildLineWidget(
-                    line: line,
-                    inkColor: inkColor,
-                    divineNameColor: divineNameColor,
-                    highlightBg: highlightBg,
-                    isDark: isDark,
-                  ),
+                  child: prepared.isHeader
+                      ? SizedBox(
+                          width: 340,
+                          child: MushafSurahHeaderBanner(
+                            surahName: prepared.cleanHeaderName,
+                            fontSize: 18,
+                            accentColor: widget.accentColor,
+                            isDark: isDark,
+                          ),
+                        )
+                      : _QcfCompactLineCanvas(
+                          line: prepared,
+                          isDark: isDark,
+                          highlightedVerseKey: widget.highlightedVerseKey,
+                          highlightColor: highlightBg,
+                          highlightBorderColor: highlightBorderColor,
+                          highlightFade: _highlightFadeController,
+                          onTapVerse: widget.onTapVerse,
+                          onLongPressVerse: widget.onLongPressVerse,
+                        ),
                 ),
             ],
           ),
@@ -156,91 +215,81 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
           Padding(
             padding: EdgeInsets.only(top: widget.topInset),
             child: Container(
-        decoration: BoxDecoration(
-          color: paperColor,
-          border: Border(
-            left: BorderSide(color: pageEdgeDividerColor, width: 1.2),
-            right: BorderSide(
-              color: pageEdgeDividerColor.withValues(alpha: 0.35),
-              width: 0.5,
-            ),
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'سورة ${widget.pageData.surahName}',
-                  style: GoogleFonts.cairo(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: metaColor,
+              decoration: BoxDecoration(
+                color: paperColor,
+                border: Border(
+                  left: BorderSide(color: pageEdgeDividerColor, width: 1.2),
+                  right: BorderSide(
+                    color: pageEdgeDividerColor.withValues(alpha: 0.35),
+                    width: 0.5,
                   ),
-                ),
-                Text(
-                  'الجزء $arabicJuz | الحزب $arabicHizb',
-                  style: GoogleFonts.cairo(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: metaColor,
-                  ),
-                ),
-              ],
-            ),
-            Divider(height: 8, thickness: 0.8, color: dividerColor),
-            Expanded(
-              child: isOpeningPage
-                  ? QcfOpeningPageFrame(
-                      pageNumber: pageNumber,
-                      surahName: surahMeta!.name,
-                      ayahCount: surahMeta.ayahCount,
-                      isDark: isDark,
-                      versesChild: buildCompactVerses(),
-                    )
-                  : (isCompactPage
-                      ? buildCompactVerses()
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            for (final line in lines)
-                              Expanded(
-                                child: Center(
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.center,
-                                    child: _buildLineWidget(
-                                      line: line,
-                                      inkColor: inkColor,
-                                      divineNameColor: divineNameColor,
-                                      highlightBg: highlightBg,
-                                      isDark: isDark,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        )),
-            ),
-            Divider(height: 8, thickness: 0.8, color: dividerColor),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: Text(
-                arabicPage,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.cairo(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: metaColor,
                 ),
               ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'سورة ${widget.pageData.surahName}',
+                        style: GoogleFonts.cairo(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: metaColor,
+                        ),
+                      ),
+                      Text(
+                        'الجزء $arabicJuz | الحزب $arabicHizb',
+                        style: GoogleFonts.cairo(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: metaColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Divider(height: 8, thickness: 0.8, color: dividerColor),
+                  Expanded(
+                    child: isOpeningPage
+                        ? QcfOpeningPageFrame(
+                            pageNumber: pageNumber,
+                            surahName: surahMeta!.name,
+                            ayahCount: surahMeta.ayahCount,
+                            isDark: isDark,
+                            versesChild: buildCompactVerses(),
+                          )
+                        : (isCompactPage
+                            ? buildCompactVerses()
+                            : _QcfStandardVersesSheet(
+                                lines: preparedLines,
+                                isDark: isDark,
+                                accentColor: widget.accentColor,
+                                highlightedVerseKey: widget.highlightedVerseKey,
+                                highlightColor: highlightBg,
+                                highlightBorderColor: highlightBorderColor,
+                                highlightFade: _highlightFadeController,
+                                onTapVerse: widget.onTapVerse,
+                                onLongPressVerse: widget.onLongPressVerse,
+                              )),
+                  ),
+                  Divider(height: 8, thickness: 0.8, color: dividerColor),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Text(
+                      arabicPage,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.cairo(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: metaColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
           ),
           if (widget.isPageBookmarked)
             Positioned(
@@ -275,344 +324,236 @@ class _QcfMushafPageWidgetState extends State<QcfMushafPageWidget> {
       ),
     );
   }
+}
 
-  Widget _buildLineWidget({
+class _AyahRef {
+  final int surah;
+  final int ayah;
+
+  const _AyahRef(this.surah, this.ayah);
+}
+
+class _PreparedQcfLine {
+  static final RegExp _surahPrefixRegex = RegExp(r'^سورة\s+');
+
+  final QcfMushafLine rawLine;
+  final TextPainter? textPainter;
+  final List<Rect> ornamentRects;
+  final Rect? sajdahRect;
+  final Map<String, ({int start, int end})> verseCharRanges;
+  final List<_AyahRef?> _charToAyah;
+  final Map<String, RRect?> _highlightCache = <String, RRect?>{};
+
+  _PreparedQcfLine._({
+    required this.rawLine,
+    required this.textPainter,
+    required this.ornamentRects,
+    required this.sajdahRect,
+    required this.verseCharRanges,
+    required List<_AyahRef?> charToAyah,
+  }) : _charToAyah = charToAyah;
+
+  bool get isHeader => rawLine.type == 'surah-header';
+
+  String get cleanHeaderName {
+    final cleaned = rawLine.text.replaceFirst(_surahPrefixRegex, '').trim();
+    return cleaned.isNotEmpty ? cleaned : rawLine.text;
+  }
+
+  double get naturalWidth => textPainter?.width ?? 0.0;
+  double get naturalHeight => textPainter?.height ?? 0.0;
+
+  static _PreparedQcfLine prepare({
     required QcfMushafLine line,
+    required String fontFamily,
     required Color inkColor,
     required Color divineNameColor,
-    required Color highlightBg,
     required bool isDark,
+    required TextScaler textScaler,
   }) {
     if (line.type == 'surah-header') {
-      final cleanName = line.text.replaceFirst(RegExp(r'^سورة\s+'), '').trim();
-      return SizedBox(
-        width: 340,
-        child: MushafSurahHeaderBanner(
-          surahName: cleanName.isNotEmpty ? cleanName : line.text,
-          fontSize: 18,
-          accentColor: widget.accentColor,
-          isDark: isDark,
-        ),
+      return _PreparedQcfLine._(
+        rawLine: line,
+        textPainter: null,
+        ornamentRects: const <Rect>[],
+        sajdahRect: null,
+        verseCharRanges: const <String, ({int start, int end})>{},
+        charToAyah: const <_AyahRef?>[],
       );
     }
 
     if (line.type == 'basmala') {
       final bsmlGlyph = line.qpcV1;
-      if (bsmlGlyph != null && bsmlGlyph.isNotEmpty) {
-        return Text(
-          bsmlGlyph,
-          textDirection: TextDirection.ltr,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          style: TextStyle(
-            fontFamily: QcfMushafRepository.basmalaFontFamily,
-            fontSize: 24,
-            height: 1.25,
-            color: inkColor,
-          ),
-        );
-      }
-      return Text(
-        'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
-        textDirection: TextDirection.rtl,
+      final hasQcfBasmala = bsmlGlyph != null && bsmlGlyph.isNotEmpty;
+      final tp = TextPainter(
+        text: TextSpan(
+          text: hasQcfBasmala
+              ? bsmlGlyph
+              : 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+          style: hasQcfBasmala
+              ? TextStyle(
+                  fontFamily: QcfMushafRepository.basmalaFontFamily,
+                  fontSize: 24,
+                  height: 1.25,
+                  color: inkColor,
+                )
+              : GoogleFonts.amiri(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: inkColor,
+                ),
+        ),
+        textDirection: hasQcfBasmala ? TextDirection.ltr : TextDirection.rtl,
         textAlign: TextAlign.center,
         maxLines: 1,
-        style: GoogleFonts.amiri(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: inkColor,
-        ),
+        textScaler: textScaler,
+      )..layout();
+
+      return _PreparedQcfLine._(
+        rawLine: line,
+        textPainter: tp,
+        ornamentRects: const <Rect>[],
+        sajdahRect: null,
+        verseCharRanges: const <String, ({int start, int end})>{},
+        charToAyah: const <_AyahRef?>[],
       );
     }
 
-    return _buildLineRichText(
-      line: line,
-      inkColor: inkColor,
-      divineNameColor: divineNameColor,
-      highlightBg: highlightBg,
-    );
-  }
-
-  GestureRecognizer? _createRecognizer(int surahNumber, int ayahNumber) {
-    final hasTap = widget.onTapVerse != null;
-    final hasLongPress = widget.onLongPressVerse != null;
-    void handleTap() => widget.onTapVerse?.call(surahNumber, ayahNumber);
-    void handleLongPress() =>
-        widget.onLongPressVerse?.call(surahNumber, ayahNumber);
-    GestureRecognizer? recognizer;
-    if (hasTap && hasLongPress) {
-      recognizer = _QcfTapAndLongPressRecognizer(
-        onTap: handleTap,
-        onLongPress: handleLongPress,
-      );
-    } else if (hasTap) {
-      recognizer = TapGestureRecognizer()..onTap = handleTap;
-    } else if (hasLongPress) {
-      recognizer = LongPressGestureRecognizer()..onLongPress = handleLongPress;
-    }
-    if (recognizer != null) {
-      _recognizers.add(recognizer);
-    }
-    return recognizer;
-  }
-
-  Widget _buildLineRichText({
-    required QcfMushafLine line,
-    required Color inkColor,
-    required Color divineNameColor,
-    required Color highlightBg,
-  }) {
     final baseStyle = TextStyle(
-      fontFamily: widget.pageData.fontFamily,
+      fontFamily: fontFamily,
       fontSize: 28,
       height: 1.35,
       color: inkColor,
     );
+    final divineStyle = baseStyle.copyWith(color: divineNameColor);
+    final ornamentColor =
+        isDark ? const Color(0xFFE5C271) : const Color(0xFF6B4A20);
+    final ornamentStyle = baseStyle.copyWith(
+      color: ornamentColor,
+      fontWeight: FontWeight.w600,
+    );
 
     final spans = <InlineSpan>[];
+    final ornamentRanges = <({int start, int end})>[];
+    final verseCharRanges = <String, ({int start, int end})>{};
+    final charToAyah = <_AyahRef?>[];
     int charOffset = 0;
-    int? sajdahStart;
-    int? sajdahEnd;
-    int? highlightStart;
-    int? highlightEnd;
+    ({int start, int end})? sajdahRange;
+
+    void appendChars(String text, TextStyle style, _AyahRef? ref) {
+      spans.add(TextSpan(text: text, style: style));
+      for (int c = 0; c < text.length; c++) {
+        charToAyah.add(ref);
+      }
+      charOffset += text.length;
+    }
 
     for (int i = 0; i < line.words.length; i++) {
       final word = line.words[i];
-      final isSelected = widget.highlightedVerseKey == word.verseKey;
-      final recognizer = _recognizerForAyah(word.surahNumber, word.ayahNumber);
-      final isDivine = word.isDivineReference;
-      final wordTextColor = isDivine ? divineNameColor : inkColor;
-      if (isSelected) {
-        highlightStart ??= charOffset;
-      }
+      final wordStart = charOffset;
+      final ref = _AyahRef(word.surahNumber, word.ayahNumber);
+      final wordStyle = word.isDivineReference ? divineStyle : baseStyle;
 
       if (word.isPureAyahOrnament) {
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: _QcfOrnamentBadge(
-              glyph: word.glyph,
-              baseStyle: baseStyle,
-              isDark: widget.isDark,
-              onTap: widget.onTapVerse == null
-                  ? null
-                  : () => widget.onTapVerse!(word.surahNumber, word.ayahNumber),
-              onLongPress: widget.onLongPressVerse == null
-                  ? null
-                  : () =>
-                      widget.onLongPressVerse!(word.surahNumber, word.ayahNumber),
-            ),
-          ),
-        );
-        charOffset += 1;
+        final ornStart = charOffset;
+        appendChars(word.glyph, ornamentStyle, ref);
+        ornamentRanges.add((start: ornStart, end: charOffset));
       } else if (word.hasTrailingAyahOrnament) {
         final splitIdx = word.glyph.lastIndexOf(' ');
         final wordPart = word.glyph.substring(0, splitIdx);
         final ornamentPart = word.glyph.substring(splitIdx + 1);
         if (word.isSajdahWord) {
-          sajdahStart = charOffset;
-          sajdahEnd = charOffset + wordPart.length;
+          sajdahRange = (start: charOffset, end: charOffset + wordPart.length);
         }
-        spans.add(
-          TextSpan(
-            text: wordPart,
-            recognizer: recognizer,
-            style: baseStyle.copyWith(color: wordTextColor),
-          ),
-        );
-        charOffset += wordPart.length;
-        spans.add(
-          TextSpan(
-            text: ' ',
-            recognizer: recognizer,
-            style: baseStyle,
-          ),
-        );
-        charOffset += 1;
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: _QcfOrnamentBadge(
-              glyph: ornamentPart,
-              baseStyle: baseStyle,
-              isDark: widget.isDark,
-              onTap: widget.onTapVerse == null
-                  ? null
-                  : () => widget.onTapVerse!(word.surahNumber, word.ayahNumber),
-              onLongPress: widget.onLongPressVerse == null
-                  ? null
-                  : () =>
-                      widget.onLongPressVerse!(word.surahNumber, word.ayahNumber),
-            ),
-          ),
-        );
-        charOffset += 1;
+        appendChars(wordPart, wordStyle, ref);
+        appendChars(' ', baseStyle, ref);
+        final ornStart = charOffset;
+        appendChars(ornamentPart, ornamentStyle, ref);
+        ornamentRanges.add((start: ornStart, end: charOffset));
       } else {
         if (word.isSajdahWord) {
-          sajdahStart = charOffset;
-          sajdahEnd = charOffset + word.glyph.length;
+          sajdahRange =
+              (start: charOffset, end: charOffset + word.glyph.length);
         }
-        spans.add(
-          TextSpan(
-            text: word.glyph,
-            recognizer: recognizer,
-            style: baseStyle.copyWith(color: wordTextColor),
-          ),
-        );
-        charOffset += word.glyph.length;
+        appendChars(word.glyph, wordStyle, ref);
       }
-      if (isSelected) {
-        highlightEnd = charOffset;
-      }
+
+      final verseKey = word.verseKey;
+      final existingRange = verseCharRanges[verseKey];
+      verseCharRanges[verseKey] = (
+        start: existingRange != null ? existingRange.start : wordStart,
+        end: charOffset,
+      );
 
       if (i < line.words.length - 1) {
-        spans.add(
-          TextSpan(
-            text: ' ',
-            style: baseStyle,
-          ),
-        );
-        charOffset += 1;
+        final nextWord = line.words[i + 1];
+        final sameAyah = nextWord.surahNumber == word.surahNumber &&
+            nextWord.ayahNumber == word.ayahNumber;
+        appendChars(' ', baseStyle, sameAyah ? ref : null);
       }
     }
 
-    final Widget lineText = sajdahStart != null && sajdahEnd != null
-        ? _SajdahLineOverlay(
-            sajdahStart: sajdahStart,
-            sajdahEnd: sajdahEnd,
-            isDark: widget.isDark,
-            spans: spans,
-          )
-        : Text.rich(
-            TextSpan(children: spans),
-            textDirection: TextDirection.rtl,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-          );
+    final tp = TextPainter(
+      text: TextSpan(children: spans),
+      textDirection: TextDirection.rtl,
+      textAlign: TextAlign.center,
+      maxLines: 1,
+      textScaler: textScaler,
+    )..layout();
 
-    if (highlightStart == null || highlightEnd == null) {
-      return lineText;
+    final lineHeight = tp.height;
+    final ornamentRects = <Rect>[];
+    for (final range in ornamentRanges) {
+      final boxes = tp.getBoxesForSelection(
+        TextSelection(baseOffset: range.start, extentOffset: range.end),
+      );
+      if (boxes.isEmpty) continue;
+      var left = boxes.first.left;
+      var right = boxes.first.right;
+      for (final b in boxes.skip(1)) {
+        if (b.left < left) left = b.left;
+        if (b.right > right) right = b.right;
+      }
+      ornamentRects.add(Rect.fromLTRB(left, 0.0, right, lineHeight));
     }
 
-    return _QcfAyahHighlightLine(
-      highlightStart: highlightStart,
-      highlightEnd: highlightEnd,
-      highlightColor: highlightBg,
-      borderColor: widget.isDark
-          ? const Color(0x80F59E0B)
-          : const Color(0x80C9A23A),
-      child: lineText,
-    );
-  }
-}
-
-class _QcfAyahHighlightLine extends StatefulWidget {
-  final int? highlightStart;
-  final int? highlightEnd;
-  final Color highlightColor;
-  final Color borderColor;
-  final Widget child;
-
-  const _QcfAyahHighlightLine({
-    required this.highlightStart,
-    required this.highlightEnd,
-    required this.highlightColor,
-    required this.borderColor,
-    required this.child,
-  });
-
-  @override
-  State<_QcfAyahHighlightLine> createState() => _QcfAyahHighlightLineState();
-}
-
-class _QcfAyahHighlightLineState extends State<_QcfAyahHighlightLine>
-    with SingleTickerProviderStateMixin {
-  final GlobalKey _childKey = GlobalKey();
-  late final AnimationController _fadeController;
-
-  @override
-  void initState() {
-    super.initState();
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 220),
-      value: 1.0,
-    );
-  }
-
-  @override
-  void didUpdateWidget(covariant _QcfAyahHighlightLine oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.highlightStart != null &&
-        (oldWidget.highlightStart != widget.highlightStart ||
-            oldWidget.highlightEnd != widget.highlightEnd)) {
-      _fadeController.forward(from: 0.0);
+    Rect? sajdahRect;
+    if (sajdahRange != null) {
+      final boxes = tp.getBoxesForSelection(
+        TextSelection(
+          baseOffset: sajdahRange.start,
+          extentOffset: sajdahRange.end,
+        ),
+      );
+      if (boxes.isNotEmpty) {
+        sajdahRect = boxes.first.toRect();
+      }
     }
-  }
 
-  @override
-  void dispose() {
-    _fadeController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final start = widget.highlightStart;
-    final end = widget.highlightEnd;
-    return CustomPaint(
-      painter: start == null || end == null
-          ? null
-          : _QcfAyahHighlightPainter(
-              childKey: _childKey,
-              start: start,
-              end: end,
-              color: widget.highlightColor,
-              borderColor: widget.borderColor,
-              fade: _fadeController,
-            ),
-      child: KeyedSubtree(key: _childKey, child: widget.child),
+    return _PreparedQcfLine._(
+      rawLine: line,
+      textPainter: tp,
+      ornamentRects: ornamentRects,
+      sajdahRect: sajdahRect,
+      verseCharRanges: verseCharRanges,
+      charToAyah: charToAyah,
     );
   }
-}
 
-class _QcfAyahHighlightPainter extends CustomPainter {
-  final GlobalKey childKey;
-  final int start;
-  final int end;
-  final Color color;
-  final Color borderColor;
-  final Animation<double> fade;
-
-  _QcfAyahHighlightPainter({
-    required this.childKey,
-    required this.start,
-    required this.end,
-    required this.color,
-    required this.borderColor,
-    required this.fade,
-  }) : super(repaint: fade);
-
-  RenderParagraph? _findParagraph(RenderObject? node) {
-    if (node == null) return null;
-    if (node is RenderParagraph) return node;
-    RenderParagraph? found;
-    node.visitChildren((child) {
-      found ??= _findParagraph(child);
-    });
-    return found;
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paragraph =
-        _findParagraph(childKey.currentContext?.findRenderObject());
-    if (paragraph == null || !paragraph.hasSize) return;
-    final boxes = paragraph.getBoxesForSelection(
-      TextSelection(baseOffset: start, extentOffset: end),
+  RRect? highlightRRectFor(String? verseKey) {
+    if (verseKey == null || textPainter == null) return null;
+    final range = verseCharRanges[verseKey];
+    if (range == null) return null;
+    if (_highlightCache.containsKey(verseKey)) {
+      return _highlightCache[verseKey];
+    }
+    final boxes = textPainter!.getBoxesForSelection(
+      TextSelection(baseOffset: range.start, extentOffset: range.end),
     );
-    if (boxes.isEmpty) return;
-
+    if (boxes.isEmpty) {
+      _highlightCache[verseKey] = null;
+      return null;
+    }
     var bounds = boxes.first.toRect();
     for (final box in boxes.skip(1)) {
       bounds = bounds.expandToInclude(box.toRect());
@@ -626,116 +567,98 @@ class _QcfAyahHighlightPainter extends CustomPainter {
       ),
       const Radius.circular(9),
     );
-    final opacity = fade.value.clamp(0.0, 1.0);
+    _highlightCache[verseKey] = rrect;
+    return rrect;
+  }
+
+  _AyahRef? hitTestUnscaled(Offset localPos) {
+    final tp = textPainter;
+    if (tp == null || _charToAyah.isEmpty) return null;
+    if (localPos.dx < -6 ||
+        localPos.dx > tp.width + 6 ||
+        localPos.dy < -4 ||
+        localPos.dy > tp.height + 4) {
+      return null;
+    }
+    final clamped = Offset(
+      localPos.dx.clamp(0.0, tp.width),
+      localPos.dy.clamp(0.0, tp.height),
+    );
+    final rawOffset = tp.getPositionForOffset(clamped).offset;
+    final idx = rawOffset.clamp(0, _charToAyah.length - 1);
+    return _charToAyah[idx] ??
+        (idx > 0 ? _charToAyah[idx - 1] : null) ??
+        (idx + 1 < _charToAyah.length ? _charToAyah[idx + 1] : null);
+  }
+
+  void paintStaticContent(Canvas canvas, bool isDark) {
+    final tp = textPainter;
+    if (tp == null) return;
+
+    for (final rect in ornamentRects) {
+      if (isDark) {
+        final diameter = math.min(rect.width - 6.0, rect.height - 12.0);
+        final radius = diameter / 2.0;
+        if (radius <= 0.5) continue;
+        final paint = Paint()
+          ..shader = ui.Gradient.radial(
+            rect.center,
+            radius,
+            const <Color>[
+              Color(0xFF1A222C),
+              Color(0xFF1A222C),
+              Color(0x33C9A354),
+              Colors.transparent,
+            ],
+            const <double>[0.0, 0.46, 0.76, 1.0],
+          );
+        canvas.drawCircle(rect.center, radius, paint);
+      } else {
+        final diameter = math.min(rect.width - 8.0, rect.height - 18.0);
+        final radius = diameter / 2.0;
+        if (radius <= 0.5) continue;
+        canvas.drawCircle(
+          rect.center,
+          radius,
+          Paint()..color = const Color(0xFFFFFFFF),
+        );
+      }
+    }
+
+    tp.paint(canvas, Offset.zero);
+
+    final sajdah = sajdahRect;
+    if (sajdah != null) {
+      _paintSajdahIndicator(canvas, sajdah, isDark);
+    }
+  }
+
+  static void paintHighlightRRect(
+    Canvas canvas,
+    RRect rrect,
+    Color fillColor,
+    Color borderColor,
+    double opacity,
+  ) {
+    final clampedOpacity = opacity.clamp(0.0, 1.0);
     canvas.drawRRect(
       rrect,
-      Paint()..color = color.withValues(alpha: color.a * opacity),
+      Paint()..color = fillColor.withValues(alpha: fillColor.a * clampedOpacity),
     );
     canvas.drawRRect(
       rrect,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.9
-        ..color = borderColor.withValues(alpha: borderColor.a * opacity),
+        ..color = borderColor.withValues(alpha: borderColor.a * clampedOpacity),
     );
   }
 
-  @override
-  bool shouldRepaint(covariant _QcfAyahHighlightPainter oldDelegate) {
-    return oldDelegate.start != start ||
-        oldDelegate.end != end ||
-        oldDelegate.color != color ||
-        oldDelegate.borderColor != borderColor ||
-        oldDelegate.childKey != childKey ||
-        oldDelegate.fade != fade;
-  }
-}
-
-class _SajdahLineOverlay extends StatefulWidget {
-  final int sajdahStart;
-  final int sajdahEnd;
-  final bool isDark;
-  final List<InlineSpan> spans;
-
-  const _SajdahLineOverlay({
-    required this.sajdahStart,
-    required this.sajdahEnd,
-    required this.isDark,
-    required this.spans,
-  });
-
-  @override
-  State<_SajdahLineOverlay> createState() => _SajdahLineOverlayState();
-}
-
-class _SajdahLineOverlayState extends State<_SajdahLineOverlay> {
-  final GlobalKey _textKey = GlobalKey();
-  Rect? _wordRect;
-
-  @override
-  void initState() {
-    super.initState();
-    _scheduleMeasure();
-  }
-
-  @override
-  void didUpdateWidget(covariant _SajdahLineOverlay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _scheduleMeasure();
-  }
-
-  void _scheduleMeasure() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final renderObj = _textKey.currentContext?.findRenderObject();
-      if (renderObj is! RenderParagraph) return;
-      final boxes = renderObj.getBoxesForSelection(
-        TextSelection(
-          baseOffset: widget.sajdahStart,
-          extentOffset: widget.sajdahEnd,
-        ),
-      );
-      if (boxes.isEmpty) return;
-      final rect = boxes.first.toRect();
-      if (_wordRect != rect) {
-        setState(() {
-          _wordRect = rect;
-        });
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      foregroundPainter: _wordRect == null
-          ? null
-          : _SajdahIndicatorPainter(
-              wordRect: _wordRect!,
-              isDark: widget.isDark,
-            ),
-      child: Text.rich(
-        TextSpan(children: widget.spans),
-        key: _textKey,
-        textDirection: TextDirection.rtl,
-        textAlign: TextAlign.center,
-        maxLines: 1,
-      ),
-    );
-  }
-}
-
-class _SajdahIndicatorPainter extends CustomPainter {
-  final Rect wordRect;
-  final bool isDark;
-
-  const _SajdahIndicatorPainter({
-    required this.wordRect,
-    required this.isDark,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
+  static void _paintSajdahIndicator(
+    Canvas canvas,
+    Rect wordRect,
+    bool isDark,
+  ) {
     final left = wordRect.left;
     final right = wordRect.right;
     final width = wordRect.width;
@@ -748,7 +671,6 @@ class _SajdahIndicatorPainter extends CustomPainter {
     if (lineEndX <= lineStartX) return;
 
     final lineY = wordRect.bottom - 2.0;
-
     final lineColor =
         isDark ? const Color(0xFFD4A84B) : const Color(0xFF6B4A20);
     final ornamentColor =
@@ -792,183 +714,354 @@ class _SajdahIndicatorPainter extends CustomPainter {
     );
   }
 
-  @override
-  bool shouldRepaint(covariant _SajdahIndicatorPainter oldDelegate) {
-    return oldDelegate.wordRect != wordRect || oldDelegate.isDark != isDark;
+  void dispose() {
+    textPainter?.dispose();
   }
 }
 
-class _QcfOrnamentBadge extends StatelessWidget {
-  final String glyph;
-  final TextStyle baseStyle;
+class _QcfStandardVersesSheet extends StatelessWidget {
+  final List<_PreparedQcfLine> lines;
   final bool isDark;
-  final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
+  final Color accentColor;
+  final String? highlightedVerseKey;
+  final Color highlightColor;
+  final Color highlightBorderColor;
+  final Animation<double> highlightFade;
+  final void Function(int surahNumber, int ayahNumber)? onTapVerse;
+  final void Function(int surahNumber, int ayahNumber)? onLongPressVerse;
 
-  const _QcfOrnamentBadge({
-    required this.glyph,
-    required this.baseStyle,
+  const _QcfStandardVersesSheet({
+    required this.lines,
     required this.isDark,
-    required this.onTap,
-    this.onLongPress,
+    required this.accentColor,
+    required this.highlightedVerseKey,
+    required this.highlightColor,
+    required this.highlightBorderColor,
+    required this.highlightFade,
+    required this.onTapVerse,
+    required this.onLongPressVerse,
   });
+
+  _AyahRef? _hitTest(Offset localPos, Size areaSize) {
+    if (lines.isEmpty || areaSize.width <= 0 || areaSize.height <= 0) {
+      return null;
+    }
+    final slotH = areaSize.height / lines.length;
+    if (slotH <= 0) return null;
+    final slotIndex = (localPos.dy / slotH).floor();
+    if (slotIndex < 0 || slotIndex >= lines.length) return null;
+
+    final line = lines[slotIndex];
+    if (line.isHeader || line.naturalWidth <= 0 || line.naturalHeight <= 0) {
+      return null;
+    }
+
+    final scale = math.min(
+      1.0,
+      math.min(areaSize.width / line.naturalWidth, slotH / line.naturalHeight),
+    );
+    final dx = (areaSize.width - line.naturalWidth * scale) / 2.0;
+    final dy =
+        (slotIndex * slotH) + (slotH - line.naturalHeight * scale) / 2.0;
+
+    return line.hitTestUnscaled(
+      Offset((localPos.dx - dx) / scale, (localPos.dy - dy) / scale),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (isDark) {
-      const ornamentColor = Color(0xFFE5C271);
-      const radialColors = <Color>[
-        Color(0xFF1A222C),
-        Color(0xFF1A222C),
-        Color(0x33C9A354),
-        Colors.transparent,
-      ];
+    final activeKey = highlightedVerseKey;
+    final hasHighlight = activeKey != null &&
+        lines.any((l) => l.verseCharRanges.containsKey(activeKey));
 
-      return GestureDetector(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        behavior: HitTestBehavior.opaque,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            const Positioned.fill(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 3, vertical: 6),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: radialColors,
-                      stops: [0.0, 0.46, 0.76, 1.0],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final areaSize = Size(constraints.maxWidth, constraints.maxHeight);
+        final slotH =
+            lines.isEmpty ? 0.0 : constraints.maxHeight / lines.length;
+
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTapUp: onTapVerse == null
+              ? null
+              : (details) {
+                  final hit = _hitTest(details.localPosition, areaSize);
+                  if (hit != null) {
+                    onTapVerse!(hit.surah, hit.ayah);
+                  }
+                },
+          onLongPressStart: onLongPressVerse == null
+              ? null
+              : (details) {
+                  final hit = _hitTest(details.localPosition, areaSize);
+                  if (hit != null) {
+                    onLongPressVerse!(hit.surah, hit.ayah);
+                  }
+                },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (hasHighlight)
+                IgnorePointer(
+                  child: CustomPaint(
+                    size: areaSize,
+                    painter: _QcfPageHighlightPainter(
+                      lines: lines,
+                      verseKey: activeKey,
+                      fillColor: highlightColor,
+                      borderColor: highlightBorderColor,
+                      fade: highlightFade,
+                    ),
+                  ),
+                ),
+              IgnorePointer(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    size: areaSize,
+                    isComplex: true,
+                    willChange: false,
+                    painter: _QcfStaticLinesPainter(
+                      lines: lines,
+                      isDark: isDark,
                     ),
                   ),
                 ),
               ),
-            ),
-            Text(
-              glyph,
-              textDirection: TextDirection.rtl,
-              style: baseStyle.copyWith(
-                color: ornamentColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+              for (int i = 0; i < lines.length; i++)
+                if (lines[i].isHeader)
+                  Positioned(
+                    top: i * slotH,
+                    left: 0,
+                    right: 0,
+                    height: slotH,
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.center,
+                        child: SizedBox(
+                          width: 340,
+                          child: MushafSurahHeaderBanner(
+                            surahName: lines[i].cleanHeaderName,
+                            fontSize: 18,
+                            accentColor: accentColor,
+                            isDark: isDark,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _QcfStaticLinesPainter extends CustomPainter {
+  final List<_PreparedQcfLine> lines;
+  final bool isDark;
+
+  const _QcfStaticLinesPainter({
+    required this.lines,
+    required this.isDark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (lines.isEmpty || size.width <= 0 || size.height <= 0) return;
+    final slotH = size.height / lines.length;
+    if (slotH <= 0) return;
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      if (line.isHeader || line.naturalWidth <= 0 || line.naturalHeight <= 0) {
+        continue;
+      }
+      final scale = math.min(
+        1.0,
+        math.min(size.width / line.naturalWidth, slotH / line.naturalHeight),
       );
+      final dx = (size.width - line.naturalWidth * scale) / 2.0;
+      final dy = (i * slotH) + (slotH - line.naturalHeight * scale) / 2.0;
+
+      canvas.save();
+      canvas.translate(dx, dy);
+      if (scale != 1.0) {
+        canvas.scale(scale);
+      }
+      line.paintStaticContent(canvas, isDark);
+      canvas.restore();
     }
+  }
+
+  @override
+  bool shouldRepaint(covariant _QcfStaticLinesPainter oldDelegate) {
+    return !identical(oldDelegate.lines, lines) ||
+        oldDelegate.isDark != isDark;
+  }
+}
+
+class _QcfPageHighlightPainter extends CustomPainter {
+  final List<_PreparedQcfLine> lines;
+  final String verseKey;
+  final Color fillColor;
+  final Color borderColor;
+  final Animation<double> fade;
+
+  _QcfPageHighlightPainter({
+    required this.lines,
+    required this.verseKey,
+    required this.fillColor,
+    required this.borderColor,
+    required this.fade,
+  }) : super(repaint: fade);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (lines.isEmpty || size.width <= 0 || size.height <= 0) return;
+    final slotH = size.height / lines.length;
+    if (slotH <= 0) return;
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final rrect = line.highlightRRectFor(verseKey);
+      if (rrect == null || line.naturalWidth <= 0 || line.naturalHeight <= 0) {
+        continue;
+      }
+      final scale = math.min(
+        1.0,
+        math.min(size.width / line.naturalWidth, slotH / line.naturalHeight),
+      );
+      final dx = (size.width - line.naturalWidth * scale) / 2.0;
+      final dy = (i * slotH) + (slotH - line.naturalHeight * scale) / 2.0;
+
+      canvas.save();
+      canvas.translate(dx, dy);
+      if (scale != 1.0) {
+        canvas.scale(scale);
+      }
+      _PreparedQcfLine.paintHighlightRRect(
+        canvas,
+        rrect,
+        fillColor,
+        borderColor,
+        fade.value,
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _QcfPageHighlightPainter oldDelegate) {
+    return !identical(oldDelegate.lines, lines) ||
+        oldDelegate.verseKey != verseKey ||
+        oldDelegate.fillColor != fillColor ||
+        oldDelegate.borderColor != borderColor ||
+        oldDelegate.fade != fade;
+  }
+}
+
+class _QcfCompactLineCanvas extends StatelessWidget {
+  final _PreparedQcfLine line;
+  final bool isDark;
+  final String? highlightedVerseKey;
+  final Color highlightColor;
+  final Color highlightBorderColor;
+  final Animation<double> highlightFade;
+  final void Function(int surahNumber, int ayahNumber)? onTapVerse;
+  final void Function(int surahNumber, int ayahNumber)? onLongPressVerse;
+
+  const _QcfCompactLineCanvas({
+    required this.line,
+    required this.isDark,
+    required this.highlightedVerseKey,
+    required this.highlightColor,
+    required this.highlightBorderColor,
+    required this.highlightFade,
+    required this.onTapVerse,
+    required this.onLongPressVerse,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasLineHighlight = highlightedVerseKey != null &&
+        line.verseCharRanges.containsKey(highlightedVerseKey);
 
     return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      behavior: HitTestBehavior.opaque,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          const Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 9),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFFFFFFFF),
-                ),
-              ),
-            ),
-          ),
-          Text(
-            glyph,
-            textDirection: TextDirection.rtl,
-            style: baseStyle.copyWith(
-              color: const Color(0xFF6B4A20),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+      behavior: HitTestBehavior.translucent,
+      onTapUp: onTapVerse == null
+          ? null
+          : (details) {
+              final hit = line.hitTestUnscaled(details.localPosition);
+              if (hit != null) {
+                onTapVerse!(hit.surah, hit.ayah);
+              }
+            },
+      onLongPressStart: onLongPressVerse == null
+          ? null
+          : (details) {
+              final hit = line.hitTestUnscaled(details.localPosition);
+              if (hit != null) {
+                onLongPressVerse!(hit.surah, hit.ayah);
+              }
+            },
+      child: CustomPaint(
+        size: Size(line.naturalWidth, line.naturalHeight),
+        painter: _QcfCompactLinePainter(
+          line: line,
+          isDark: isDark,
+          verseKey: hasLineHighlight ? highlightedVerseKey : null,
+          fillColor: highlightColor,
+          borderColor: highlightBorderColor,
+          fade: hasLineHighlight ? highlightFade : null,
+        ),
       ),
     );
   }
 }
 
-class _QcfTapAndLongPressRecognizer extends OneSequenceGestureRecognizer {
-  final VoidCallback onTap;
-  final VoidCallback onLongPress;
+class _QcfCompactLinePainter extends CustomPainter {
+  final _PreparedQcfLine line;
+  final bool isDark;
+  final String? verseKey;
+  final Color fillColor;
+  final Color borderColor;
+  final Animation<double>? fade;
 
-  _QcfTapAndLongPressRecognizer({
-    required this.onTap,
-    required this.onLongPress,
-  });
-
-  Timer? _longPressTimer;
-  Offset? _initialPosition;
-  bool _longPressTriggered = false;
-  int? _activePointer;
-
-  @override
-  void addAllowedPointer(PointerDownEvent event) {
-    if (_activePointer != null) return;
-    startTrackingPointer(event.pointer, event.transform);
-    _activePointer = event.pointer;
-    _initialPosition = event.position;
-    _longPressTriggered = false;
-    _longPressTimer?.cancel();
-    _longPressTimer = Timer(kLongPressTimeout, () {
-      _longPressTriggered = true;
-      resolve(GestureDisposition.accepted);
-      onLongPress();
-    });
-  }
+  _QcfCompactLinePainter({
+    required this.line,
+    required this.isDark,
+    required this.verseKey,
+    required this.fillColor,
+    required this.borderColor,
+    required this.fade,
+  }) : super(repaint: fade);
 
   @override
-  void handleEvent(PointerEvent event) {
-    if (event.pointer != _activePointer) return;
-    if (event is PointerMoveEvent) {
-      final start = _initialPosition;
-      if (start != null && (event.position - start).distance > kTouchSlop) {
-        _reset();
-        resolve(GestureDisposition.rejected);
-      }
-    } else if (event is PointerUpEvent) {
-      final wasLongPress = _longPressTriggered;
-      _reset();
-      if (!wasLongPress) {
-        resolve(GestureDisposition.accepted);
-        onTap();
-      }
-    } else if (event is PointerCancelEvent) {
-      _reset();
-      resolve(GestureDisposition.rejected);
+  void paint(Canvas canvas, Size size) {
+    final rrect = line.highlightRRectFor(verseKey);
+    if (rrect != null) {
+      _PreparedQcfLine.paintHighlightRRect(
+        canvas,
+        rrect,
+        fillColor,
+        borderColor,
+        fade?.value ?? 1.0,
+      );
     }
-  }
-
-  void _reset() {
-    _longPressTimer?.cancel();
-    _longPressTimer = null;
-    if (_activePointer != null) {
-      stopTrackingPointer(_activePointer!);
-      _activePointer = null;
-    }
-    _initialPosition = null;
+    line.paintStaticContent(canvas, isDark);
   }
 
   @override
-  String get debugDescription => 'qcf tap and long press';
-
-  @override
-  void rejectGesture(int pointer) {
-    if (pointer == _activePointer) {
-      _reset();
-    }
-    super.rejectGesture(pointer);
-  }
-
-  @override
-  void didStopTrackingLastPointer(int pointer) {}
-
-  @override
-  void dispose() {
-    _reset();
-    super.dispose();
+  bool shouldRepaint(covariant _QcfCompactLinePainter oldDelegate) {
+    return !identical(oldDelegate.line, line) ||
+        oldDelegate.isDark != isDark ||
+        oldDelegate.verseKey != verseKey ||
+        oldDelegate.fillColor != fillColor ||
+        oldDelegate.borderColor != borderColor ||
+        oldDelegate.fade != fade;
   }
 }
 

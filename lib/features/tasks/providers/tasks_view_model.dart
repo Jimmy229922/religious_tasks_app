@@ -234,7 +234,7 @@ class TasksViewModel extends ChangeNotifier {
     },
     {
       "text":
-          "وَمَنْ يَتَّقِ اللَّهَ يَجْعَلْ لَهُ مَخْرَجًا ۝ وَيَرْزُقْهُ مِنْ حَيْثُ لَا يَحْتَسِبُ",
+          "وَمَنْ يَتَّقِ اللَّهَ يَجْعَلْ لَهُ مَخْرَجًا ۝٢ وَيَرْزُقْهُ مِنْ حَيْثُ لَا يَحْتَسِبُ ۝٣",
       "source": "سورة الطلاق • ٢-٣"
     },
     {"text": "وَرَحْمَتِي وَسِعَتْ كُلَّ شَيْءٍ", "source": "سورة الأعراف • ١٥٦"},
@@ -252,11 +252,11 @@ class TasksViewModel extends ChangeNotifier {
     },
     {"text": "وَكَفَىٰ بِاللَّهِ وَكِيلًا", "source": "سورة النساء • ٨١"},
     {
-      "text": "رَبِّ اشْرَحْ لِي صَدْرِي ۝ وَيَسِّرْ لِي أَمْرِي",
+      "text": "رَبِّ اشْرَحْ لِي صَدْرِي ۝٢٥ وَيَسِّرْ لِي أَمْرِي ۝٢٦",
       "source": "سورة طه • ٢٥-٢٦"
     },
     {
-      "text": "فَإِنَّ مَعَ الْعُسْرِ يُسْرًا ۝ إِنَّ مَعَ الْعُسْرِ يُسْرًا",
+      "text": "فَإِنَّ مَعَ الْعُسْرِ يُسْرًا ۝٥ إِنَّ مَعَ الْعُسْرِ يُسْرًا ۝٦",
       "source": "سورة الشرح • ٥-٦"
     },
     {
@@ -538,7 +538,7 @@ class TasksViewModel extends ChangeNotifier {
 
     _loadQuranProgress();
     refreshRandomContent();
-    await refreshLocation();
+    await refreshLocation(userInitiated: false);
     await _updateOtherWidgets();
     notifyListeners();
   }
@@ -556,8 +556,8 @@ class TasksViewModel extends ChangeNotifier {
     return null;
   }
 
-  Future<void> refreshLocation() async {
-    await _initLocationAndPrayers(requestPermission: true);
+  Future<void> refreshLocation({bool userInitiated = false}) async {
+    await _initLocationAndPrayers(requestPermission: userInitiated);
   }
 
   bool _isDisposed = false;
@@ -589,10 +589,11 @@ class TasksViewModel extends ChangeNotifier {
         }
         _updatePrayerWidget();
 
-        // Auto-refresh location every hour
-        if (_lastLocationRefresh == null ||
-            newNow.difference(_lastLocationRefresh!).inHours >= 1) {
-          refreshLocation();
+        // Auto-refresh location every hour only if coordinates are not yet loaded
+        if (_prayerTimes == null &&
+            (_lastLocationRefresh == null ||
+                newNow.difference(_lastLocationRefresh!).inHours >= 1)) {
+          refreshLocation(userInitiated: false);
         }
 
         notifyListeners();
@@ -757,7 +758,8 @@ class TasksViewModel extends ChangeNotifier {
 
     final parsedLat = savedLat == null ? null : double.tryParse(savedLat);
     final parsedLng = savedLng == null ? null : double.tryParse(savedLng);
-    if (parsedLat != null && parsedLng != null) {
+    final hasCachedCoords = parsedLat != null && parsedLng != null;
+    if (hasCachedCoords) {
       final pos = Position(
         latitude: parsedLat,
         longitude: parsedLng,
@@ -770,85 +772,200 @@ class TasksViewModel extends ChangeNotifier {
         altitudeAccuracy: 0,
         headingAccuracy: 0,
       );
-      await _calculatePrayers(pos);
+      await _calculatePrayers(
+        pos,
+        useSavedMetadataOnly: true,
+        scheduleNotifications: false,
+      );
       debugPrint("📍 Using cached location for instant startup");
     }
 
     _isLoadingLocation = true;
     notifyListeners();
 
-    // 2. Fetch fresh location in background
     final result = await _locationService.getCurrentPosition(
       requestPermission: requestPermission,
+      openSettingsIfDisabled: requestPermission,
     );
     _lastLocationRefresh = DateTime.now();
 
     if (result.position != null) {
-      // Save for next time
-      await _storage.setString(_latKey, result.position!.latitude.toString());
-      await _storage.setString(_lngKey, result.position!.longitude.toString());
+      final newPos = result.position!;
+      final movedSignificantly = !hasCachedCoords ||
+          (newPos.latitude - parsedLat).abs() > 0.01 ||
+          (newPos.longitude - parsedLng).abs() > 0.01;
+      await _storage.setString(_latKey, newPos.latitude.toString());
+      await _storage.setString(_lngKey, newPos.longitude.toString());
 
-      await _calculatePrayers(result.position!);
-    } else if (parsedLat == null || parsedLng == null) {
-      // Only show error if we don't even have a cached version
+      final hasSavedMethod =
+          (_storage.getString('calculation_method') ?? '').isNotEmpty;
+      final hasSavedLocName = (_storage.getString(_locNameKey) ?? '').isNotEmpty;
+
+      await _calculatePrayers(
+        newPos,
+        useSavedMetadataOnly:
+            !movedSignificantly && hasSavedMethod && hasSavedLocName,
+        scheduleNotifications: true,
+      );
+    } else if (!hasCachedCoords) {
       _locationName = result.message.isNotEmpty
           ? result.message
           : AppStrings.unknownLocation;
+    } else {
+      if (_prayerTimes != null && _tomorrowPrayerTimes != null) {
+        final afterTomorrow = DateTime.now().add(const Duration(days: 2));
+        final params = await _resolveSavedPrayerParams();
+        final afterTomorrowTimes = PrayerTimes(
+          Coordinates(parsedLat, parsedLng),
+          DateComponents(
+            afterTomorrow.year,
+            afterTomorrow.month,
+            afterTomorrow.day,
+          ),
+          params,
+        );
+        unawaited(
+          _notificationService.schedulePrayerNotifications(
+            today: _prayerTimes!,
+            tomorrow: _tomorrowPrayerTimes!,
+            afterTomorrow: afterTomorrowTimes,
+          ),
+        );
+      }
     }
 
     _isLoadingLocation = false;
     notifyListeners();
   }
 
-  Future<void> _calculatePrayers(Position position) async {
-    final coordinates = Coordinates(position.latitude, position.longitude);
-
-    // 1. Detect Country and get calculation method
-    CalculationMethod method = CalculationMethod.egyptian; // Default
-    try {
-      final countryCode = await _locationService.getCountryCode(position);
-      if (countryCode != null) {
-        switch (countryCode.toUpperCase()) {
-          case 'SA':
-            method = CalculationMethod.umm_al_qura;
-            break;
-          case 'AE':
-          case 'QA':
-          case 'KW':
-          case 'OM':
-          case 'BH':
-            method = CalculationMethod.dubai; // Common for Gulf
-            break;
-          case 'MA':
-          case 'DZ':
-          case 'TN':
-            method = CalculationMethod
-                .muslim_world_league; // Fallback from committee
-            break;
-          case 'JO':
-          case 'LB':
-          case 'SY':
-          case 'PS':
-            method = CalculationMethod.karachi; // Often used in Levant
-            break;
-          case 'EG':
-            method = CalculationMethod.egyptian;
-            break;
-          default:
-            method = CalculationMethod.muslim_world_league; // Global default
-        }
+  Future<void> applyPrayerOffsetsAndReschedule() async {
+    final coords = _prayerTimes?.coordinates;
+    Position? position;
+    if (coords != null) {
+      position = Position(
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        timestamp: DateTime.now(),
+        accuracy: 0,
+        altitude: 0,
+        heading: 0,
+        speed: 0,
+        speedAccuracy: 0,
+        altitudeAccuracy: 0,
+        headingAccuracy: 0,
+      );
+    } else {
+      final savedLat = double.tryParse(_storage.getString(_latKey) ?? '');
+      final savedLng = double.tryParse(_storage.getString(_lngKey) ?? '');
+      if (savedLat != null && savedLng != null) {
+        position = Position(
+          latitude: savedLat,
+          longitude: savedLng,
+          timestamp: DateTime.now(),
+          accuracy: 0,
+          altitude: 0,
+          heading: 0,
+          speed: 0,
+          speedAccuracy: 0,
+          altitudeAccuracy: 0,
+          headingAccuracy: 0,
+        );
       }
-    } catch (e) {
-      debugPrint("Failed to detect country method: $e");
     }
 
-    // Save calculation method for background use
-    await _storage.setString('calculation_method', method.name);
+    if (position == null) {
+      await refreshLocation();
+      return;
+    }
+
+    await _calculatePrayers(
+      position,
+      useSavedMetadataOnly: true,
+      scheduleNotifications: true,
+    );
+  }
+
+  Future<CalculationParameters> _resolveSavedPrayerParams() async {
+    final savedMethod = _storage.getString('calculation_method');
+    CalculationMethod method = CalculationMethod.egyptian;
+    if (savedMethod != null && savedMethod.isNotEmpty) {
+      method = CalculationMethod.values.firstWhere(
+        (e) => e.name == savedMethod,
+        orElse: () => CalculationMethod.egyptian,
+      );
+    }
+    final params = method.getParameters();
+    params.madhab = Madhab.shafi;
+    try {
+      final notificationPrefs = await NotificationPreferencesService().load();
+      params.adjustments.fajr = notificationPrefs.getPrayerOffset('fajr');
+      params.adjustments.sunrise = notificationPrefs.getPrayerOffset('sunrise');
+      params.adjustments.dhuhr = notificationPrefs.getPrayerOffset('dhuhr');
+      params.adjustments.asr = notificationPrefs.getPrayerOffset('asr');
+      params.adjustments.maghrib = notificationPrefs.getPrayerOffset('maghrib');
+      params.adjustments.isha = notificationPrefs.getPrayerOffset('isha');
+    } catch (_) {}
+    return params;
+  }
+
+  Future<void> _calculatePrayers(
+    Position position, {
+    bool useSavedMetadataOnly = false,
+    bool scheduleNotifications = true,
+  }) async {
+    final coordinates = Coordinates(position.latitude, position.longitude);
+
+    CalculationMethod method = CalculationMethod.egyptian;
+    final savedMethodName = _storage.getString('calculation_method');
+    if (savedMethodName != null && savedMethodName.isNotEmpty) {
+      method = CalculationMethod.values.firstWhere(
+        (e) => e.name == savedMethodName,
+        orElse: () => CalculationMethod.egyptian,
+      );
+    }
+
+    if (!useSavedMetadataOnly) {
+      try {
+        final countryCode = await _locationService.getCountryCode(position);
+        if (countryCode != null) {
+          switch (countryCode.toUpperCase()) {
+            case 'SA':
+              method = CalculationMethod.umm_al_qura;
+              break;
+            case 'AE':
+            case 'QA':
+            case 'KW':
+            case 'OM':
+            case 'BH':
+              method = CalculationMethod.dubai;
+              break;
+            case 'MA':
+            case 'DZ':
+            case 'TN':
+              method = CalculationMethod.muslim_world_league;
+              break;
+            case 'JO':
+            case 'LB':
+            case 'SY':
+            case 'PS':
+              method = CalculationMethod.karachi;
+              break;
+            case 'EG':
+              method = CalculationMethod.egyptian;
+              break;
+            default:
+              method = CalculationMethod.muslim_world_league;
+          }
+        }
+      } catch (e) {
+        debugPrint("Failed to detect country method: $e");
+      }
+      await _storage.setString('calculation_method', method.name);
+    }
 
     final params = method.getParameters();
     params.madhab = Madhab.shafi;
 
-    // Load manual offsets from settings
     try {
       final notificationPrefs = await NotificationPreferencesService().load();
       params.adjustments.fajr = notificationPrefs.getPrayerOffset('fajr');
@@ -869,34 +986,42 @@ class TasksViewModel extends ChangeNotifier {
 
     final afterTomorrow = DateTime.now().add(const Duration(days: 2));
     final afterTomorrowTimes = PrayerTimes(
-        coordinates,
-        DateComponents(
-            afterTomorrow.year, afterTomorrow.month, afterTomorrow.day),
-        params);
+      coordinates,
+      DateComponents(
+        afterTomorrow.year,
+        afterTomorrow.month,
+        afterTomorrow.day,
+      ),
+      params,
+    );
 
     _prayerTimes = todayTimes;
     _tomorrowPrayerTimes = tomorrowTimes;
     _isLoadingLocation = false;
-
-    try {
-      final resolvedName = await _locationService
-          .getLocationName(position)
-          .timeout(const Duration(seconds: 5));
-      if (resolvedName.trim().isNotEmpty) {
-        _locationName = resolvedName;
-        await _storage.setString(_locNameKey, resolvedName);
-      }
-    } catch (_) {}
-
     _updateTaskDescriptions();
     notifyListeners();
 
-    // Schedule notifications for 3 days
-    await _notificationService.schedulePrayerNotifications(
+    if (!useSavedMetadataOnly) {
+      try {
+        final resolvedName = await _locationService
+            .getLocationName(position)
+            .timeout(const Duration(seconds: 5));
+        if (resolvedName.trim().isNotEmpty && _locationName != resolvedName) {
+          _locationName = resolvedName;
+          await _storage.setString(_locNameKey, resolvedName);
+          notifyListeners();
+        }
+      } catch (_) {}
+    }
+
+    if (scheduleNotifications) {
+      await _notificationService.schedulePrayerNotifications(
         today: todayTimes,
         tomorrow: tomorrowTimes,
-        afterTomorrow: afterTomorrowTimes);
-    await _updatePrayerWidget();
+        afterTomorrow: afterTomorrowTimes,
+      );
+      await _updatePrayerWidget();
+    }
   }
 
   Future<void> _updatePrayerWidget() async {

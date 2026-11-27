@@ -59,9 +59,8 @@ class NotificationPreferencesService {
         .values[soundTypeIndex.clamp(0, AdhanSoundType.values.length - 1)];
 
     for (final prayerKey in prayerKeys) {
-      adhanEnabled[prayerKey] = prayerKey == 'sunrise'
-          ? false
-          : (prefs.getBool('adhan_enabled_$prayerKey') ?? true);
+      adhanEnabled[prayerKey] = prefs.getBool('adhan_enabled_$prayerKey') ??
+          (prayerKey != 'sunrise');
       prayerOffsets[prayerKey] =
           (prefs.getInt('prayer_offset_$prayerKey') ?? 0).clamp(-60, 60);
     }

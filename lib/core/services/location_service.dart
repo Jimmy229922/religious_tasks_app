@@ -14,15 +14,22 @@ class LocationService {
   /// relying on stale 24-hour cached positions.
   Future<({Position? position, String message})> getHighAccuracyPosition({
     bool requestPermission = false,
+    bool openSettingsIfDisabled = false,
   }) async {
     try {
       var serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (requestPermission) {
+        if (openSettingsIfDisabled) {
           await Geolocator.openLocationSettings();
           serviceEnabled = await Geolocator.isLocationServiceEnabled();
         }
         if (!serviceEnabled) {
+          try {
+            final cached = await Geolocator.getLastKnownPosition();
+            if (cached != null) {
+              return (position: cached, message: '');
+            }
+          } catch (_) {}
           return (position: null, message: AppStrings.enableLocationService);
         }
       }
@@ -64,15 +71,22 @@ class LocationService {
   /// Also returns a status message.
   Future<({Position? position, String message})> getCurrentPosition({
     bool requestPermission = false,
+    bool openSettingsIfDisabled = false,
   }) async {
     try {
       var serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (requestPermission) {
+        if (openSettingsIfDisabled) {
           await Geolocator.openLocationSettings();
           serviceEnabled = await Geolocator.isLocationServiceEnabled();
         }
         if (!serviceEnabled) {
+          try {
+            final cached = await Geolocator.getLastKnownPosition();
+            if (cached != null) {
+              return (position: cached, message: '');
+            }
+          } catch (_) {}
           return (position: null, message: AppStrings.enableLocationService);
         }
       }

@@ -13,6 +13,7 @@ import 'package:religious_tasks_app/features/athkar/screens/qiyam_layl_screen.da
 import 'package:religious_tasks_app/features/athkar/screens/surah_kahf_screen.dart';
 import 'package:religious_tasks_app/features/athkar/screens/various_athkar_screen.dart';
 import 'package:religious_tasks_app/features/happiness_jar/screens/happiness_jar_screen.dart';
+import 'package:religious_tasks_app/features/mosques/screens/nearby_mosques_screen.dart';
 import 'package:religious_tasks_app/features/names_of_allah/screens/names_of_allah_screen.dart';
 import 'package:religious_tasks_app/features/qibla/screens/qibla_screen.dart';
 import 'package:religious_tasks_app/features/quran/screens/khatmah_screen.dart';
@@ -245,6 +246,22 @@ class _AllFeaturesScreenState extends State<AllFeaturesScreen> {
         name: "الأدوات والخدمات التفاعلية 🧭",
         icon: Icons.explore_rounded,
         features: [
+          AppFeatureItem(
+            title: "المساجد القريبة",
+            description: "خريطة تفاعلية لاكتشاف أقرب المساجد من موقعك والاتجاهات إليها",
+            icon: Icons.mosque_rounded,
+            color: const Color(0xFF047857),
+            badge: "جديد",
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => NearbyMosquesScreen(
+                  initialLatitude: coords.latitude,
+                  initialLongitude: coords.longitude,
+                ),
+              ),
+            ),
+          ),
           AppFeatureItem(
             title: "برطمان السعادة",
             description: "رسائل يومية مبهجة وبشائر تفاؤل تفرح قلبك كل يوم",

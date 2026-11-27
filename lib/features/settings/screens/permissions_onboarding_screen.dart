@@ -48,16 +48,19 @@ class _PermissionsOnboardingScreenState
   }
 
   Future<void> _checkPermissions() async {
-    final notif = await Permission.notification.status;
-    final loc = await Permission.locationWhenInUse.status;
-    final battery = await Permission.ignoreBatteryOptimizations.status;
-    final overlay = await Permission.systemAlertWindow.status;
-
-    PermissionStatus alarm =
-        PermissionStatus.granted; // Default for older android
-    if (Platform.isAndroid) {
-      alarm = await Permission.scheduleExactAlarm.status;
-    }
+    final statuses = await Future.wait<PermissionStatus>([
+      Permission.notification.status,
+      Permission.locationWhenInUse.status,
+      Permission.ignoreBatteryOptimizations.status,
+      Permission.systemAlertWindow.status,
+      if (Platform.isAndroid) Permission.scheduleExactAlarm.status,
+    ]);
+    final notif = statuses[0];
+    final loc = statuses[1];
+    final battery = statuses[2];
+    final overlay = statuses[3];
+    final alarm =
+        Platform.isAndroid ? statuses[4] : PermissionStatus.granted;
 
     if (mounted) {
       setState(() {

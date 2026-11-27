@@ -63,7 +63,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkOnboardingAndNavigate() async {
     try {
       final prefsFuture = SharedPreferences.getInstance();
-      final minDelayFuture = Future.delayed(const Duration(milliseconds: 1200));
+      final minDelayFuture = Future.delayed(const Duration(milliseconds: 350));
 
       await Future.wait([
         prefsFuture,
@@ -108,21 +108,12 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<bool> _areAllPermissionsGranted() async {
-    final notificationGranted = await Permission.notification.isGranted;
-    final locationGranted = await Permission.locationWhenInUse.isGranted;
-
-    if (!notificationGranted || !locationGranted) {
-      return false;
-    }
-
-    if (Platform.isAndroid) {
-      final exactAlarmGranted = await Permission.scheduleExactAlarm.isGranted;
-      if (!exactAlarmGranted) {
-        return false;
-      }
-    }
-
-    return true;
+    final checks = await Future.wait<bool>([
+      Permission.notification.isGranted,
+      Permission.locationWhenInUse.isGranted,
+      if (Platform.isAndroid) Permission.scheduleExactAlarm.isGranted,
+    ]);
+    return checks.every((granted) => granted);
   }
 
   void _navigateToHome() {
@@ -137,7 +128,7 @@ class _SplashScreenState extends State<SplashScreen> {
             child: child,
           );
         },
-        transitionDuration: const Duration(milliseconds: 400),
+        transitionDuration: const Duration(milliseconds: 260),
       ),
     );
   }
@@ -218,6 +209,8 @@ class _SplashScreenState extends State<SplashScreen> {
                                       ? 'assets/icon/app_icon_dark.jpg'
                                       : 'assets/icon/app_icon_light.jpg',
                                   fit: BoxFit.cover,
+                                  cacheWidth: 456,
+                                  cacheHeight: 456,
                                 ),
                               ),
                             ),

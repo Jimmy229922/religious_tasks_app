@@ -72,6 +72,13 @@ class _IslamicCardGeneratorDialogState
   TextStyle _getFontStyle(CardThemePreset preset) {
     final color = _getTextColor(preset);
     switch (_selectedFont) {
+      case 'amiri':
+        return GoogleFonts.amiri(
+          fontSize: 21,
+          fontWeight: FontWeight.bold,
+          color: color,
+          height: 1.65,
+        );
       case 'cairo':
         return GoogleFonts.cairo(
           fontSize: 18,
@@ -142,10 +149,12 @@ class _IslamicCardGeneratorDialogState
   }
 
   void _shareCardAsText() {
+    final isQuran = widget.title.contains('آية');
+    final body = isQuran ? '﴿ ${widget.content} ﴾' : '« ${widget.content} »';
     final String textToShare =
         '✨ ${widget.title} ✨\n\n'
-        '"${widget.content}"\n'
-        '${widget.subtitle != null ? "📌 ${widget.subtitle}\n" : ""}\n'
+        '$body\n'
+        '${widget.subtitle != null ? "— ${widget.subtitle}\n" : ""}\n'
         '${_showWatermark ? "🌿 تطبيق رفيق المسلم - الدال على الخير كفاعله\nhttps://whatsapp.com/channel/0029VaNwp3YDzgT3fxWoGx2z" : ""}';
 
     SharePlus.instance.share(
@@ -337,13 +346,17 @@ class _IslamicCardGeneratorDialogState
                   Expanded(
                     child: _buildFontChip('aref', "رقعة إسلامي"),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
-                    child: _buildFontChip('cairo', "خط كايرو"),
+                    child: _buildFontChip('amiri', "نسخ قرآني"),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
-                    child: _buildFontChip('mono', "حديث أنيق"),
+                    child: _buildFontChip('cairo', "كايرو"),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _buildFontChip('mono', "حديث"),
                   ),
                 ],
               ),

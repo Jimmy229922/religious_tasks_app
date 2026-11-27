@@ -85,7 +85,7 @@ class _QiblaScreenState extends State<QiblaScreen> with WidgetsBindingObserver {
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _refreshGpsLocation();
+      if (mounted) _refreshGpsLocation(userInitiated: false);
     });
   }
 
@@ -121,13 +121,14 @@ class _QiblaScreenState extends State<QiblaScreen> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  Future<void> _refreshGpsLocation() async {
+  Future<void> _refreshGpsLocation({bool userInitiated = true}) async {
     if (_isRefreshingLocation) return;
     setState(() => _isRefreshingLocation = true);
 
     try {
       final res = await LocationService().getHighAccuracyPosition(
-        requestPermission: true,
+        requestPermission: userInitiated,
+        openSettingsIfDisabled: userInitiated,
       );
       if (!mounted) return;
       if (res.position != null) {
@@ -144,7 +145,6 @@ class _QiblaScreenState extends State<QiblaScreen> with WidgetsBindingObserver {
       } else {
         try {
           final vm = Provider.of<TasksViewModel>(context, listen: false);
-          await vm.refreshLocation();
           if (!mounted) return;
           setState(() {
             if (vm.prayerTimes?.coordinates != null) {
